@@ -130,7 +130,7 @@ package body I18N.Runtime.Tests.Execution is
    is
       pragma Unreferenced (T);
       Runtime : I18N.Runtime.Runtime;
-      Failures : array (1 .. 4) of Boolean := (others => False)
+      Failures : array (1 .. 4) of Boolean := [others => False]
         with Atomic_Components;
 
       task type Worker is

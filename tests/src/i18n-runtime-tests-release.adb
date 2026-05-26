@@ -3,7 +3,6 @@ with AUnit.Assertions;
 
 with I18N.Arguments;
 with I18N.Result; use I18N.Result;
-with I18N.Runtime;
 with I18N.Diagnostics;
 
 package body I18N.Runtime.Tests.Release is
@@ -103,7 +102,6 @@ package body I18N.Runtime.Tests.Release is
 
    overriding
    procedure Register_Tests (T : in out Test_Case) is
-      use AUnit.Test_Cases;
    begin
       AUnit.Test_Cases.Registration.Register_Routine
         (T,
