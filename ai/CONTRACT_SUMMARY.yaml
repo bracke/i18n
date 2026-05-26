@@ -1,0 +1,100 @@
+project: ICU Messages Ada
+version_contract: v1.0 release candidate with GNAT/GPRbuild library/test verification
+language: Ada 2022
+purpose: Deterministic ICU-style catalog message rendering.
+production_path: text catalog -> deterministic catalog validation -> locale/key lookup -> public catalog render -> structured public result
+public_packages:
+  - I18N
+  - I18N.Runtime
+  - I18N.Result
+  - I18N.Diagnostics
+  - I18N.Arguments
+  - I18N.Locales
+canonical_catalog_format:
+  type: line-oriented text
+  default_locale: "default_locale = en"
+  message_entry: "locale.key = ICU message"
+  comments: "# at start of trimmed line"
+  binary_catalogs: not shipped in v1.0
+icu_subset:
+  variables: true
+  plural_branches: [one, other]
+  select_branches: [male, female, other]
+  arbitrary_select_branch_names: false
+  selectordinal_branches: [one, two, few, other]
+locale_fallback:
+  order: language-region -> language -> default locale
+  missing_key_after_fallback: Missing_Key
+render_contract:
+  normal_failures_raise: false
+  result_type: I18N.Result.Render_Result
+  public_render_materializes_result_text: true
+  public_render_zero_allocation_api: false
+arguments_contract:
+  type_is_limited: true
+  whole_object_assignment: forbidden
+  explicit_copy_operation: I18N.Arguments.Copy
+  statuses:
+    - Success
+    - Missing_Key
+    - Missing_Argument
+    - Invalid_Argument
+    - Formatting_Error
+    - Execution_Error
+    - Buffer_Overflow
+    - Internal_Error
+diagnostics:
+  optional: true
+  no_op_by_default: true
+  changes_render_output: false
+  callback_exceptions_escape: false
+threading:
+  initialized_runtime: read-only/shared rendering intended
+allocation:
+  initialization_may_allocate: true
+  fixed_buffer_render_path_used_for_zero_allocation_checks: private child I18N.Runtime.Compatibility.Render_Into
+forbidden_public_leaks:
+  - parser cursor state
+  - AST node access
+  - compiler internals
+  - IR opcode arrays
+  - cache map internals
+  - buffer internals
+ada_private_internal_packages:
+  - I18N.AST
+  - I18N.Buffer
+  - I18N.Cache
+  - I18N.Compiled
+  - I18N.Compiler
+  - I18N.Errors
+  - I18N.Fast_Render
+  - I18N.Observability
+  - I18N.Parser
+  - I18N.Render
+  - I18N.Runtime.Compatibility
+  - I18N.Validation
+api_visibility_enforced: Ada private child packages hide internal/regression units from ordinary downstream application imports.
+release_verification_required:
+  verified_status: core library build, test project build, and AUnit runner passed for this handoff
+  verified_commands:
+    - gprbuild -P i18n.gpr
+    - gprbuild -P tests/i18n_tests.gpr
+    - ./tests/bin/tests
+  storage_warning_status: I18N.Errors.Result no longer uses discriminated string storage that triggered the GNAT Storage_Error warning
+  remaining_publication_checks:
+    - gprbuild -P examples/examples.gpr
+    - alr build
+    - gnatdoc -P i18n.gpr
+package_metadata:
+  alire_manifest: alire.toml
+  crate_name: i18n
+  version: 1.0.0
+  primary_project_file: i18n.gpr
+  license: MIT
+  toolchain_dependency: gnat >=12
+  packaging_doc: docs/PACKAGING.md
+
+argument_contract:
+  arguments_are_limited_noncopyable: true
+  mutation_api: Set/Clear
+  render_usage: pass existing Arguments object to I18N.Runtime.Render

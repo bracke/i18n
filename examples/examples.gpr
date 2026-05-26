@@ -1,0 +1,39 @@
+with "../i18n.gpr";
+
+project Examples is
+   for Source_Dirs use (".");
+   for Main use
+     ("hello_world.adb",
+      "basic_render.adb",
+      "plural_render.adb",
+      "select_render.adb",
+      "selectordinal_render.adb",
+      "nested_message_render.adb",
+      "locale_fallback.adb",
+      "fallback_chain.adb",
+      "missing_key.adb",
+      "missing_argument.adb",
+      "invalid_argument.adb",
+      "invalid_catalog.adb",
+      "invalid_catalog_fields.adb",
+      "diagnostics_non_interference.adb",
+      "equals_in_value.adb",
+      "reuse_runtime.adb",
+      "status_handling.adb",
+      "diagnostics_inspection.adb",
+      "default_locale_key.adb",
+      "empty_message.adb",
+      "argument_lifecycle.adb",
+      "public_api_example.adb",
+      "public_api_sealed.adb");
+   for Object_Dir use "../obj/examples";
+   for Exec_Dir use ".";
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022",
+         "-gnata",
+         "-gnatwa",
+         "-gnatwe");
+   end Compiler;
+end Examples;

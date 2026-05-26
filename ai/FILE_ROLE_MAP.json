@@ -1,0 +1,481 @@
+{
+  "project": "ICU Messages Ada",
+  "version_contract": "v1.0",
+  "files": [
+    {
+      "file": "AGENTS.md",
+      "role": "repository_metadata"
+    },
+    {
+      "file": "LICENSE",
+      "role": "license"
+    },
+    {
+      "file": "MANIFEST.txt",
+      "role": "repository_metadata"
+    },
+    {
+      "file": "PROJECT_INDEX.md",
+      "role": "repository_metadata"
+    },
+    {
+      "file": "README.md",
+      "role": "repository_metadata"
+    },
+    {
+      "file": ".gitignore",
+      "role": "repository_metadata"
+    },
+    {
+      "file": "ai/API_MANIFEST.json",
+      "role": "machine_readable_metadata"
+    },
+    {
+      "file": "ai/CONTRACT_SUMMARY.yaml",
+      "role": "machine_readable_metadata"
+    },
+    {
+      "file": "ai/EXAMPLE_CATALOG.json",
+      "role": "machine_readable_metadata"
+    },
+    {
+      "file": "ai/FILE_ROLE_MAP.json",
+      "role": "ai_metadata"
+    },
+    {
+      "file": "alire.toml",
+      "role": "package_metadata"
+    },
+    {
+      "file": "docs/AI_CONSUMPTION_GUIDE.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/API.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/ARCHITECTURE.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/CATALOG_FORMAT.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/COMPATIBILITY.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/ERROR_MODEL.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/EXAMPLES.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/ICU_SUBSET.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/PACKAGING.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/PUBLIC_API_BOUNDARY.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/PUBLIC_IMPORT_RULES.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/QUICKSTART.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/RELEASE_CHECKLIST.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/RELEASE_VERIFICATION.md",
+      "role": "Release verification gate and GNAT/GPRbuild acceptance criteria",
+      "public_contract": false
+    },
+    {
+      "file": "docs/TEST_MATRIX.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/THREADING.md",
+      "role": "documentation"
+    },
+    {
+      "file": "docs/VALIDATION.md",
+      "role": "documentation"
+    },
+    {
+      "file": "examples/EXAMPLES_INDEX.md",
+      "role": "example_documentation"
+    },
+    {
+      "file": "examples/EXPECTED_OUTPUT.md",
+      "role": "example_documentation"
+    },
+    {
+      "file": "examples/README.md",
+      "role": "example_documentation"
+    },
+    {
+      "file": "examples/argument_lifecycle.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/basic_render.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/catalogs/invalid_duplicate.catalog",
+      "role": "example_catalog"
+    },
+    {
+      "file": "examples/catalogs/invalid_empty_default_locale.catalog",
+      "role": "example_invalid_catalog"
+    },
+    {
+      "file": "examples/catalogs/invalid_empty_key.catalog",
+      "role": "example_invalid_catalog"
+    },
+    {
+      "file": "examples/catalogs/invalid_empty_locale.catalog",
+      "role": "example_invalid_catalog"
+    },
+    {
+      "file": "examples/catalogs/invalid_syntax.catalog",
+      "role": "example_catalog"
+    },
+    {
+      "file": "examples/catalogs/messages.catalog",
+      "role": "example_catalog"
+    },
+    {
+      "file": "examples/default_locale_key.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/diagnostics_inspection.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/diagnostics_non_interference.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/empty_message.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/equals_in_value.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/example_support.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/example_support.ads",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/example_trace_callbacks.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/example_trace_callbacks.ads",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/examples.gpr",
+      "role": "example_project"
+    },
+    {
+      "file": "examples/fallback_chain.adb",
+      "role": "example_program"
+    },
+    {
+      "file": "examples/hello_world.adb",
+      "role": "example_program"
+    },
+    {
+      "file": "examples/invalid_argument.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/invalid_catalog.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/invalid_catalog_fields.adb",
+      "role": "example_program"
+    },
+    {
+      "file": "examples/locale_fallback.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/missing_argument.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/missing_key.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/nested_message_render.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/plural_render.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/public_api_example.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/public_api_sealed.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/reuse_runtime.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/select_render.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/selectordinal_render.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "examples/status_handling.adb",
+      "role": "example_source"
+    },
+    {
+      "file": "i18n.gpr",
+      "role": "repository_metadata"
+    },
+    {
+      "file": "src/i18n-arguments.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-arguments.ads",
+      "role": "stable_public_api"
+    },
+    {
+      "file": "src/i18n-ast.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-ast.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-buffer.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-buffer.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-cache.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-cache.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-compiled.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-compiled.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-compiler.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-compiler.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-diagnostics.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-diagnostics.ads",
+      "role": "stable_public_api"
+    },
+    {
+      "file": "src/i18n-errors.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-errors.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-fast_render.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-fast_render.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-locales.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-locales.ads",
+      "role": "stable_public_api"
+    },
+    {
+      "file": "src/i18n-observability.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-observability.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-parser.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-parser.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-render.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-render.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-result.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-result.ads",
+      "role": "stable_public_api"
+    },
+    {
+      "file": "src/i18n-runtime-compatibility.adb",
+      "role": "compatibility_or_internal_bridge"
+    },
+    {
+      "file": "src/i18n-runtime-compatibility.ads",
+      "role": "compatibility_or_internal_bridge"
+    },
+    {
+      "file": "src/i18n-runtime.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-runtime.ads",
+      "role": "stable_public_api"
+    },
+    {
+      "file": "src/i18n-validation.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-validation.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n.ads",
+      "role": "stable_public_api"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-release.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-release.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-strict.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-strict.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-compilation.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-compilation.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-execution.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-execution.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-diagnostics.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-diagnostics.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-corpus.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-corpus.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-suite.adb",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests-suite.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n-runtime-tests.ads",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/i18n_tests.gpr",
+      "role": "release_or_regression_tests"
+    },
+    {
+      "file": "tests/test_runner.adb",
+      "role": "release_or_regression_tests"
+    }
+  ],
+  "ada_visibility_note": "src/i18n-parser.ads, validation/compiler/cache/compiled/buffer/errors/observability/render/fast_render, runtime-compatibility specs are Ada private child packages.",
+  "release_verification_note": "GNAT/GPRbuild has verified the library build, test project build, and AUnit test runner for this handoff. Example, Alire, and GNATdoc checks remain publication checks unless separately verified."
+}

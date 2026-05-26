@@ -1,0 +1,253 @@
+{
+  "project": "ICU Messages Ada",
+  "version_contract": "v1.0 release candidate with GNAT/GPRbuild library/test verification",
+  "language": "Ada 2022",
+  "public_packages": [
+    {
+      "name": "I18N",
+      "file": "src/i18n.ads",
+      "role": "Stable root namespace for ICU Messages Ada public packages",
+      "stable": true,
+      "primary_subprograms": [],
+      "stable_surface": []
+    },
+    {
+      "name": "I18N.Runtime",
+      "file": "src/i18n-runtime.ads",
+      "role": "Catalog-backed runtime initialization and public rendering facade",
+      "stable": true,
+      "primary_subprograms": [
+        {
+          "name": "Initialize",
+          "kind": "procedure",
+          "signature_summary": "Initialize (Runtime : in out I18N.Runtime.Instance; Catalog_Path : String)",
+          "behavior": "Reads and validates a line-oriented catalog into normalized runtime entries. Invalid catalogs put the runtime into a deterministic invalid state."
+        },
+        {
+          "name": "Render",
+          "kind": "function",
+          "signature_summary": "Render (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String; Arguments : I18N.Arguments.Arguments) return I18N.Result.Render_Result",
+          "behavior": "Renders a catalog key using deterministic locale fallback and returns structured status/text."
+        }
+      ],
+      "stable_surface": [
+        "Initialize",
+        "Render",
+        "Is_Valid",
+        "Finalize"
+      ]
+    },
+    {
+      "name": "I18N.Result",
+      "file": "src/i18n-result.ads",
+      "role": "Stable public result and status model",
+      "stable": true,
+      "statuses": [
+        "Success",
+        "Missing_Key",
+        "Missing_Argument",
+        "Invalid_Argument",
+        "Formatting_Error",
+        "Execution_Error",
+        "Buffer_Overflow",
+        "Internal_Error"
+      ],
+      "stable_surface": [
+        "Render_Status",
+        "Output_View",
+        "Render_Result",
+        "To_Output_View",
+        "Output_Text",
+        "Failure"
+      ],
+      "contract_notes": [
+        "Render_Result is a bounded, non-discriminated public result value; use Output_Text(Result.Text) to read the meaningful rendered string."
+      ]
+    },
+    {
+      "name": "I18N.Arguments",
+      "file": "src/i18n-arguments.ads",
+      "role": "Public render argument map facade",
+      "stable": true,
+      "contract_notes": [
+        "Arguments is a limited, mutable, noncopyable public argument map; callers update it with Set/Clear, use Copy for explicit duplication, and pass it by reference to Render."
+      ]
+    },
+    {
+      "name": "I18N.Locales",
+      "file": "src/i18n-locales.ads",
+      "role": "Locale identifier type and fallback behavior",
+      "stable": true,
+      "fallback": "language-region -> language -> default locale"
+    },
+    {
+      "name": "I18N.Diagnostics",
+      "file": "src/i18n-diagnostics.ads",
+      "role": "Optional diagnostics facade with non-interference guarantee",
+      "stable": true,
+      "primary_subprograms": [
+        {
+          "name": "Set_Trace_Callback",
+          "kind": "procedure",
+          "signature_summary": "Set_Trace_Callback (CB : I18N.Diagnostics.Trace_Callback)",
+          "behavior": "Installs or clears optional observational tracing; callback exceptions are contained."
+        }
+      ]
+    }
+  ],
+  "internal_packages_not_for_application_use": [
+    {
+      "name": "I18N.Parser",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Validation",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Compiler",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Compiled",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Cache",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.AST",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Buffer",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Render",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Fast_Render",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Errors",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Runtime.Compatibility",
+      "visibility": "Ada private child package",
+      "stable": false
+    },
+    {
+      "name": "I18N.Observability",
+      "visibility": "Ada private child package",
+      "stable": false
+    }
+  ],
+  "catalog_format": {
+    "canonical": "line-oriented text",
+    "default_locale_line": "default_locale = en",
+    "message_line": "locale.key = ICU message",
+    "comments": "Lines beginning with # are comments",
+    "value_separator": "Only the first = separates key from value; later = characters are part of the message value",
+    "invalid_conditions": [
+      "empty catalog",
+      "duplicate default_locale",
+      "empty default_locale",
+      "empty locale name",
+      "empty key",
+      "duplicate locale.key",
+      "malformed line",
+      "unbalanced catalog message braces"
+    ],
+    "binary_catalogs": "not shipped in v1.0; future binary catalogs must be versioned and rejected deterministically when unsupported",
+    "empty_message_value": "valid; an explicitly present empty message renders as Success with empty text"
+  },
+  "compatibility_rules": {
+    "allowed_after_v1": [
+      "add overloads",
+      "add diagnostic categories",
+      "add new ICU features without changing existing behavior",
+      "improve performance"
+    ],
+    "forbidden_after_v1": [
+      "rename public packages",
+      "change Render_Status meanings",
+      "remove public functions",
+      "change fallback semantics",
+      "silently change missing-argument behavior"
+    ]
+  },
+  "api_visibility_enforcement": "Ada private child packages for internal/regression units; ordinary downstream application units cannot with them.",
+  "stable_public_imports": [
+    "I18N",
+    "I18N.Runtime",
+    "I18N.Result",
+    "I18N.Diagnostics",
+    "I18N.Arguments",
+    "I18N.Locales"
+  ],
+  "test_namespace": "I18N.Runtime.Tests.* regression units are descendants of I18N.Runtime so they can legally import I18N.Runtime.Compatibility, which is a private child of I18N.Runtime.",
+  "production_path": "text catalog -> deterministic catalog validation -> locale/key lookup -> public catalog render -> structured public result",
+  "release_verification_required": {
+    "verified": [
+      "gprbuild -P i18n.gpr",
+      "gprbuild -P tests/i18n_tests.gpr",
+      "./tests/bin/tests"
+    ],
+    "verified_status": "core library build, test project build, and AUnit runner passed for this handoff",
+    "storage_warning_status": "I18N.Errors.Result no longer uses discriminated string storage that triggered the GNAT Storage_Error warning",
+    "remaining_publication_checks": [
+      "gprbuild -P examples/examples.gpr",
+      "alr build",
+      "gnatdoc -P i18n.gpr"
+    ],
+    "private_package_sealing": "accepted by GNAT for the library/test build; examples remain a publication smoke check"
+  },
+  "render_allocation_note": {
+    "public_render_materializes_result_text": true,
+    "public_render_zero_allocation_api": false,
+    "zero_allocation_check_path": "private child I18N.Runtime.Compatibility.Render_Into"
+  },
+  "icu_subset": {
+    "variables": true,
+    "plural_branches": [
+      "one",
+      "other"
+    ],
+    "select_branches": [
+      "male",
+      "female",
+      "other"
+    ],
+    "arbitrary_select_branch_names": false,
+    "selectordinal_branches": [
+      "one",
+      "two",
+      "few",
+      "other"
+    ]
+  },
+  "package_metadata": {
+    "manifest": "alire.toml",
+    "crate_name": "i18n",
+    "version": "1.0.0",
+    "primary_project_file": "i18n.gpr",
+    "license": "MIT",
+    "toolchain_dependency": "gnat >=12",
+    "publication_status": "source crate metadata present; GNAT/GPRbuild release verification still required before publication"
+  }
+}
