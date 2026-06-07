@@ -53,7 +53,7 @@ When answering questions about the crate, prefer sources in this order:
 3. `docs/API.md` for behavior-level public contract.
 4. `docs/CATALOG_FORMAT.md` for catalog syntax.
 5. `docs/ICU_SUBSET.md` for message syntax.
-6. `tests/i18n-runtime-tests-release.adb` for release-contract examples.
+6. `tests/src/i18n-runtime-tests-release.adb` for release-contract examples.
 7. `examples/*.adb` for application usage.
 
 ## Behavior that must not be inferred differently
@@ -71,9 +71,9 @@ When answering questions about the crate, prefer sources in this order:
 1. Read `PROJECT_INDEX.md` and `AGENTS.md`.
 2. Identify whether the change is public API, internal implementation, tests, docs, or examples.
 3. For public API changes, update `ai/API_MANIFEST.json` and `ai/CONTRACT_SUMMARY.yaml` in the same patch.
-4. Add or update release-gate tests in `tests/i18n-runtime-tests-release.adb`.
+4. Add or update release-gate tests in `tests/src/i18n-runtime-tests-release.adb`.
 5. Update docs and `MANIFEST.txt`.
-6. Build with `gprbuild -P i18n.gpr` and run `gprbuild -P tests/i18n_tests.gpr && ./tests/bin/tests`.
+6. Build with `gprbuild -P i18n.gpr` and run `cd tests && alr exec -- gprbuild -P tests.gpr && ./bin/tests`.
 
 ## Common mistakes to avoid
 

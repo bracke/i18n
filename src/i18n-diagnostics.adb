@@ -1,73 +1,15 @@
-with I18N.Observability;
+with I18N.Diagnostics.Callbacks;
 
 package body I18N.Diagnostics is
-
-   protected Callback_State is
-      procedure Set
-        (CB : Trace_Callback);
-
-      function Get
-         return Trace_Callback;
-   private
-      Current_CB : Trace_Callback := null;
-   end Callback_State;
-
-   protected body Callback_State is
-      procedure Set
-        (CB : Trace_Callback)
-      is
-      begin
-         Current_CB := CB;
-      end Set;
-
-      function Get
-         return Trace_Callback
-      is
-      begin
-         return Current_CB;
-      end Get;
-   end Callback_State;
-
-   function To_Public
-     (Event : I18N.Observability.Trace_Event_Kind)
-      return Trace_Event_Kind
-   is
-   begin
-      case Event is
-         when I18N.Observability.Message_Start => return Message_Start;
-         when I18N.Observability.Op_Text       => return Op_Text;
-         when I18N.Observability.Op_Variable   => return Op_Variable;
-         when I18N.Observability.Op_Plural     => return Op_Plural;
-         when I18N.Observability.Op_Select     => return Op_Select;
-         when I18N.Observability.Op_Ordinal    => return Op_Ordinal;
-         when I18N.Observability.Message_End   => return Message_End;
-      end case;
-   end To_Public;
-
-   procedure Public_Trace_Trampoline
-     (Event : I18N.Observability.Trace_Event_Kind;
-      Key   : String)
-   is
-      CB : constant Trace_Callback := Callback_State.Get;
-   begin
-      if CB /= null then
-         CB.all (To_Public (Event), Key);
-      end if;
-   exception
-      when others =>
-         null;
-   end Public_Trace_Trampoline;
+   pragma SPARK_Mode (On);
 
    procedure Set_Trace_Callback
      (CB : Trace_Callback)
+   with
+     SPARK_Mode => Off
    is
    begin
-      Callback_State.Set (CB);
-      if CB = null then
-         I18N.Observability.Set_Trace_Callback (null);
-      else
-         I18N.Observability.Set_Trace_Callback (Public_Trace_Trampoline'Access);
-      end if;
+      I18N.Diagnostics.Callbacks.Set (CB);
    end Set_Trace_Callback;
 
    procedure Copy_Text
@@ -75,14 +17,15 @@ package body I18N.Diagnostics is
       Target : out String;
       Last   : out Natural)
    is
-      Copy_Last : Natural := 0;
+      Copy_Last : constant Natural := Natural'Min (Source'Length, Target'Length);
    begin
       Target := [others => Character'Val (0)];
-      if Source'Length > 0 then
-         Copy_Last := Natural'Min (Source'Length, Target'Length);
-         Target (Target'First .. Target'First + Copy_Last - 1) :=
-           Source (Source'First .. Source'First + Copy_Last - 1);
-      end if;
+
+      for Offset in 1 .. Copy_Last loop
+         Target (Target'First + (Offset - 1)) :=
+           Source (Source'First + (Offset - 1));
+      end loop;
+
       Last := Copy_Last;
    end Copy_Text;
 
@@ -99,19 +42,18 @@ package body I18N.Diagnostics is
       Message : String := "";
       Key     : String := "")
    is
-      Slot             : Positive;
-      Effective_Kind   : Diagnostic_Kind := Kind;
-      Effective_Message : String (1 .. Message_Capacity) :=
+      Slot               : Positive;
+      Effective_Kind     : Diagnostic_Kind := Kind;
+      pragma Warnings (Off, "initialization of * has no effect*");
+      Effective_Message  : String (1 .. Message_Capacity) :=
         [others => Character'Val (0)];
-      Effective_Last   : Natural := 0;
-      Effective_Key    : String (1 .. Key_Capacity) :=
-        (others => Character'Val (0));
-      Effective_Key_Last : Natural := 0;
+      Effective_Last     : Natural range 0 .. Message_Capacity := 0;
+      Effective_Key      : String (1 .. Key_Capacity) :=
+        [others => Character'Val (0)];
+      Effective_Key_Last : Natural range 0 .. Key_Capacity := 0;
+      pragma Warnings (On, "initialization of * has no effect*");
    begin
-      if List.Count >= Max_Diagnostics then
-         --  Preserve bounded storage while still surfacing the fact that
-         --  diagnostics were truncated. The last slot is reserved/reused as a
-         --  deterministic overflow warning rather than growing the list.
+      if List.Count = Max_Diagnostics then
          Slot := Max_Diagnostics;
          Effective_Kind := Overflow_Warning;
          Copy_Text
@@ -141,14 +83,6 @@ package body I18N.Diagnostics is
       List.Items (Slot).Key := Effective_Key;
       List.Items (Slot).Key_Last := Effective_Key_Last;
    end Add;
-
-   function Length
-     (List : Diagnostic_List)
-      return Natural
-   is
-   begin
-      return List.Count;
-   end Length;
 
    function Element
      (List  : Diagnostic_List;

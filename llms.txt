@@ -1,0 +1,59 @@
+# ICU Messages Ada
+
+ICU Messages Ada is an Ada 2022 library for deterministic ICU-style message rendering from text catalogs. Treat this repository as the `i18n` Alire crate and use the public facade packages unless explicitly working on internals.
+
+## Stable Public API
+
+Application code may depend on:
+
+- `I18N`
+- `I18N.Runtime`
+- `I18N.Result`
+- `I18N.Diagnostics`
+- `I18N.Arguments`
+- `I18N.Locales`
+
+Do not present parser, AST, validation, compiler, compiled IR, cache, buffer, render internals, fast-render internals, errors, observability, or `I18N.Runtime.Compatibility` as application-facing API. Those units are implementation or regression-test support and are sealed with Ada private child package visibility where appropriate.
+
+## Start Here
+
+- Repository map: `PROJECT_INDEX.md`
+- Contributor and AI maintenance rules: `AGENTS.md`
+- Quick usage: `docs/QUICKSTART.md`
+- Public API contract: `docs/API.md`
+- Catalog format: `docs/CATALOG_FORMAT.md`
+- Supported ICU subset: `docs/ICU_SUBSET.md`
+- Error/status model: `docs/ERROR_MODEL.md`
+- Threading and allocation notes: `docs/THREADING.md`
+- Public/private import boundary: `docs/PUBLIC_API_BOUNDARY.md`, `docs/PUBLIC_IMPORT_RULES.md`
+- Release checks: `docs/RELEASE_CHECKLIST.md`, `docs/RELEASE_VERIFICATION.md`, `docs/TEST_MATRIX.md`
+
+## Machine-Readable Metadata
+
+- `ai/API_MANIFEST.json`: public package and result/status manifest.
+- `ai/CONTRACT_SUMMARY.yaml`: compact behavior and compatibility contract.
+- `ai/EXAMPLE_CATALOG.json`: example and catalog inventory.
+- `ai/FILE_ROLE_MAP.json`: file role classification.
+
+Metadata helps navigation but does not override Ada specs, documentation, tests, or compiler behavior.
+
+## Build And Test
+
+```sh
+gprbuild -P i18n.gpr
+cd tests
+alr exec -- gprbuild -P tests.gpr
+./bin/tests
+cd ..
+gprbuild -P examples/examples.gpr
+```
+
+For release candidates, also run the Alire and documentation checks listed in `docs/RELEASE_VERIFICATION.md`.
+
+## Behavioral Rules
+
+- Preserve deterministic catalog validation and render failure statuses.
+- Preserve locale fallback: `language-region -> language -> default locale`.
+- Preserve diagnostics non-interference: callbacks must not change render output or status, and callback exceptions must not escape.
+- Do not document behavior that is not implemented and covered by tests.
+- Keep `alire.toml`, `i18n.gpr`, `LICENSE`, `MANIFEST.txt`, docs, and `ai/*` metadata synchronized when public behavior or packaging changes.

@@ -56,4 +56,4 @@ Documentation must describe implemented behavior only. A release is invalid if d
 
 ## Toolchain verification
 
-Current handoff status: GNAT/GPRbuild has built the library and test project, and the AUnit runner has passed. Example-project, Alire, and GNATdoc checks remain publication checks unless separately verified. See `docs/RELEASE_VERIFICATION.md`.
+The validation boundary is release-ready only when the build, test, example, Alire, and documentation checks in `docs/RELEASE_VERIFICATION.md` pass for the intended release channel.

@@ -1,9 +1,9 @@
 name = "i18n"
-description = "Message-formatting library for a a strict, deterministic subset of ICU"
-version = "1.0"
+description = "Message-formatting library for a strict, deterministic subset of ICU"
+version = "1.0.0"
 authors = ["Bent Bracke"]
 maintainers = ["Bent Bracke <bent@bracke.dk>"]
 maintainers-logins = ["bracke"]
-licenses = "MIT OR Apache-2.0 WITH LLVM-exception"
+licenses = "MIT"
 website = ""
 tags = ["messages","i18n","locales"]

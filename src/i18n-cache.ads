@@ -36,7 +36,8 @@ private package I18N.Cache is
    with
      Pre => Contains (Key);
 
-   --  Clear every cached compiled message. Initialization-only operation only; do not call concurrently with read-only cache access or rendering.
+   --  Clear every cached compiled message. Initialization-only operation only;
+   --  do not call concurrently with read-only cache access or rendering.
    procedure Clear;
 
    --  @return Number of successful cache misses that performed real compilation.

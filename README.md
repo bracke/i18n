@@ -93,8 +93,10 @@ A successfully initialized runtime is intended to be shared for concurrent read-
 
 ```sh
 gprbuild -P i18n.gpr
-gprbuild -P tests/i18n_tests.gpr
-./tests/bin/tests
+cd tests
+alr exec -- gprbuild -P tests.gpr
+./bin/tests
+cd ..
 ```
 
 The test suite is the release gate and includes parser, validator, compiler/cache regression, IR equivalence, render, plural/select/selectordinal, locale fallback, diagnostics, fuzz smoke, corpus regression, concurrency, zero-allocation compatibility-path checks, and public API freeze checks. See `docs/TEST_MATRIX.md` and `docs/RELEASE_VERIFICATION.md`.
@@ -147,7 +149,7 @@ These files are non-runtime metadata. They do not define behavior independently 
 
 ## Verification status
 
-Current local verification status for this handoff: the library project builds, the test project builds, and the AUnit test runner executes successfully under GNAT/GPRbuild. The `I18N.Errors.Result` `Storage_Error` warning is not present in the current verified build. Before publishing a tagged v1.0 release, still run the example project and packaging/documentation tooling checks listed in `docs/RELEASE_VERIFICATION.md`.
+Before publishing or tagging v1.0, run the release verification commands in `docs/RELEASE_VERIFICATION.md`. The required checks include the library build, test project build, AUnit runner, example project, Alire build, and selected documentation tooling. Treat any recurrence of the `I18N.Errors.Result` `Storage_Error` warning as a release blocker.
 
 ## v1.0 compatibility boundary
 

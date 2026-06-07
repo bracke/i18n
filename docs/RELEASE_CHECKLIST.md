@@ -1,6 +1,6 @@
 # Release Checklist
 
-A v1.0 release candidate is acceptable only when the mandatory items below are true. Items marked as already verified reflect the latest local handoff status.
+A v1.0 release candidate is acceptable only when the mandatory items below are true for the candidate being published.
 
 ## Build and tests
 
@@ -35,7 +35,7 @@ A v1.0 release candidate is acceptable only when the mandatory items below are t
 
 ## Release blocker
 
-Do not tag v1.0 from documentation review alone. The library/test build and AUnit runner have been verified for this handoff. Before public publication, also verify the example project and any selected packaging/documentation tooling such as Alire and GNATdoc.
+Do not tag v1.0 from documentation review alone. Before public publication, verify the library build, test project build, AUnit runner, example project, and selected packaging/documentation tooling such as Alire and GNATdoc for the candidate being published.
 
 ## Ada discriminant-safety audit
 

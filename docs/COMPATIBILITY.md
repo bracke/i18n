@@ -51,4 +51,4 @@ Internal and compatibility-only packages may change without source-compatibility
 
 ## Release verification
 
-The core compatibility boundary is backed by a GNAT/GPRbuild build of the library and test project plus a passing AUnit run for this handoff. Public publication should still include example-project and packaging/documentation tooling verification for the intended release channel.
+The compatibility boundary is backed by the release verification commands in `docs/RELEASE_VERIFICATION.md`, including the library build, test project build, AUnit run, example-project build, and selected packaging/documentation tooling for the intended release channel.

@@ -60,18 +60,19 @@ package body I18N.Runtime.Tests.Compilation is
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      Message : I18N.Compiled.Compiled_Message;
       Source  : constant String := "Hello {name}";
    begin
       I18N.Cache.Clear;
 
       declare
-         Result : constant I18N.Errors.Result :=
+         Message : I18N.Compiled.Compiled_Message;
+         Result  : constant I18N.Errors.Result :=
            I18N.Cache.Get_Or_Compile (Source, Message);
       begin
          AUnit.Assertions.Assert
-           (Condition => Result.Ok,
-            Message   => "first cache compile should succeed");
+           (Condition =>
+              Result.Ok and then I18N.Compiled.Op_Count (Message) > 0,
+            Message   => "first cache compile should produce IR");
       end;
 
       AUnit.Assertions.Assert
@@ -84,12 +85,14 @@ package body I18N.Runtime.Tests.Compilation is
          Message   => "cache clear should reset compile count");
 
       declare
-         Result : constant I18N.Errors.Result :=
+         Message : I18N.Compiled.Compiled_Message;
+         Result  : constant I18N.Errors.Result :=
            I18N.Cache.Get_Or_Compile (Source, Message);
       begin
          AUnit.Assertions.Assert
-           (Condition => Result.Ok,
-            Message   => "compile after cache clear should succeed");
+           (Condition =>
+              Result.Ok and then I18N.Compiled.Op_Count (Message) > 0,
+            Message   => "compile after cache clear should produce IR");
       end;
 
       AUnit.Assertions.Assert
@@ -262,7 +265,15 @@ package body I18N.Runtime.Tests.Compilation is
    is
       pragma Unreferenced (T);
       Source : constant String :=
-        "{count, plural, one {{gender, select, male {He has # item} female {She has # item} other {They have # item}}} other {{gender, select, male {He has # items} female {She has # items} other {They have # items}}}}";
+        "{count, plural, "
+        & "one {{gender, select, "
+        & "male {He has # item} "
+        & "female {She has # item} "
+        & "other {They have # item}}} "
+        & "other {{gender, select, "
+        & "male {He has # items} "
+        & "female {She has # items} "
+        & "other {They have # items}}}}";
       Root   : I18N.AST.Node_Access := I18N.Parser.Parse (Source);
       Msg    : constant I18N.Compiled.Compiled_Message :=
         I18N.Compiler.Compile (Root);
@@ -304,7 +315,13 @@ package body I18N.Runtime.Tests.Compilation is
       Runtime : I18N.Runtime.Runtime;
       Args    : I18N.Arguments.Arguments;
       Source  : constant String :=
-        "{count, plural, one {{num, selectordinal, one {#st inner} two {#nd inner} few {#rd inner} other {#th inner}} outer #} other {outer #}}";
+        "{count, plural, "
+        & "one {{num, selectordinal, "
+        & "one {#st inner} "
+        & "two {#nd inner} "
+        & "few {#rd inner} "
+        & "other {#th inner}} outer #} "
+        & "other {outer #}}";
    begin
       I18N.Runtime.Compatibility.Initialize_Message (Runtime, Source);
       Add_Arg (Args, "count", "1");

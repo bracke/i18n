@@ -408,74 +408,74 @@
       "role": "stable_public_api"
     },
     {
-      "file": "tests/i18n-runtime-tests-release.adb",
+      "file": "tests/src/i18n-runtime-tests-release.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-release.ads",
+      "file": "tests/src/i18n-runtime-tests-release.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-strict.adb",
+      "file": "tests/src/i18n-runtime-tests-strict.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-strict.ads",
+      "file": "tests/src/i18n-runtime-tests-strict.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-compilation.adb",
+      "file": "tests/src/i18n-runtime-tests-compilation.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-compilation.ads",
+      "file": "tests/src/i18n-runtime-tests-compilation.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-execution.adb",
+      "file": "tests/src/i18n-runtime-tests-execution.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-execution.ads",
+      "file": "tests/src/i18n-runtime-tests-execution.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-diagnostics.adb",
+      "file": "tests/src/i18n-runtime-tests-diagnostics.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-diagnostics.ads",
+      "file": "tests/src/i18n-runtime-tests-diagnostics.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-corpus.adb",
+      "file": "tests/src/i18n-runtime-tests-corpus.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-corpus.ads",
+      "file": "tests/src/i18n-runtime-tests-corpus.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-suite.adb",
+      "file": "tests/src/i18n-runtime-tests-suite.adb",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests-suite.ads",
+      "file": "tests/src/i18n-runtime-tests-suite.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n-runtime-tests.ads",
+      "file": "tests/src/i18n-runtime-tests.ads",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/i18n_tests.gpr",
+      "file": "tests/tests.gpr",
       "role": "release_or_regression_tests"
     },
     {
-      "file": "tests/test_runner.adb",
+      "file": "tests/src/tests.adb",
       "role": "release_or_regression_tests"
     }
   ],
   "ada_visibility_note": "src/i18n-parser.ads, validation/compiler/cache/compiled/buffer/errors/observability/render/fast_render, runtime-compatibility specs are Ada private child packages.",
-  "release_verification_note": "GNAT/GPRbuild has verified the library build, test project build, and AUnit test runner for this handoff. Example, Alire, and GNATdoc checks remain publication checks unless separately verified."
+  "release_verification_note": "Release candidates require the library build, test project build, AUnit test runner, example project, Alire build, and selected documentation tooling to pass for the candidate being published."
 }

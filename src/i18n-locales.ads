@@ -22,6 +22,7 @@
 --     Parent ("de")    = ""
 package I18N.Locales is
    pragma Preelaborate;
+   pragma SPARK_Mode (On);
 
    --  Public locale identifier used by the stable render API.
    subtype Locale_Id is String;
@@ -35,5 +36,8 @@ package I18N.Locales is
    --  @return Parent locale or empty string when no parent exists.
    function Parent
      (Item : Locale_Id)
-      return String;
+      return String
+   with
+     Global => null,
+     Post   => Parent'Result'Length <= Item'Length;
 end I18N.Locales;

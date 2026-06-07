@@ -28,6 +28,7 @@
 --        null;
 --     end if;
 package I18N.Diagnostics is
+   pragma SPARK_Mode (On);
    --  Stable public trace event kind.
    type Trace_Event_Kind is
      (Message_Start,
@@ -50,7 +51,9 @@ package I18N.Diagnostics is
    --
    --  @param CB Callback to invoke for trace events, or null.
    procedure Set_Trace_Callback
-     (CB : Trace_Callback);
+     (CB : Trace_Callback)
+   with
+     SPARK_Mode => Off;
 
    --  Structured public diagnostic classification.
    type Diagnostic_Kind is
@@ -73,9 +76,9 @@ package I18N.Diagnostics is
    type Diagnostic is record
       Kind         : Diagnostic_Kind := Parse_Error;
       Message      : String (1 .. Message_Capacity) := [others => Character'Val (0)];
-      Message_Last : Natural := 0;
+      Message_Last : Natural range 0 .. Message_Capacity := 0;
       Key          : String (1 .. Key_Capacity) := [others => Character'Val (0)];
-      Key_Last     : Natural := 0;
+      Key_Last     : Natural range 0 .. Key_Capacity := 0;
    end record;
 
    --  Public diagnostic array type.
@@ -84,14 +87,17 @@ package I18N.Diagnostics is
    --  Preallocated diagnostic list used by Result and execution contexts.
    type Diagnostic_List is record
       Items : Diagnostic_Array (1 .. Max_Diagnostics);
-      Count : Natural := 0;
+      Count : Natural range 0 .. Max_Diagnostics := 0;
    end record;
 
    --  Reset a diagnostic list without releasing storage.
    --
    --  @param List Diagnostic list to clear.
    procedure Clear
-     (List : in out Diagnostic_List);
+     (List : in out Diagnostic_List)
+   with
+     Global => null,
+     Post   => Length (List) = 0;
 
    --  Append one diagnostic if capacity remains.
    --
@@ -106,13 +112,19 @@ package I18N.Diagnostics is
      (List    : in out Diagnostic_List;
       Kind    : Diagnostic_Kind;
       Message : String := "";
-      Key     : String := "");
+      Key     : String := "")
+   with
+     Global => null,
+     Post   => Length (List) <= Max_Diagnostics;
 
    --  @param List Diagnostic list to inspect.
    --  @return Number of stored diagnostics.
    function Length
      (List : Diagnostic_List)
-      return Natural;
+      return Natural is (List.Count)
+   with
+     Global => null,
+     Post   => Length'Result <= Max_Diagnostics;
 
    --  @param List Diagnostic list to inspect.
    --  @param Index One-based diagnostic index.
@@ -120,19 +132,27 @@ package I18N.Diagnostics is
    function Element
      (List  : Diagnostic_List;
       Index : Positive)
-      return Diagnostic;
+      return Diagnostic
+   with
+     Global => null;
 
    --  @param Item Diagnostic to inspect.
    --  @return Message slice without fixed-storage padding.
    function Message_Text
      (Item : Diagnostic)
-      return String;
+      return String
+   with
+     Global => null,
+     Post   => Message_Text'Result'Length = Item.Message_Last;
 
    --  @param Item Diagnostic to inspect.
    --  @return Key slice without fixed-storage padding.
    function Key_Text
      (Item : Diagnostic)
-      return String;
+      return String
+   with
+     Global => null,
+     Post   => Key_Text'Result'Length = Item.Key_Last;
 
    --  @param List Diagnostic list to inspect.
    --  @param Kind Diagnostic kind to find.
@@ -140,6 +160,8 @@ package I18N.Diagnostics is
    function Has_Kind
      (List : Diagnostic_List;
       Kind : Diagnostic_Kind)
-      return Boolean;
+      return Boolean
+   with
+     Global => null;
 
 end I18N.Diagnostics;

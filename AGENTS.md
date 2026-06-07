@@ -38,14 +38,16 @@ Everything else under `src/` is implementation detail or compatibility/regressio
 
 ```sh
 gprbuild -P i18n.gpr
-gprbuild -P tests/i18n_tests.gpr
-./tests/bin/tests
+cd tests
+alr exec -- gprbuild -P tests.gpr
+./bin/tests
+cd ..
 gprbuild -P examples/examples.gpr
 ```
 
 ## Release verification rule
 
-Do not mark the release complete from source/documentation inspection alone. For this handoff, GNAT/GPRbuild has built the library and test project and the AUnit runner has passed. Before public publication, also verify the example project and selected packaging/documentation tooling. See `docs/RELEASE_VERIFICATION.md`.
+Do not mark the release complete from source/documentation inspection alone. Before public publication, run the library build, test project build, AUnit runner, example project, Alire build, and selected packaging/documentation tooling listed in `docs/RELEASE_VERIFICATION.md`.
 
 ## Coding rules
 

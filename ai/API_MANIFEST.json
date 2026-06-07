@@ -205,10 +205,10 @@
   "release_verification_required": {
     "verified": [
       "gprbuild -P i18n.gpr",
-      "gprbuild -P tests/i18n_tests.gpr",
-      "./tests/bin/tests"
+      "cd tests && alr exec -- gprbuild -P tests.gpr",
+      "cd tests && ./bin/tests"
     ],
-    "verified_status": "core library build, test project build, and AUnit runner passed for this handoff",
+    "verified_status": "release candidates require the core library build, test project build, and AUnit runner to pass",
     "storage_warning_status": "I18N.Errors.Result no longer uses discriminated string storage that triggered the GNAT Storage_Error warning",
     "remaining_publication_checks": [
       "gprbuild -P examples/examples.gpr",

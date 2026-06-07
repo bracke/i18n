@@ -13,4 +13,5 @@
 --  compatibility contract.
 package I18N is
    pragma Preelaborate;
+   pragma SPARK_Mode (On);
 end I18N;

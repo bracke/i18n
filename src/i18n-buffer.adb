@@ -1,4 +1,5 @@
 package body I18N.Buffer is
+   pragma SPARK_Mode (On);
 
    procedure Clear
      (Item : in out Buffer)
@@ -39,22 +40,6 @@ package body I18N.Buffer is
          Item.Data (Item.Used) := C;
       end if;
    end Append;
-
-   function Overflowed
-     (Item : Buffer)
-      return Boolean
-   is
-   begin
-      return Item.Had_Overflow;
-   end Overflowed;
-
-   function Length
-     (Item : Buffer)
-      return Natural
-   is
-   begin
-      return Item.Used;
-   end Length;
 
    function To_String
      (Item : Buffer)

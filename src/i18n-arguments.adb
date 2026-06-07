@@ -24,7 +24,6 @@ package body I18N.Arguments is
       end if;
    end Set;
 
-
    procedure Copy
      (Source      : Arguments;
       Destination : in out Arguments)

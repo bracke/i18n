@@ -1,17 +1,17 @@
 # Release Verification Status
 
-This document records what must be verified before tagging ICU Messages Ada v1.0.
-
-This document records the verified and remaining release checks for ICU Messages Ada v1.0. Documentation and metadata describe the intended public contract; the compiler remains the authority for Ada visibility, private-child legality, elaboration rules, project-file source inclusion, and warning cleanliness.
+This document records what must be verified before tagging ICU Messages Ada v1.0. Documentation and metadata describe the intended public contract; the compiler remains the authority for Ada visibility, private-child legality, elaboration rules, project-file source inclusion, and warning cleanliness.
 
 ## Verified GNAT/GPRbuild checks
 
-The following checks have been reported as passing for this handoff after the internal result storage warning fix:
+Run these checks for every release candidate:
 
 ```sh
 gprbuild -P i18n.gpr
-gprbuild -P tests/i18n_tests.gpr
-./tests/bin/tests
+cd tests
+alr exec -- gprbuild -P tests.gpr
+./bin/tests
+cd ..
 ```
 
 These checks establish that the core library builds, the test project builds, the AUnit suite runs successfully, and GNAT accepts the private-child package structure used by the tests.

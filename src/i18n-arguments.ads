@@ -45,7 +45,6 @@ package I18N.Arguments is
       Key   : String;
       Value : String);
 
-
    --  Replace Destination with a copy of Source.
    --
    --  @param Source Argument map to copy from.

@@ -134,7 +134,6 @@ package body I18N.AST is
          Item => Item);
    end Append_Plural;
 
-
    procedure Append_Select
      (Head   : in out Node_Access;
       Tail   : in out Node_Access;
@@ -176,8 +175,6 @@ package body I18N.AST is
          Tail => Tail,
          Item => Item);
    end Append_Select;
-
-
 
    procedure Append_Select_Ordinal
      (Head  : in out Node_Access;

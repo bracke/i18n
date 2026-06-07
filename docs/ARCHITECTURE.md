@@ -66,4 +66,4 @@ No application-facing release feature may require parser cursors, cache maps, IR
 
 ## Release verification boundary
 
-GNAT/GPRbuild has confirmed the core library build, test project build, and AUnit runner for this handoff. Example-project, Alire, and GNATdoc checks remain part of the final publication checklist unless separately verified. See `docs/RELEASE_VERIFICATION.md`.
+The release boundary is verified by the commands in `docs/RELEASE_VERIFICATION.md`: the core library build, test project build, AUnit runner, example project, Alire build, and selected documentation tooling must pass for the intended release channel.

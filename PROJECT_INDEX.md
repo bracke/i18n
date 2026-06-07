@@ -52,7 +52,7 @@ Application examples must not `with` these internal packages.
 | File | Purpose |
 | --- | --- |
 | `i18n.gpr` | Main library project. |
-| `tests/i18n_tests.gpr` | AUnit release-gate test project. |
+| `tests/tests.gpr` | AUnit release-gate test project. |
 | `examples/examples.gpr` | v1.0 public API examples project. |
 | `examples/README.md` | Example directory orientation and public API import rule. |
 | `examples/EXPECTED_OUTPUT.md` | Typical example output notes. |

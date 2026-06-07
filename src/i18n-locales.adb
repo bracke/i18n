@@ -1,4 +1,5 @@
 package body I18N.Locales is
+   pragma SPARK_Mode (On);
 
    function Parent
      (Item : Locale_Id)

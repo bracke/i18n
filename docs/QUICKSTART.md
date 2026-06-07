@@ -154,8 +154,10 @@ Application code should not `with` parser, validator, compiler, IR, cache, AST, 
 ## 6. Run the release test suite
 
 ```sh
-gprbuild -P tests/i18n_tests.gpr
-./tests/bin/tests
+cd tests
+alr exec -- gprbuild -P tests.gpr
+./bin/tests
+cd ..
 ```
 
 The tests are the release gate. See `docs/TEST_MATRIX.md` for the mapping between v1.0 requirements and concrete test groups.
