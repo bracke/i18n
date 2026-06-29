@@ -348,6 +348,14 @@
       "role": "stable_public_api"
     },
     {
+      "file": "src/i18n-plurals.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-plurals.ads",
+      "role": "stable_public_api"
+    },
+    {
       "file": "src/i18n-observability.adb",
       "role": "internal_implementation"
     },

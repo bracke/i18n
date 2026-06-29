@@ -26,9 +26,9 @@ Initialization may allocate for:
 * compilation;
 * cache/store population.
 
-The compatibility `Render_Into` path writes into caller-owned fixed storage for supported output sizes and is the path used by zero-allocation release checks.
+The public `I18N.Runtime.Render_Into` facade is allocation-free: it renders directly into the caller-owned `String` without building an intermediate dynamic buffer. The internal `I18N.Runtime.Compatibility.Render_Into` path writes into caller-owned fixed storage and is the path used by the zero-allocation release checks.
 
-The public catalog `Render` function returns `I18N.Result.Render_Result`, whose text view materializes the final string after execution. Therefore the public facade is stable and structured, but it is not itself specified as a zero-allocation API. The strict no-allocation guarantee is specifically verified at the lower-level caller-owned-buffer render path.
+The public catalog `Render` function returns `I18N.Result.Render_Result`, whose text view materializes the final string after execution. Therefore that facade is stable and structured, but it is not itself specified as a zero-allocation API. For allocation-free rendering, use the public `Render_Into` facade.
 
 ## Determinism
 

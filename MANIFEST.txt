@@ -81,6 +81,8 @@ src/i18n-fast_render.adb
 src/i18n-fast_render.ads
 src/i18n-locales.adb
 src/i18n-locales.ads
+src/i18n-plurals.adb
+src/i18n-plurals.ads
 src/i18n-observability.adb
 src/i18n-observability.ads
 src/i18n-parser.adb
@@ -134,6 +136,8 @@ tests/src/i18n-runtime-tests-diagnostics.adb
 tests/src/i18n-runtime-tests-diagnostics.ads
 tests/src/i18n-runtime-tests-execution.adb
 tests/src/i18n-runtime-tests-execution.ads
+tests/src/i18n-runtime-tests-features.adb
+tests/src/i18n-runtime-tests-features.ads
 tests/src/i18n-runtime-tests-release.adb
 tests/src/i18n-runtime-tests-release.ads
 tests/src/i18n-runtime-tests-strict.adb

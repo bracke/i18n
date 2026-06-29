@@ -12,7 +12,7 @@ gprbuild -P examples/examples.gpr
 Run examples from the repository root, for example:
 
 ```sh
-./examples/hello_world
+./examples/bin/hello_world
 ```
 
 ## Catalogs

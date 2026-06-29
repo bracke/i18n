@@ -14,7 +14,7 @@ gprbuild -P examples/examples.gpr
 ```
 
 The example executables are emitted into the `examples/` directory by the example
-project file. Run them from the repository root, for example `./examples/hello_world`,
+project file. Run them from the repository root, for example `./examples/bin/hello_world`,
 so relative catalog paths resolve correctly.
 
 ## Shared catalog

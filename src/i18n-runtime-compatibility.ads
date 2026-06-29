@@ -6,10 +6,19 @@ with I18N.Arguments;
 
 --  Internal/test compatibility API for in-tree regression tests.
 --
---  This child package is not part of the stable v1.0 application API. It keeps
+--  This child package is not part of the stable application API. It keeps
 --  the single-message, fixed-buffer, and internal-error entry points
 --  available for regression and differential tests without exposing them from
 --  I18N.Runtime itself.
+--
+--  Semantics note: this path drives the legacy compiled IR (I18N.Compiler /
+--  I18N.Fast_Render), which is locale-agnostic and supports only male/female/
+--  other select branches and a hardcoded plural/ordinal category mapping. The
+--  authoritative public path is I18N.Runtime.Render / Render_Into, which adds
+--  generalized select branches and locale-aware plural/selectordinal selection
+--  through I18N.Plurals. Both share the "only other is mandatory" branch
+--  policy. Do not treat the compatibility path as a reference for public
+--  rendering semantics.
 private package I18N.Runtime.Compatibility is
 
    --  Initialize the compatibility single-message runtime path.

@@ -1,5 +1,17 @@
 package body I18N.Arguments is
 
+   --  Render a signed integer as a strict decimal string without the leading
+   --  space that Long_Long_Integer'Image produces for non-negative values.
+   function Decimal_Image (Value : Long_Long_Integer) return String is
+      Image : constant String := Long_Long_Integer'Image (Value);
+   begin
+      if Image'Length > 0 and then Image (Image'First) = ' ' then
+         return Image (Image'First + 1 .. Image'Last);
+      end if;
+
+      return Image;
+   end Decimal_Image;
+
    procedure Clear
      (Args : in out Arguments)
    is
@@ -23,6 +35,33 @@ package body I18N.Arguments is
          Args.Values.Insert (Key, Value);
       end if;
    end Set;
+
+   procedure Set_Integer
+     (Args  : in out Arguments;
+      Key   : String;
+      Value : Long_Long_Integer)
+   is
+   begin
+      Set (Args, Key, Decimal_Image (Value));
+   end Set_Integer;
+
+   procedure Set_Natural
+     (Args  : in out Arguments;
+      Key   : String;
+      Value : Natural)
+   is
+   begin
+      Set (Args, Key, Decimal_Image (Long_Long_Integer (Value)));
+   end Set_Natural;
+
+   procedure Set_Boolean
+     (Args  : in out Arguments;
+      Key   : String;
+      Value : Boolean)
+   is
+   begin
+      Set (Args, Key, (if Value then "true" else "false"));
+   end Set_Boolean;
 
    procedure Copy
      (Source      : Arguments;

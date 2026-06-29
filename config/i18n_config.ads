@@ -15,6 +15,6 @@ package I18n_Config is
    Alire_Host_Distro : constant String := "ubuntu";
 
    type Build_Profile_Kind is (release, validation, development);
-   Build_Profile : constant Build_Profile_Kind := development;
+   Build_Profile : constant Build_Profile_Kind := release;
 
 end I18n_Config;

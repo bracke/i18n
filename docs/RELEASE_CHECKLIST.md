@@ -8,7 +8,9 @@ A v1.0 release candidate is acceptable only when the mandatory items below are t
 [verified] alr build succeeds
 [verified] tests/alr build succeeds
 [verified] tests/alr run passes
-[verified] gprbuild -P examples/examples.gpr succeeds
+[verified] alr test succeeds
+[verified] alr exec -- gprbuild -P examples/examples.gpr succeeds
+[verified] alr exec -- gnatprove -P i18n.gpr --level=0 --mode=check succeeds
 ```
 
 ## Public API
@@ -27,6 +29,7 @@ A v1.0 release candidate is acceptable only when the mandatory items below are t
 * `docs/THREADING.md` distinguishes public render from the no-allocation compatibility `Render_Into` path.
 * `docs/COMPATIBILITY.md` states the source/runtime compatibility boundary.
 * `docs/RELEASE_VERIFICATION.md` states the GNAT/GPRbuild verification commands and private-package acceptance rules.
+* `docs/SPARK.md` states the SPARK-enabled units and GNATprove release command.
 
 ## Cleanup
 

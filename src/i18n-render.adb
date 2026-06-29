@@ -170,8 +170,12 @@ package body I18N.Render is
                            declare
                               Rendered_Value : constant String :=
                                 Integer_Image_No_Leading_Space (Numeric_Value);
+                              --  Only "other" is mandatory; an absent "one"
+                              --  branch falls back to "other".
                               Selected_AST : constant I18N.AST.Node_Access :=
-                                (if Numeric_Value = 1 then Current.One else Current.Other);
+                                (if Numeric_Value = 1
+                                    and then Current.One /= null
+                                 then Current.One else Current.Other);
                            begin
                               if Selected_AST = null then
                                  Fail (State, I18N.Errors.Missing_Branch);
@@ -199,23 +203,21 @@ package body I18N.Render is
                   else
                      declare
                         Value : constant String := Args.Get (Key);
+                        Matched : constant Boolean :=
+                          I18N.AST.Has_Branch (Current.Branches, Value);
                         Selected_AST : constant I18N.AST.Node_Access :=
-                          (if Value = "male" then Current.Male
-                           elsif Value = "female" then Current.Female
-                           else Current.Select_Other);
+                          (if Matched
+                           then I18N.AST.Branch_Body (Current.Branches, Value)
+                           else I18N.AST.Branch_Body (Current.Branches, "other"));
                      begin
-                        if Selected_AST = null then
-                           if Current.Select_Other = null then
-                              Fail (State, I18N.Errors.Missing_Branch);
-                           else
-                              Render_Nodes
-                                (Root                   => Current.Select_Other,
-                                 Args                   => Args,
-                                 Output                 => Output,
-                                 State                  => State,
-                                 Number_Text            => Number_Text,
-                                 Substitute_Number_Sign => Substitute_Number_Sign);
-                           end if;
+                        if not Matched
+                          and then not I18N.AST.Has_Branch
+                                         (Current.Branches, "other")
+                        then
+                           Fail (State, I18N.Errors.Missing_Branch);
+                        elsif Selected_AST = null then
+                           --  Present-but-empty branch renders as empty text.
+                           null;
                         else
                            Render_Nodes
                              (Root                   => Selected_AST,
@@ -248,13 +250,19 @@ package body I18N.Render is
                            declare
                               Rendered_Value : constant String :=
                                 Integer_Image_No_Leading_Space (Numeric_Value);
-                              Selected_AST : constant I18N.AST.Node_Access :=
+                              --  Only "other" is mandatory; an absent category
+                              --  branch falls back to "other".
+                              Selected_AST : I18N.AST.Node_Access :=
                                 (case Category_For_Ordinal (Numeric_Value) is
                                     when One   => Current.Ord_One,
                                     when Two   => Current.Ord_Two,
                                     when Few   => Current.Ord_Few,
                                     when Other => Current.Ord_Other);
                            begin
+                              if Selected_AST = null then
+                                 Selected_AST := Current.Ord_Other;
+                              end if;
+
                               if Selected_AST = null then
                                  Fail (State, I18N.Errors.Missing_Branch);
                               else

@@ -73,14 +73,18 @@ package body I18N.Validation is
                   return I18N.Errors.Failure (I18N.Errors.Validation_Error);
                end if;
 
-               declare
-                  One_Result : constant I18N.Errors.Result :=
-                    Validate_Branch (Current.One);
-               begin
-                  if not One_Result.Ok then
-                     return One_Result;
-                  end if;
-               end;
+               --  Only "other" is mandatory. An absent "one" branch is valid
+               --  and falls back to "other" at render time.
+               if Current.One /= null then
+                  declare
+                     One_Result : constant I18N.Errors.Result :=
+                       Validate_Nodes (Current.One);
+                  begin
+                     if not One_Result.Ok then
+                        return One_Result;
+                     end if;
+                  end;
+               end if;
 
                declare
                   Other_Result : constant I18N.Errors.Result :=
@@ -96,68 +100,77 @@ package body I18N.Validation is
                   return I18N.Errors.Failure (I18N.Errors.Validation_Error);
                end if;
 
-               if Current.Male /= null then
-                  declare
-                     Male_Result : constant I18N.Errors.Result :=
-                       Validate_Nodes (Current.Male);
-                  begin
-                     if not Male_Result.Ok then
-                        return Male_Result;
-                     end if;
-                  end;
-               end if;
-
-               if Current.Female /= null then
-                  declare
-                     Female_Result : constant I18N.Errors.Result :=
-                       Validate_Nodes (Current.Female);
-                  begin
-                     if not Female_Result.Ok then
-                        return Female_Result;
-                     end if;
-                  end;
-               end if;
-
+               --  Each named branch must use a valid identifier and contain a
+               --  structurally valid body. Branch bodies may be empty (a
+               --  present-but-empty branch).
                declare
-                  Other_Result : constant I18N.Errors.Result :=
-                    Validate_Branch (Current.Select_Other);
+                  Branch : I18N.AST.Branch_Access := Current.Branches;
                begin
-                  if not Other_Result.Ok then
-                     return Other_Result;
-                  end if;
+                  while Branch /= null loop
+                     if not Is_Valid_Identifier (To_String (Branch.Name)) then
+                        return
+                          I18N.Errors.Failure (I18N.Errors.Validation_Error);
+                     end if;
+
+                     if Branch.Body_Root /= null then
+                        declare
+                           Branch_Result : constant I18N.Errors.Result :=
+                             Validate_Nodes (Branch.Body_Root);
+                        begin
+                           if not Branch_Result.Ok then
+                              return Branch_Result;
+                           end if;
+                        end;
+                     end if;
+
+                     Branch := Branch.Next;
+                  end loop;
                end;
+
+               --  The mandatory fallback branch named "other" must be present.
+               if not I18N.AST.Has_Branch (Current.Branches, "other") then
+                  return I18N.Errors.Failure (I18N.Errors.Missing_Branch);
+               end if;
 
             when I18N.AST.SelectOrdinal =>
                if not Is_Valid_Identifier (To_String (Current.Name)) then
                   return I18N.Errors.Failure (I18N.Errors.Validation_Error);
                end if;
 
-               declare
-                  One_Result : constant I18N.Errors.Result :=
-                    Validate_Branch (Current.Ord_One);
-               begin
-                  if not One_Result.Ok then
-                     return One_Result;
-                  end if;
-               end;
+               --  Only "other" is mandatory. Absent one/two/few branches are
+               --  valid and fall back to "other" at render time.
+               if Current.Ord_One /= null then
+                  declare
+                     One_Result : constant I18N.Errors.Result :=
+                       Validate_Nodes (Current.Ord_One);
+                  begin
+                     if not One_Result.Ok then
+                        return One_Result;
+                     end if;
+                  end;
+               end if;
 
-               declare
-                  Two_Result : constant I18N.Errors.Result :=
-                    Validate_Branch (Current.Ord_Two);
-               begin
-                  if not Two_Result.Ok then
-                     return Two_Result;
-                  end if;
-               end;
+               if Current.Ord_Two /= null then
+                  declare
+                     Two_Result : constant I18N.Errors.Result :=
+                       Validate_Nodes (Current.Ord_Two);
+                  begin
+                     if not Two_Result.Ok then
+                        return Two_Result;
+                     end if;
+                  end;
+               end if;
 
-               declare
-                  Few_Result : constant I18N.Errors.Result :=
-                    Validate_Branch (Current.Ord_Few);
-               begin
-                  if not Few_Result.Ok then
-                     return Few_Result;
-                  end if;
-               end;
+               if Current.Ord_Few /= null then
+                  declare
+                     Few_Result : constant I18N.Errors.Result :=
+                       Validate_Nodes (Current.Ord_Few);
+                  begin
+                     if not Few_Result.Ok then
+                        return Few_Result;
+                     end if;
+                  end;
+               end if;
 
                declare
                   Other_Result : constant I18N.Errors.Result :=

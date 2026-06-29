@@ -12,6 +12,7 @@ Stable public packages:
 * `I18N.Diagnostics`
 * `I18N.Arguments`
 * `I18N.Locales`
+* `I18N.Plurals`
 
 Parser, validation, compiler, AST, compiled IR, cache, buffer, fast-render, lower-level renderer, internal error, observability, and compatibility packages are Ada private child packages. Ordinary application code cannot legally `with` those packages.
 
@@ -68,9 +69,76 @@ Render behavior:
 * returns `Internal_Error` only for unexpected implementation failures contained by the facade;
 * does not raise for normal ICU/render failures.
 
+### Catalog shard loading
+
+```ada
+type Duplicate_Policy is (Reject_Duplicates, Keep_First, Override_Previous);
+type Load_Status is
+  (Loaded, Source_Not_Found, Invalid_Catalog, Duplicate_Rejected, Runtime_Invalid);
+type Load_Result is record
+   Status           : Load_Status;
+   Entries_Added    : Natural;   --  new locale/key pairs inserted
+   Entries_Replaced : Natural;   --  existing pairs overwritten (Override_Previous)
+   Entries_Ignored  : Natural;   --  duplicate pairs skipped (Keep_First)
+   Diagnostics      : I18N.Diagnostics.Diagnostic_List;
+end record;
+
+procedure Load_File
+  (Item   : in out Instance; Path : String;
+   Result : out Load_Result; Policy : Duplicate_Policy := Reject_Duplicates);
+procedure Load_Text
+  (Item   : in out Instance; Source_Name : String; Text : String;
+   Result : out Load_Result; Policy : Duplicate_Policy := Reject_Duplicates);
+```
+
+`Load_File`/`Load_Text` layer additional catalog shards into a runtime. They are transactional and non-destructive: a failed load (`Source_Not_Found`, `Invalid_Catalog`, `Duplicate_Rejected`, `Runtime_Invalid`) leaves the runtime exactly as it was. The legacy `Load` procedure is retained and, like `Initialize`, marks the runtime invalid on failure.
+
+### Catalog validation
+
+```ada
+type Catalog_Validation_Result is record
+   Valid       : Boolean;
+   Entry_Count : Natural;
+   Diagnostics : I18N.Diagnostics.Diagnostic_List;
+end record;
+
+function Validate_Catalog_File (Path : String) return Catalog_Validation_Result;
+function Validate_Catalog_Text
+  (Source_Name : String; Text : String) return Catalog_Validation_Result;
+```
+
+Validation never mutates any runtime. If validation fails, existing runtimes remain usable.
+
+### Key resolution
+
+```ada
+type Resolve_Status is (Found, Missing_Key, Runtime_Invalid);
+type Resolve_Result is record
+   Status : Resolve_Status; ...
+end record;
+function Resolved_Locale (Item : Resolve_Result) return I18N.Locales.Locale_Id;
+function Resolve
+  (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String)
+   return Resolve_Result;
+```
+
+`Resolve` answers whether a key is reachable through locale fallback without rendering it and without arguments.
+
+### Bounded rendering
+
+```ada
+procedure Render_Into
+  (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String;
+   Arguments : I18N.Arguments.Arguments;
+   Target : in out String; Last : out Natural;
+   Status : out I18N.Result.Render_Status);
+```
+
+Renders the compiled AST **directly into** caller-owned storage without materializing an intermediate dynamic buffer. On `Success`, `Target (Target'First .. Last)` holds the output. On `Buffer_Overflow`, `Target` holds the prefix that fits and `Last` is the last written index. On any other failure, `Last = 0`.
+
 ### Allocation note
 
-Public `Render` returns a structured result containing materialized text. The public function is not specified as a zero-allocation API. The no-allocation release gate applies to the private fixed-buffer compatibility path used by in-tree regression tests.
+Public `Render` returns a structured result containing materialized text and is not specified as a zero-allocation API. `Render_Into` is the public allocation-free path: it writes each rendered fragment straight into the caller's `String` and never builds an `Unbounded_String`. The no-allocation release gate also covers the private fixed-buffer compatibility path used by in-tree regression tests.
 
 ### Runtime inspection and cleanup
 
@@ -107,13 +175,26 @@ Public argument map API:
 
 ```ada
 procedure Set (Args : in out Arguments; Key : String; Value : String);
+procedure Set_Integer (Args : in out Arguments; Key : String; Value : Long_Long_Integer);
+procedure Set_Natural (Args : in out Arguments; Key : String; Value : Natural);
+procedure Set_Boolean (Args : in out Arguments; Key : String; Value : Boolean);
 procedure Clear (Args : in out Arguments);
 procedure Copy (Source : Arguments; Destination : in out Arguments);
 function Has (Args : Arguments; Key : String) return Boolean;
 function Get (Args : Arguments; Key : String) return String;
 ```
 
-Arguments are string-valued and intentionally noncopyable at the Ada type level; pass them by reference, mutate them with `Set`/`Clear`, use `Copy` when an explicit duplicate is needed, and do not rely on whole-object assignment. Numeric plural and selectordinal selectors are parsed strictly during render. Missing values produce `Missing_Argument`; syntactically invalid numeric selectors produce `Invalid_Argument`.
+Arguments are string-valued and intentionally noncopyable at the Ada type level; pass them by reference, mutate them with `Set`/`Clear`, use `Copy` when an explicit duplicate is needed, and do not rely on whole-object assignment. `Set_Integer`/`Set_Natural` write strict decimal text with no `'Image` leading space; `Set_Boolean` writes `true`/`false`. These helpers are deterministic and not locale-aware. Numeric plural and selectordinal selectors are parsed strictly during render. Missing values produce `Missing_Argument`; syntactically invalid numeric selectors produce `Invalid_Argument`.
+
+## `I18N.Plurals`
+
+```ada
+type Plural_Category is (Zero, One, Two, Few, Many, Other);
+function Cardinal (Locale : I18N.Locales.Locale_Id; Value : Long_Long_Integer) return Plural_Category;
+function Ordinal  (Locale : I18N.Locales.Locale_Id; Value : Long_Long_Integer) return Plural_Category;
+```
+
+Pure, total classification of an integer value into a CLDR plural category. Cardinal coverage is `en`, `de`, `nl`, `es`, `it`, `fr`, `pt`, `ru`, `pl`, `cs`, `ar` (the Slavic/Arabic rules cover all six categories); ordinal coverage is `en`, `fr`, `it`. Locales outside these sets resolve through the language subtag to the root rule (`Other`). Operands are integer-only (fraction digits zero).
 
 ## `I18N.Locales`
 

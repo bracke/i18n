@@ -1,6 +1,6 @@
 # Public Import Rules
 
-The v1.0 release enforces the API boundary with Ada visibility, not only with documentation.
+The release enforces the API boundary with Ada visibility, not only with documentation.
 
 ## Allowed application imports
 
@@ -12,10 +12,11 @@ with I18N.Runtime;
 with I18N.Result;
 with I18N.Arguments;
 with I18N.Locales;
+with I18N.Plurals;
 with I18N.Diagnostics;
 ```
 
-`I18N.Diagnostics` is optional and observational.
+`I18N.Plurals` provides CLDR plural-category classification. `I18N.Diagnostics` is optional and observational.
 
 ## Forbidden downstream imports — do not write this
 

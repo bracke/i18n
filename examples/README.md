@@ -9,7 +9,7 @@ The shortest example is:
 
 ```sh
 gprbuild -P examples/examples.gpr
-./examples/hello_world
+./examples/bin/hello_world
 ```
 
 Expected output:

@@ -1,5 +1,6 @@
-with Ada.Text_IO;
 with AUnit.Assertions;
+
+with Project_Tools.Files;
 
 with I18N.Arguments;
 with I18N.Result; use I18N.Result;
@@ -26,11 +27,8 @@ package body I18N.Runtime.Tests.Release is
    end Raising_Trace;
 
    procedure Write_File (Path : String; Text : String) is
-      File : Ada.Text_IO.File_Type;
    begin
-      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, Path);
-      Ada.Text_IO.Put (File, Text);
-      Ada.Text_IO.Close (File);
+      Project_Tools.Files.Write_Text_File (Path, Text);
    end Write_File;
 
    procedure Add_Arg
@@ -58,6 +56,9 @@ package body I18N.Runtime.Tests.Release is
      (T : in out AUnit.Test_Cases.Test_Case'Class);
 
    procedure Test_Duplicate_Catalog_Entry_Is_Rejected
+     (T : in out AUnit.Test_Cases.Test_Case'Class);
+
+   procedure Test_Load_Appends_Catalog_And_Rejects_Duplicates
      (T : in out AUnit.Test_Cases.Test_Case'Class);
 
    procedure Test_Default_Locale_May_Appear_After_Entries
@@ -131,6 +132,10 @@ package body I18N.Runtime.Tests.Release is
         (T,
          Test_Duplicate_Catalog_Entry_Is_Rejected'Access,
          "duplicate catalog entries are deterministic initialization failures");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Load_Appends_Catalog_And_Rejects_Duplicates'Access,
+         "Load appends catalog shards and rejects duplicate loaded entries");
       AUnit.Test_Cases.Registration.Register_Routine
         (T,
          Test_Default_Locale_May_Appear_After_Entries'Access,
@@ -414,6 +419,67 @@ package body I18N.Runtime.Tests.Release is
          Message   =>
            "duplicate locale/key entries must make catalog initialization invalid");
    end Test_Duplicate_Catalog_Entry_Is_Rejected;
+
+   procedure Test_Load_Appends_Catalog_And_Rejects_Duplicates
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Base_Path      : constant String := "/tmp/i18n_release_load_base.catalog";
+      Shard_Path     : constant String := "/tmp/i18n_release_load_shard.catalog";
+      Duplicate_Path : constant String := "/tmp/i18n_release_load_duplicate.catalog";
+      Runtime        : I18N.Runtime.Instance;
+      Args           : I18N.Arguments.Arguments;
+   begin
+      Write_File
+        (Base_Path,
+         "default_locale = en"
+         & ASCII.LF
+         & "en.title = ""Welcome"""
+         & ASCII.LF);
+      Write_File
+        (Shard_Path,
+         "default_locale = de"
+         & ASCII.LF
+         & "de.title = ""Willkommen"""
+         & ASCII.LF);
+
+      I18N.Runtime.Initialize (Runtime, Base_Path);
+      I18N.Runtime.Load (Runtime, Shard_Path);
+
+      declare
+         English : constant I18N.Result.Render_Result :=
+           I18N.Runtime.Render
+             (Item      => Runtime,
+              Locale    => "en",
+              Key       => "title",
+              Arguments => Args);
+         German  : constant I18N.Result.Render_Result :=
+           I18N.Runtime.Render
+             (Item      => Runtime,
+              Locale    => "de-DE",
+              Key       => "title",
+              Arguments => Args);
+      begin
+         AUnit.Assertions.Assert
+           (Condition =>
+              I18N.Runtime.Is_Valid (Runtime)
+              and then English.Status = I18N.Result.Success
+              and then I18N.Result.Output_Text (English.Text) = "Welcome"
+              and then German.Status = I18N.Result.Success
+              and then I18N.Result.Output_Text (German.Text) = "Willkommen",
+            Message   => "Load should preserve base messages and append shard messages");
+      end;
+
+      Write_File
+        (Duplicate_Path,
+         "de.title = ""Duplicate"""
+         & ASCII.LF);
+      I18N.Runtime.Load (Runtime, Duplicate_Path);
+
+      AUnit.Assertions.Assert
+        (Condition => not I18N.Runtime.Is_Valid (Runtime),
+         Message   => "Load must reject duplicates across loaded catalog files");
+   end Test_Load_Appends_Catalog_And_Rejects_Duplicates;
 
    procedure Test_Default_Locale_May_Appear_After_Entries
      (T : in out AUnit.Test_Cases.Test_Case'Class)

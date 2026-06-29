@@ -8,26 +8,9 @@ alire/
 .alire/
 
 # Example executables emitted by examples/examples.gpr
-examples/argument_lifecycle
-examples/basic_render
-examples/default_locale_key
-examples/diagnostics_inspection
-examples/diagnostics_non_interference
-examples/empty_message
-examples/equals_in_value
-examples/fallback_chain
-examples/hello_world
-examples/invalid_argument
-examples/invalid_catalog
-examples/invalid_catalog_fields
-examples/locale_fallback
-examples/missing_argument
-examples/missing_key
-examples/nested_message_render
-examples/plural_render
-examples/public_api_example
-examples/public_api_sealed
-examples/reuse_runtime
-examples/select_render
-examples/selectordinal_render
-examples/status_handling
+examples/bin/
+
+# check_i18n generated output
+check_i18n/bin/
+check_i18n/obj/
+check_i18n/config/

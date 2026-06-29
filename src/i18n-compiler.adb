@@ -61,7 +61,7 @@ package body I18N.Compiler is
    is
       Jump_Index : Positive;
       Jump       : I18N.Compiled.Op;
-      Stop_One   : Natural;
+      Stop_One   : Natural := 0;
       Stop_Other : Natural;
       End_Index  : Positive;
    begin
@@ -70,9 +70,13 @@ package body I18N.Compiler is
       I18N.Compiled.Append (Build, Jump);
       Jump_Index := I18N.Compiled.Last_Index (Build);
 
-      Jump.One_Target := Next_Index (Build);
-      Compile_Nodes (Node.One, Build, Substitute => True);
-      Append_Stop (Build, Stop_One, Restores => True);
+      --  Only "other" is mandatory; an absent "one" branch leaves One_Target 0
+      --  so the renderer falls back to "other".
+      if Node.One /= null then
+         Jump.One_Target := Next_Index (Build);
+         Compile_Nodes (Node.One, Build, Substitute => True);
+         Append_Stop (Build, Stop_One, Restores => True);
+      end if;
 
       Jump.Other_Target := Next_Index (Build);
       Compile_Nodes (Node.Other, Build, Substitute => True);
@@ -81,7 +85,9 @@ package body I18N.Compiler is
       End_Index := Next_Index (Build);
       Jump.End_Target := End_Index;
       Patch (Build, Jump_Index, Jump);
-      Patch_Stop_Target (Build, Positive (Stop_One), End_Index);
+      if Stop_One /= 0 then
+         Patch_Stop_Target (Build, Positive (Stop_One), End_Index);
+      end if;
       Patch_Stop_Target (Build, Positive (Stop_Other), End_Index);
    end Compile_Plural;
 
@@ -96,28 +102,39 @@ package body I18N.Compiler is
       Stop_Female : Natural := 0;
       Stop_Other  : Positive;
       End_Index   : Positive;
+
+      --  The internal compiled IR dispatches the legacy gender select branches
+      --  (male/female/other). Generalized named-branch selects are handled by
+      --  the public AST renderer; the compiled compatibility path only needs
+      --  male/female/other, which it resolves from the generalized branch list.
+      Male_Body   : constant I18N.AST.Node_Access :=
+        I18N.AST.Branch_Body (Node.Branches, "male");
+      Female_Body : constant I18N.AST.Node_Access :=
+        I18N.AST.Branch_Body (Node.Branches, "female");
+      Other_Body  : constant I18N.AST.Node_Access :=
+        I18N.AST.Branch_Body (Node.Branches, "other");
    begin
       Jump.Kind := I18N.Compiled.Jump_Select;
       Jump.Key := new String'(To_String (Node.Name));
       I18N.Compiled.Append (Build, Jump);
       Jump_Index := I18N.Compiled.Last_Index (Build);
 
-      if Node.Male /= null then
+      if Male_Body /= null then
          Jump.Male_Hash := Ada.Strings.Hash ("male");
          Jump.Male_Target := Next_Index (Build);
-         Compile_Nodes (Node.Male, Build, Substitute);
+         Compile_Nodes (Male_Body, Build, Substitute);
          Append_Stop (Build, Stop_Male, Restores => False);
       end if;
 
-      if Node.Female /= null then
+      if Female_Body /= null then
          Jump.Female_Hash := Ada.Strings.Hash ("female");
          Jump.Female_Target := Next_Index (Build);
-         Compile_Nodes (Node.Female, Build, Substitute);
+         Compile_Nodes (Female_Body, Build, Substitute);
          Append_Stop (Build, Stop_Female, Restores => False);
       end if;
 
       Jump.Other_Target := Next_Index (Build);
-      Compile_Nodes (Node.Select_Other, Build, Substitute);
+      Compile_Nodes (Other_Body, Build, Substitute);
       Append_Stop (Build, Stop_Other, Restores => False);
 
       End_Index := Next_Index (Build);
@@ -138,9 +155,9 @@ package body I18N.Compiler is
    is
       Jump       : I18N.Compiled.Op;
       Jump_Index : Positive;
-      Stop_One   : Natural;
-      Stop_Two   : Natural;
-      Stop_Few   : Natural;
+      Stop_One   : Natural := 0;
+      Stop_Two   : Natural := 0;
+      Stop_Few   : Natural := 0;
       Stop_Other : Natural;
       End_Index  : Positive;
    begin
@@ -149,17 +166,25 @@ package body I18N.Compiler is
       I18N.Compiled.Append (Build, Jump);
       Jump_Index := I18N.Compiled.Last_Index (Build);
 
-      Jump.One_Target := Next_Index (Build);
-      Compile_Nodes (Node.Ord_One, Build, Substitute => True);
-      Append_Stop (Build, Stop_One, Restores => True);
+      --  Only "other" is mandatory; absent one/two/few branches leave their
+      --  targets 0 so the renderer falls back to "other".
+      if Node.Ord_One /= null then
+         Jump.One_Target := Next_Index (Build);
+         Compile_Nodes (Node.Ord_One, Build, Substitute => True);
+         Append_Stop (Build, Stop_One, Restores => True);
+      end if;
 
-      Jump.Two_Target := Next_Index (Build);
-      Compile_Nodes (Node.Ord_Two, Build, Substitute => True);
-      Append_Stop (Build, Stop_Two, Restores => True);
+      if Node.Ord_Two /= null then
+         Jump.Two_Target := Next_Index (Build);
+         Compile_Nodes (Node.Ord_Two, Build, Substitute => True);
+         Append_Stop (Build, Stop_Two, Restores => True);
+      end if;
 
-      Jump.Few_Target := Next_Index (Build);
-      Compile_Nodes (Node.Ord_Few, Build, Substitute => True);
-      Append_Stop (Build, Stop_Few, Restores => True);
+      if Node.Ord_Few /= null then
+         Jump.Few_Target := Next_Index (Build);
+         Compile_Nodes (Node.Ord_Few, Build, Substitute => True);
+         Append_Stop (Build, Stop_Few, Restores => True);
+      end if;
 
       Jump.Other_Target := Next_Index (Build);
       Compile_Nodes (Node.Ord_Other, Build, Substitute => True);
@@ -168,9 +193,15 @@ package body I18N.Compiler is
       End_Index := Next_Index (Build);
       Jump.End_Target := End_Index;
       Patch (Build, Jump_Index, Jump);
-      Patch_Stop_Target (Build, Positive (Stop_One), End_Index);
-      Patch_Stop_Target (Build, Positive (Stop_Two), End_Index);
-      Patch_Stop_Target (Build, Positive (Stop_Few), End_Index);
+      if Stop_One /= 0 then
+         Patch_Stop_Target (Build, Positive (Stop_One), End_Index);
+      end if;
+      if Stop_Two /= 0 then
+         Patch_Stop_Target (Build, Positive (Stop_Two), End_Index);
+      end if;
+      if Stop_Few /= 0 then
+         Patch_Stop_Target (Build, Positive (Stop_Few), End_Index);
+      end if;
       Patch_Stop_Target (Build, Positive (Stop_Other), End_Index);
    end Compile_Ordinal;
 

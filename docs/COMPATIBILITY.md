@@ -2,7 +2,7 @@
 
 ## Source compatibility
 
-The v1.0 source-compatibility boundary covers only the public packages:
+The source-compatibility boundary covers only the public packages:
 
 * `I18N`
 * `I18N.Runtime`
@@ -10,6 +10,7 @@ The v1.0 source-compatibility boundary covers only the public packages:
 * `I18N.Diagnostics`
 * `I18N.Arguments`
 * `I18N.Locales`
+* `I18N.Plurals`
 
 Allowed after v1.0:
 
@@ -30,7 +31,7 @@ Forbidden after v1.0:
 
 ## Runtime/catalog compatibility
 
-The current v1.0 release defines a text authoring catalog format, not a persistent binary compiled catalog format. Catalogs are deterministic line-oriented source catalogs. Public initialization stores normalized locale/key/source entries and rejects malformed catalog structure deterministically; persistent compiled catalogs are not part of v1.0.
+The release defines a text authoring catalog format, not a persistent binary compiled catalog format. Catalogs are deterministic line-oriented source catalogs. Initialization and shard loading parse, validate, and compile each message once and store the compiled entry behind a normalized locale/key index, rejecting malformed catalog structure deterministically; persistent on-disk compiled catalogs are not part of the release.
 
 If a future binary catalog format is introduced, it must include at least:
 

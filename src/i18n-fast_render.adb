@@ -330,7 +330,11 @@ package body I18N.Fast_Render is
                                  State          => State);
                               Number_Value := Numeric_Value;
                               Number_Active := True;
-                              if Numeric_Value = 1 then
+                              --  Only "other" is mandatory; an absent "one"
+                              --  branch (One_Target = 0) falls back to "other".
+                              if Numeric_Value = 1
+                                and then Operation.One_Target /= 0
+                              then
                                  IP := Positive (Operation.One_Target);
                               else
                                  IP := Positive (Operation.Other_Target);
@@ -422,16 +426,30 @@ package body I18N.Fast_Render is
                                  State          => State);
                               Number_Value := Numeric_Value;
                               Number_Active := True;
-                              case Category_For_Ordinal (Numeric_Value) is
-                                 when One =>
-                                    IP := Positive (Operation.One_Target);
-                                 when Two =>
-                                    IP := Positive (Operation.Two_Target);
-                                 when Few =>
-                                    IP := Positive (Operation.Few_Target);
-                                 when Other =>
-                                    IP := Positive (Operation.Other_Target);
-                              end case;
+                              --  Only "other" is mandatory; an absent category
+                              --  branch (target 0) falls back to "other".
+                              declare
+                                 Target : I18N.Compiled.Op_Index :=
+                                   Operation.Other_Target;
+                              begin
+                                 case Category_For_Ordinal (Numeric_Value) is
+                                    when One =>
+                                       if Operation.One_Target /= 0 then
+                                          Target := Operation.One_Target;
+                                       end if;
+                                    when Two =>
+                                       if Operation.Two_Target /= 0 then
+                                          Target := Operation.Two_Target;
+                                       end if;
+                                    when Few =>
+                                       if Operation.Few_Target /= 0 then
+                                          Target := Operation.Few_Target;
+                                       end if;
+                                    when Other =>
+                                       null;
+                                 end case;
+                                 IP := Positive (Target);
+                              end;
                            end if;
                         end;
                      end if;

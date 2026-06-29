@@ -16,7 +16,7 @@ should still match semantically.
 ## Quick examples
 
 ```sh
-./examples/hello_world
+./examples/bin/hello_world
 ```
 
 ```text
@@ -24,7 +24,7 @@ hello world: Hello, Ada!
 ```
 
 ```sh
-./examples/basic_render
+./examples/bin/basic_render
 ```
 
 ```text
@@ -32,7 +32,7 @@ basic: Hello, Ada!
 ```
 
 ```sh
-./examples/public_api_example
+./examples/bin/public_api_example
 ```
 
 ```text
@@ -40,7 +40,7 @@ public API render: Servus, Ada!
 ```
 
 ```sh
-./examples/public_api_sealed
+./examples/bin/public_api_sealed
 ```
 
 ```text
@@ -50,7 +50,7 @@ public API sealed smoke: SUCCESS
 ## ICU subset examples
 
 ```sh
-./examples/plural_render
+./examples/bin/plural_render
 ```
 
 ```text
@@ -59,7 +59,7 @@ plural other: 5 items
 ```
 
 ```sh
-./examples/select_render
+./examples/bin/select_render
 ```
 
 ```text
@@ -68,7 +68,7 @@ select fallback branch: Unknown pet
 ```
 
 ```sh
-./examples/selectordinal_render
+./examples/bin/selectordinal_render
 ```
 
 ```text
@@ -77,7 +77,7 @@ ordinal other: 4th place
 ```
 
 ```sh
-./examples/nested_message_render
+./examples/bin/nested_message_render
 ```
 
 ```text
@@ -87,7 +87,7 @@ nested select/plural: Grace uploaded 2 files
 ## Locale and catalog examples
 
 ```sh
-./examples/locale_fallback
+./examples/bin/locale_fallback
 ```
 
 ```text
@@ -97,7 +97,7 @@ default en: Default fallback text for Ada.
 ```
 
 ```sh
-./examples/fallback_chain
+./examples/bin/fallback_chain
 ```
 
 ```text
@@ -107,7 +107,7 @@ fallback default en: Default fallback text for Ada.
 ```
 
 ```sh
-./examples/default_locale_key
+./examples/bin/default_locale_key
 ```
 
 ```text
@@ -115,7 +115,7 @@ unqualified catalog key uses default locale: Unqualified default-locale text for
 ```
 
 ```sh
-./examples/equals_in_value
+./examples/bin/equals_in_value
 ```
 
 ```text
@@ -123,7 +123,7 @@ equals in catalog value: A value may contain = after the first separator.
 ```
 
 ```sh
-./examples/empty_message
+./examples/bin/empty_message
 ```
 
 ```text
@@ -134,7 +134,7 @@ empty message length: 0
 ## Error and status examples
 
 ```sh
-./examples/missing_key
+./examples/bin/missing_key
 ```
 
 ```text
@@ -142,7 +142,7 @@ missing key: MISSING_KEY
 ```
 
 ```sh
-./examples/missing_argument
+./examples/bin/missing_argument
 ```
 
 ```text
@@ -150,7 +150,7 @@ missing argument: MISSING_ARGUMENT
 ```
 
 ```sh
-./examples/invalid_argument
+./examples/bin/invalid_argument
 ```
 
 ```text
@@ -158,7 +158,7 @@ invalid numeric argument: INVALID_ARGUMENT
 ```
 
 ```sh
-./examples/invalid_catalog
+./examples/bin/invalid_catalog
 ```
 
 ```text
@@ -168,7 +168,7 @@ syntax catalog valid: FALSE
 ```
 
 ```sh
-./examples/invalid_catalog_fields
+./examples/bin/invalid_catalog_fields
 ```
 
 ```text
@@ -178,7 +178,7 @@ empty default locale valid: FALSE
 ```
 
 ```sh
-./examples/status_handling
+./examples/bin/status_handling
 ```
 
 ```text
@@ -190,7 +190,7 @@ missing key status: message key not found after locale fallback
 ## Diagnostics and lifecycle examples
 
 ```sh
-./examples/diagnostics_non_interference
+./examples/bin/diagnostics_non_interference
 ```
 
 ```text
@@ -199,7 +199,7 @@ diagnostic count: 0
 ```
 
 ```sh
-./examples/diagnostics_inspection
+./examples/bin/diagnostics_inspection
 ```
 
 Expected deterministic prefix:
@@ -215,7 +215,7 @@ The diagnostic message text after `message=` may contain implementation detail
 text intended for debugging; the stable part is the status, kind, key, and count.
 
 ```sh
-./examples/reuse_runtime
+./examples/bin/reuse_runtime
 ```
 
 ```text
@@ -224,7 +224,7 @@ second render: 7 Artikel
 ```
 
 ```sh
-./examples/argument_lifecycle
+./examples/bin/argument_lifecycle
 ```
 
 ```text

@@ -1,5 +1,5 @@
-name = "tests"
-description = "Tests for i18n library"
+name = "check_i18n"
+description = "Release and documentation checks for i18n"
 version = "0.1.0-dev"
 
 authors = ["Bent Bracke"]
@@ -7,18 +7,9 @@ maintainers = ["Bent Bracke <bent@bracke.dk>"]
 maintainers-logins = ["bracke"]
 licenses = "MIT"
 website = ""
-tags = []
+tags = ["tool", "release", "check"]
 
-executables = ["tests"]
-
-[[depends-on]]
-aunit = "^26.0.0"
-
-[[depends-on]]
-i18n = "*"
-
-[[pins]]
-i18n = { path='..' }
+executables = ["check_i18n"]
 
 [[depends-on]]
 project_tools = "*"

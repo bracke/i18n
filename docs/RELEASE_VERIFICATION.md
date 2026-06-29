@@ -12,9 +12,15 @@ cd tests
 alr exec -- gprbuild -P tests.gpr
 ./bin/tests
 cd ..
+cd check_i18n
+alr build
+./bin/check_i18n
+cd ..
+alr exec -- gnatprove -P i18n.gpr --level=0 --mode=check
+alr test
 ```
 
-These checks establish that the core library builds, the test project builds, the AUnit suite runs successfully, and GNAT accepts the private-child package structure used by the tests.
+These checks establish that the core library builds, the test project builds, the AUnit suite runs successfully, the project_tools-based release guard passes, GNATprove accepts SPARK legality for enabled units, and GNAT accepts the private-child package structure used by the tests.
 
 The build is free of the GNAT warning about `I18N.Errors.Result` object creation possibly raising `Storage_Error`; the internal result value uses non-discriminated storage.
 
@@ -23,12 +29,12 @@ The build is free of the GNAT warning about `I18N.Errors.Result` object creation
 Before publishing or tagging a public v1.0 release, also run:
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 alr build
-gnatdoc -P i18n.gpr
+alr exec -- gnatdoc -P i18n.gpr
 ```
 
-Run `alr test` as well if an Alire test action is added to the manifest or local release process. The release is not publication-ready if any required local publication command fails.
+`alr test` is part of the required release gate and runs the manifest-declared test action. The release is not publication-ready if any required local publication command fails.
 
 ## Private-package sealing checks
 

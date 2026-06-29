@@ -4,6 +4,7 @@ with I18N.Runtime.Tests.Execution;
 with I18N.Runtime.Tests.Diagnostics;
 with I18N.Runtime.Tests.Corpus;
 with I18N.Runtime.Tests.Release;
+with I18N.Runtime.Tests.Features;
 
 package body I18N.Runtime.Tests.Suite is
 
@@ -19,6 +20,7 @@ package body I18N.Runtime.Tests.Suite is
       Result.Add_Test (new I18N.Runtime.Tests.Diagnostics.Test_Case);
       Result.Add_Test (new I18N.Runtime.Tests.Corpus.Test_Case);
       Result.Add_Test (new I18N.Runtime.Tests.Release.Test_Case);
+      Result.Add_Test (new I18N.Runtime.Tests.Features.Test_Case);
       return Result;
    end Suite;
 

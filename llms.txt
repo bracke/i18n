@@ -12,6 +12,7 @@ Application code may depend on:
 - `I18N.Diagnostics`
 - `I18N.Arguments`
 - `I18N.Locales`
+- `I18N.Plurals`
 
 Do not present parser, AST, validation, compiler, compiled IR, cache, buffer, render internals, fast-render internals, errors, observability, or `I18N.Runtime.Compatibility` as application-facing API. Those units are implementation or regression-test support and are sealed with Ada private child package visibility where appropriate.
 

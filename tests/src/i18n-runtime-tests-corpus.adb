@@ -674,8 +674,11 @@ package body I18N.Runtime.Tests.Corpus is
       Assert_Invalid_Source
         ("{gender, select, male {He}}",
          I18N.Errors.Missing_Branch);
+      --  Only "other" is mandatory for selectordinal; a selectordinal that
+      --  omits "other" is the missing-branch case (missing one/two/few are
+      --  valid and fall back to "other").
       Assert_Invalid_Source
-        ("{rank, selectordinal, one {#st} two {#nd} other {#th}}",
+        ("{rank, selectordinal, one {#st} two {#nd} few {#rd}}",
          I18N.Errors.Missing_Branch);
       Assert_Invalid_Source
         ("Hello {",
@@ -765,8 +768,11 @@ package body I18N.Runtime.Tests.Corpus is
       Assert_Invalid_Source
         ("{count, plural, zero {0} other {n}}",
          I18N.Errors.Parse_Error);
+      --  Generalized select accepts arbitrary identifier branch names, so a
+      --  duplicate generalized branch (not an unknown one) is the malformed
+      --  case here.
       Assert_Invalid_Source
-        ("{gender, select, unknown {U} other {O}}",
+        ("{gender, select, unknown {U} unknown {V} other {O}}",
          I18N.Errors.Parse_Error);
       Assert_Invalid_Source
         ("{rank, selectordinal, many {M} other {O}}",

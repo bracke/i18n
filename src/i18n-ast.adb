@@ -8,6 +8,10 @@ package body I18N.AST is
      (Object => Node,
       Name   => Node_Access);
 
+   procedure Free_Branch is new Ada.Unchecked_Deallocation
+     (Object => Select_Branch,
+      Name   => Branch_Access);
+
    procedure Append_Node
      (Head : in out Node_Access;
       Tail : in out Node_Access;
@@ -52,15 +56,68 @@ package body I18N.AST is
               Name  => Null_Unbounded_String,
               One    => null,
               Other  => null,
-              Male   => null,
-              Female => null,
-              Select_Other => null,
+              Branches => null,
               Ord_One   => null,
               Ord_Two   => null,
               Ord_Few   => null,
               Ord_Other => null,
               Next   => null));
    end Append_Text;
+
+   procedure Append_Branch
+     (Head      : in out Branch_Access;
+      Tail      : in out Branch_Access;
+      Name      : String;
+      Body_Root : in out Node_Access)
+   is
+      Item : constant Branch_Access :=
+        new Select_Branch'
+          (Name      => To_Unbounded_String (Name),
+           Body_Root => Body_Root,
+           Next      => null);
+   begin
+      Body_Root := null;
+
+      if Head = null then
+         Head := Item;
+         Tail := Item;
+      else
+         Tail.Next := Item;
+         Tail := Item;
+      end if;
+   end Append_Branch;
+
+   function Has_Branch
+     (Branches : Branch_Access;
+      Name     : String)
+      return Boolean
+   is
+      Current : Branch_Access := Branches;
+   begin
+      while Current /= null loop
+         if To_String (Current.Name) = Name then
+            return True;
+         end if;
+         Current := Current.Next;
+      end loop;
+      return False;
+   end Has_Branch;
+
+   function Branch_Body
+     (Branches : Branch_Access;
+      Name     : String)
+      return Node_Access
+   is
+      Current : Branch_Access := Branches;
+   begin
+      while Current /= null loop
+         if To_String (Current.Name) = Name then
+            return Current.Body_Root;
+         end if;
+         Current := Current.Next;
+      end loop;
+      return null;
+   end Branch_Body;
 
    procedure Append_Variable
      (Head : in out Node_Access;
@@ -84,9 +141,7 @@ package body I18N.AST is
               Name  => To_Unbounded_String (Name),
               One    => null,
               Other  => null,
-              Male   => null,
-              Female => null,
-              Select_Other => null,
+              Branches => null,
               Ord_One   => null,
               Ord_Two   => null,
               Ord_Few   => null,
@@ -116,9 +171,7 @@ package body I18N.AST is
            Name  => To_Unbounded_String (Name),
            One    => One,
            Other  => Other,
-           Male   => null,
-           Female => null,
-           Select_Other => null,
+           Branches => null,
            Ord_One   => null,
            Ord_Two   => null,
            Ord_Few   => null,
@@ -135,12 +188,10 @@ package body I18N.AST is
    end Append_Plural;
 
    procedure Append_Select
-     (Head   : in out Node_Access;
-      Tail   : in out Node_Access;
-      Name   : String;
-      Male   : in out Node_Access;
-      Female : in out Node_Access;
-      Other  : in out Node_Access)
+     (Head     : in out Node_Access;
+      Tail     : in out Node_Access;
+      Name     : String;
+      Branches : in out Branch_Access)
    is
       Item : Node_Access;
    begin
@@ -157,18 +208,14 @@ package body I18N.AST is
            Name   => To_Unbounded_String (Name),
            One    => null,
            Other  => null,
-           Male   => Male,
-           Female => Female,
-           Select_Other => Other,
+           Branches => Branches,
            Ord_One   => null,
            Ord_Two   => null,
            Ord_Few   => null,
            Ord_Other => null,
            Next   => null);
 
-      Male := null;
-      Female := null;
-      Other := null;
+      Branches := null;
 
       Append_Node
         (Head => Head,
@@ -200,9 +247,7 @@ package body I18N.AST is
            Name      => To_Unbounded_String (Name),
            One       => null,
            Other     => null,
-           Male      => null,
-           Female    => null,
-           Select_Other    => null,
+           Branches  => null,
            Ord_One   => One,
            Ord_Two   => Two,
            Ord_Few   => Few,
@@ -220,6 +265,21 @@ package body I18N.AST is
          Item => Item);
    end Append_Select_Ordinal;
 
+   procedure Free_Branches
+     (Branches : in out Branch_Access)
+   is
+      Current : Branch_Access := Branches;
+      Next    : Branch_Access;
+   begin
+      while Current /= null loop
+         Next := Current.Next;
+         Free (Current.Body_Root);
+         Free_Branch (Current);
+         Current := Next;
+      end loop;
+      Branches := null;
+   end Free_Branches;
+
    procedure Free
      (Root : in out Node_Access)
    is
@@ -234,9 +294,7 @@ package body I18N.AST is
             Free (Current.One);
             Free (Current.Other);
          elsif Current.Kind = I18N.AST.Select_Node then
-            Free (Current.Male);
-            Free (Current.Female);
-            Free (Current.Select_Other);
+            Free_Branches (Current.Branches);
          elsif Current.Kind = I18N.AST.SelectOrdinal then
             Free (Current.Ord_One);
             Free (Current.Ord_Two);

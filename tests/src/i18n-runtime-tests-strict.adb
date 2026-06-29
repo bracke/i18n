@@ -257,8 +257,10 @@ package body I18N.Runtime.Tests.Strict is
    is
       pragma Unreferenced (T);
    begin
+      --  Only "other" is mandatory; a selectordinal that omits "other" is the
+      --  missing-branch case (missing one/two/few fall back to "other").
       Assert_Render_Error
-        (Source  => "{num, selectordinal, one {1st} other {#th}}",
+        (Source  => "{num, selectordinal, one {1st} two {2nd} few {3rd}}",
          Error   => I18N.Errors.Missing_Branch,
          Key_1   => "num",
          Value_1 => "1");

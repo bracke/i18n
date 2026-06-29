@@ -1,6 +1,6 @@
 {
   "project": "ICU Messages Ada",
-  "version_contract": "v1.0 release candidate with GNAT/GPRbuild library/test verification",
+  "version_contract": "Stable runtime release with GNAT/GPRbuild library/test verification",
   "language": "Ada 2022",
   "public_packages": [
     {
@@ -14,25 +14,74 @@
     {
       "name": "I18N.Runtime",
       "file": "src/i18n-runtime.ads",
-      "role": "Catalog-backed runtime initialization and public rendering facade",
+      "role": "Catalog-backed runtime loading, validation, resolution, and public rendering facade",
       "stable": true,
       "primary_subprograms": [
         {
           "name": "Initialize",
           "kind": "procedure",
           "signature_summary": "Initialize (Runtime : in out I18N.Runtime.Instance; Catalog_Path : String)",
-          "behavior": "Reads and validates a line-oriented catalog into normalized runtime entries. Invalid catalogs put the runtime into a deterministic invalid state."
+          "behavior": "Reads, validates, and compiles a line-oriented catalog into indexed runtime entries. Invalid catalogs put the runtime into a deterministic invalid state."
+        },
+        {
+          "name": "Load_File",
+          "kind": "procedure",
+          "signature_summary": "Load_File (Item : in out Instance; Path : String; Result : out Load_Result; Policy : Duplicate_Policy := Reject_Duplicates)",
+          "behavior": "Transactionally layers a catalog shard from a file under a duplicate policy; non-destructive on failure."
+        },
+        {
+          "name": "Load_Text",
+          "kind": "procedure",
+          "signature_summary": "Load_Text (Item : in out Instance; Source_Name : String; Text : String; Result : out Load_Result; Policy : Duplicate_Policy := Reject_Duplicates)",
+          "behavior": "Transactionally layers an in-memory catalog shard; non-destructive on failure."
+        },
+        {
+          "name": "Validate_Catalog_File",
+          "kind": "function",
+          "signature_summary": "Validate_Catalog_File (Path : String) return Catalog_Validation_Result",
+          "behavior": "Parses and validates a catalog file without mutating any runtime; diagnostics include line numbers."
+        },
+        {
+          "name": "Validate_Catalog_Text",
+          "kind": "function",
+          "signature_summary": "Validate_Catalog_Text (Source_Name : String; Text : String) return Catalog_Validation_Result",
+          "behavior": "Parses and validates catalog text without mutating any runtime."
+        },
+        {
+          "name": "Resolve",
+          "kind": "function",
+          "signature_summary": "Resolve (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String) return Resolve_Result",
+          "behavior": "Reports whether a key resolves through locale fallback without rendering it; no arguments required."
         },
         {
           "name": "Render",
           "kind": "function",
           "signature_summary": "Render (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String; Arguments : I18N.Arguments.Arguments) return I18N.Result.Render_Result",
-          "behavior": "Renders a catalog key using deterministic locale fallback and returns structured status/text."
+          "behavior": "Renders a catalog key using deterministic locale fallback and locale-aware plural/select; returns structured status/text."
+        },
+        {
+          "name": "Render_Into",
+          "kind": "procedure",
+          "signature_summary": "Render_Into (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String; Arguments : I18N.Arguments.Arguments; Target : in out String; Last : out Natural; Status : out I18N.Result.Render_Status)",
+          "behavior": "Allocation-free render directly into caller-owned storage; reports Buffer_Overflow with the prefix that fits."
         }
       ],
       "stable_surface": [
         "Initialize",
+        "Load",
+        "Load_File",
+        "Load_Text",
+        "Duplicate_Policy",
+        "Load_Status",
+        "Load_Result",
+        "Validate_Catalog_File",
+        "Validate_Catalog_Text",
+        "Catalog_Validation_Result",
+        "Resolve",
+        "Resolve_Result",
+        "Resolved_Locale",
         "Render",
+        "Render_Into",
         "Is_Valid",
         "Finalize"
       ]
@@ -69,8 +118,20 @@
       "file": "src/i18n-arguments.ads",
       "role": "Public render argument map facade",
       "stable": true,
+      "stable_surface": [
+        "Set",
+        "Set_Integer",
+        "Set_Natural",
+        "Set_Boolean",
+        "Clear",
+        "Copy",
+        "Has",
+        "Get",
+        "Copy_Value"
+      ],
       "contract_notes": [
-        "Arguments is a limited, mutable, noncopyable public argument map; callers update it with Set/Clear, use Copy for explicit duplication, and pass it by reference to Render."
+        "Arguments is a limited, mutable, noncopyable public argument map; callers update it with Set/Clear, use Copy for explicit duplication, and pass it by reference to Render.",
+        "Set_Integer/Set_Natural write strict decimal text with no 'Image leading space; Set_Boolean writes true/false. These helpers are deterministic and not locale-aware."
       ]
     },
     {
@@ -93,6 +154,38 @@
           "behavior": "Installs or clears optional observational tracing; callback exceptions are contained."
         }
       ]
+    },
+    {
+      "name": "I18N.Plurals",
+      "file": "src/i18n-plurals.ads",
+      "role": "CLDR plural-category classification for plural/selectordinal mechanics",
+      "stable": true,
+      "primary_subprograms": [
+        {
+          "name": "Cardinal",
+          "kind": "function",
+          "signature_summary": "Cardinal (Locale : I18N.Locales.Locale_Id; Value : Long_Long_Integer) return Plural_Category",
+          "behavior": "Classifies an integer into a CLDR cardinal category for the locale."
+        },
+        {
+          "name": "Ordinal",
+          "kind": "function",
+          "signature_summary": "Ordinal (Locale : I18N.Locales.Locale_Id; Value : Long_Long_Integer) return Plural_Category",
+          "behavior": "Classifies an integer into a CLDR ordinal category for the locale."
+        }
+      ],
+      "stable_surface": [
+        "Plural_Category",
+        "Cardinal",
+        "Ordinal"
+      ],
+      "coverage": {
+        "categories": ["Zero", "One", "Two", "Few", "Many", "Other"],
+        "cardinal_locales": ["en", "de", "nl", "da", "es", "it", "fr", "pt", "ru", "pl", "cs", "ar"],
+        "ordinal_locales": ["en", "fr", "it"],
+        "fallback": "root rule (Other) for CJK and unsupported locales",
+        "operands": "integer-only"
+      }
     }
   ],
   "internal_packages_not_for_application_use": [
@@ -198,10 +291,11 @@
     "I18N.Result",
     "I18N.Diagnostics",
     "I18N.Arguments",
-    "I18N.Locales"
+    "I18N.Locales",
+    "I18N.Plurals"
   ],
   "test_namespace": "I18N.Runtime.Tests.* regression units are descendants of I18N.Runtime so they can legally import I18N.Runtime.Compatibility, which is a private child of I18N.Runtime.",
-  "production_path": "text catalog -> deterministic catalog validation -> locale/key lookup -> public catalog render -> structured public result",
+  "production_path": "text/shard catalog -> parse + validate + compile once at load -> indexed (locale,key) lookup -> locale fallback -> public render -> structured public result",
   "release_verification_required": {
     "verified": [
       "gprbuild -P i18n.gpr",
@@ -220,26 +314,20 @@
   "render_allocation_note": {
     "public_render_materializes_result_text": true,
     "public_render_zero_allocation_api": false,
+    "public_bounded_render": "I18N.Runtime.Render_Into",
+    "public_bounded_render_allocation_free": true,
     "zero_allocation_check_path": "private child I18N.Runtime.Compatibility.Render_Into"
   },
   "icu_subset": {
     "variables": true,
-    "plural_branches": [
-      "one",
-      "other"
-    ],
-    "select_branches": [
-      "male",
-      "female",
-      "other"
-    ],
-    "arbitrary_select_branch_names": false,
-    "selectordinal_branches": [
-      "one",
-      "two",
-      "few",
-      "other"
-    ]
+    "plural_branches_required": ["other"],
+    "plural_branches_optional": ["one"],
+    "select_branches": "arbitrary validated identifiers (legacy male/female/other still work)",
+    "arbitrary_select_branch_names": true,
+    "selectordinal_branches_required": ["other"],
+    "selectordinal_branches_optional": ["one", "two", "few"],
+    "missing_category_branch_falls_back_to_other": true,
+    "plural_ordinal_selection": "locale-aware via I18N.Plurals on the public render path"
   },
   "package_metadata": {
     "manifest": "alire.toml",

@@ -4,13 +4,19 @@ with Ada.Strings.Fixed;
 with Ada.Text_IO;
 
 with I18N.AST; use I18N.AST;
-with I18N.Diagnostics;
 with I18N.Result; use I18N.Result;
 with I18N.Parser;
 with I18N.Observability;
+with I18N.Plurals;
 with I18N.Validation;
 
 package body I18N.Runtime is
+
+   use type I18N.Plurals.Plural_Category;
+
+   ---------------------------------------------------------------------------
+   --  Small text helpers (catalog line parsing).
+   ---------------------------------------------------------------------------
 
    function Trimmed (Text : String) return String is
    begin
@@ -22,10 +28,8 @@ package body I18N.Runtime is
    begin
       if T'Length >= 2 and then T (T'First) = '"' and then T (T'Last) = '"'
       then
-         --  Catalog authoring uses quoted values in examples and tests.  Strip
-         --  enclosing quotes repeatedly so a value that has already passed
-         --  through one normalization layer remains stable and does not render
-         --  spurious literal quote characters.
+         --  Strip enclosing quotes repeatedly so a value already normalized once
+         --  stays stable and does not render spurious literal quote characters.
          return Unquote (T (T'First + 1 .. T'Last - 1));
       end if;
 
@@ -52,77 +56,478 @@ package body I18N.Runtime is
       return 0;
    end Equals_Index;
 
-   function Braces_Balanced (Text : String) return Boolean is
-      Depth : Natural := 0;
+   --  Composite index key: Locale & NUL & Key. NUL cannot appear in a locale or
+   --  key, so the join is unambiguous.
+   function Composite (Locale : String; Key : String) return String is
    begin
-      for C of Text loop
-         if C = '{' then
-            Depth := Depth + 1;
-         elsif C = '}' then
-            if Depth = 0 then
-               return False;
-            end if;
+      return Locale & Character'Val (0) & Key;
+   end Composite;
 
-            Depth := Depth - 1;
-         end if;
-      end loop;
+   --  Render a " at line N" suffix for diagnostics (empty when Line is 0).
+   function Line_Suffix (Line : Natural) return String is
+   begin
+      if Line = 0 then
+         return "";
+      end if;
+      --  Natural'Image carries a leading space, so this reads " at line 5".
+      return " at line" & Natural'Image (Line);
+   end Line_Suffix;
 
-      return Depth = 0;
-   end Braces_Balanced;
+   ---------------------------------------------------------------------------
+   --  Line readers.
+   ---------------------------------------------------------------------------
 
-   function Catalog_Contains
-     (Item : Runtime; Locale : String; Key : String) return Boolean
+   package Line_Vectors is new Ada.Containers.Vectors
+     (Index_Type   => Natural,
+      Element_Type => Unbounded_String);
+
+   procedure Read_File_Lines
+     (Path  : String;
+      Found : out Boolean;
+      Lines : out Line_Vectors.Vector)
    is
-      Wanted_Locale : constant String := Trimmed (Locale);
-      Wanted_Key    : constant String := Trimmed (Key);
+      File : Ada.Text_IO.File_Type;
    begin
-      for Catalog_Item of Item.Catalog loop
-         if To_String (Catalog_Item.Locale) = Wanted_Locale
-           and then To_String (Catalog_Item.Message_Key) = Wanted_Key
-         then
-            return True;
-         end if;
+      Lines.Clear;
+      Found := False;
+
+      if not Ada.Directories.Exists (Path) then
+         return;
+      elsif Ada.Directories."/="
+              (Ada.Directories.Kind (Path),
+               Ada.Directories.Ordinary_File)
+      then
+         return;
+      end if;
+
+      Ada.Text_IO.Open
+        (File => File, Mode => Ada.Text_IO.In_File, Name => Path);
+
+      while not Ada.Text_IO.End_Of_File (File) loop
+         Lines.Append (To_Unbounded_String (Ada.Text_IO.Get_Line (File)));
       end loop;
 
-      return False;
-   end Catalog_Contains;
-
-   procedure Add_Catalog_Entry
-     (Item : in out Runtime; Locale : String; Key : String; Source : String) is
-   begin
-      if not Item.Valid then
-         return;
-      end if;
-
-      if Locale'Length = 0 or else Key'Length = 0 then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Validation_Error;
-         return;
-      end if;
-
-      if Catalog_Contains (Item, Locale, Key) then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Validation_Error;
-         return;
-      end if;
-
-      if not Braces_Balanced (Source) then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Unbalanced_Braces;
-         return;
-      end if;
-
-      Item.Catalog.Append
-        (Catalog_Entry'
-           (Locale      => To_Unbounded_String (Trimmed (Locale)),
-            Message_Key => To_Unbounded_String (Trimmed (Key)),
-            Source      => To_Unbounded_String (Unquote (Source))));
+      Ada.Text_IO.Close (File);
+      Found := True;
    exception
       when others =>
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Parse_Error;
-   end Add_Catalog_Entry;
+         if Ada.Text_IO.Is_Open (File) then
+            Ada.Text_IO.Close (File);
+         end if;
+         Lines.Clear;
+         Found := False;
+   end Read_File_Lines;
 
+   function Split_Text_Lines (Text : String) return Line_Vectors.Vector is
+      Lines   : Line_Vectors.Vector;
+      Current : Unbounded_String;
+
+      procedure Flush is
+         S : constant String := To_String (Current);
+      begin
+         --  Drop a trailing carriage return so CRLF input matches LF input.
+         if S'Length > 0 and then S (S'Last) = Character'Val (13) then
+            Lines.Append (To_Unbounded_String (S (S'First .. S'Last - 1)));
+         else
+            Lines.Append (Current);
+         end if;
+         Current := Null_Unbounded_String;
+      end Flush;
+
+   begin
+      for C of Text loop
+         if C = Character'Val (10) then
+            Flush;
+         else
+            Append (Current, C);
+         end if;
+      end loop;
+
+      if Length (Current) > 0 then
+         Flush;
+      end if;
+
+      return Lines;
+   end Split_Text_Lines;
+
+   ---------------------------------------------------------------------------
+   --  Message compilation (parse + validate once at load time).
+   ---------------------------------------------------------------------------
+
+   procedure Compile_One
+     (Source : String;
+      Root   : out I18N.AST.Node_Access;
+      Ok     : out Boolean;
+      Error  : out I18N.Errors.Error_Kind)
+   is
+      Parsed : I18N.AST.Node_Access := null;
+   begin
+      Root := null;
+
+      begin
+         Parsed := I18N.Parser.Parse (Source);
+      exception
+         when others =>
+            I18N.AST.Free (Parsed);
+            Ok := False;
+            Error := I18N.Errors.Parse_Error;
+            return;
+      end;
+
+      declare
+         Validation_Result : constant I18N.Errors.Result :=
+           I18N.Validation.Validate (Parsed);
+      begin
+         if not Validation_Result.Ok then
+            I18N.AST.Free (Parsed);
+            Ok := False;
+            Error := Validation_Result.Error;
+            return;
+         end if;
+      end;
+
+      Root := Parsed;
+      Ok := True;
+      Error := I18N.Errors.Parse_Error;
+   end Compile_One;
+
+   ---------------------------------------------------------------------------
+   --  Staging (transactional ingest support).
+   ---------------------------------------------------------------------------
+
+   type Staged_Entry is record
+      Locale : Unbounded_String;
+      Key    : Unbounded_String;
+      Source : Unbounded_String;
+      Line   : Natural := 0;
+      Root   : I18N.AST.Node_Access := null;
+   end record;
+
+   package Staged_Vectors is new Ada.Containers.Vectors
+     (Index_Type   => Natural,
+      Element_Type => Staged_Entry);
+
+   procedure Free_Staged (Staged : in out Staged_Vectors.Vector) is
+   begin
+      for I in Staged.First_Index .. Staged.Last_Index loop
+         declare
+            E : Staged_Entry := Staged.Element (I);
+         begin
+            if E.Root /= null then
+               I18N.AST.Free (E.Root);
+               E.Root := null;
+               Staged.Replace_Element (I, E);
+            end if;
+         end;
+      end loop;
+      Staged.Clear;
+   end Free_Staged;
+
+   --  Add a diagnostic for a load/validation failure.
+   procedure Add_Load_Diagnostic
+     (Diagnostics : in out I18N.Diagnostics.Diagnostic_List;
+      Kind        : I18N.Diagnostics.Diagnostic_Kind;
+      Message     : String := "";
+      Key         : String := "")
+   is
+   begin
+      I18N.Diagnostics.Add
+        (List => Diagnostics, Kind => Kind, Message => Message, Key => Key);
+   end Add_Load_Diagnostic;
+
+   --  A valid locale prefix is a BCP-47-style sequence of alphanumeric subtags
+   --  separated by single hyphens, with no leading, trailing, or empty subtag.
+   function Is_Valid_Locale (Text : String) return Boolean is
+      After_Hyphen : Boolean := True;  --  start state rejects a leading hyphen
+   begin
+      if Text'Length = 0 then
+         return False;
+      end if;
+
+      for C of Text loop
+         if C = '-' then
+            if After_Hyphen then
+               return False;  --  leading hyphen or empty subtag ("--")
+            end if;
+            After_Hyphen := True;
+         elsif C in 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' then
+            After_Hyphen := False;
+         else
+            return False;
+         end if;
+      end loop;
+
+      return not After_Hyphen;  --  reject a trailing hyphen
+   end Is_Valid_Locale;
+
+   --  A valid key is a non-empty run of identifier characters and dots, with no
+   --  leading or trailing dot. Dots are allowed so dotted keys such as
+   --  "cart.items" remain valid (the locale/key split uses only the first dot).
+   function Is_Valid_Key (Text : String) return Boolean is
+   begin
+      if Text'Length = 0
+        or else Text (Text'First) = '.'
+        or else Text (Text'Last) = '.'
+      then
+         return False;
+      end if;
+
+      for C of Text loop
+         if C not in 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '-' | '.' then
+            return False;
+         end if;
+      end loop;
+
+      return True;
+   end Is_Valid_Key;
+
+   --  Parse every catalog line into staged entries. The runtime is not touched.
+   --  default_locale directives are ignored here; unqualified keys bind to
+   --  Default_Locale. On any malformed line or invalid ICU message, Ok is False,
+   --  Error classifies the failure, and all staged roots are released.
+   procedure Stage_Lines
+     (Lines          : Line_Vectors.Vector;
+      Default_Locale : String;
+      Source_Name    : String;
+      Staged         : out Staged_Vectors.Vector;
+      Ok             : out Boolean;
+      Error          : out I18N.Errors.Error_Kind;
+      Diagnostics    : in out I18N.Diagnostics.Diagnostic_List)
+   is
+   begin
+      Staged.Clear;
+      Ok := True;
+      Error := I18N.Errors.Parse_Error;
+
+      for Idx in Lines.First_Index .. Lines.Last_Index loop
+         declare
+            Line_No : constant Positive := Idx + 1;
+            Clean   : constant String :=
+              Trimmed (To_String (Lines.Element (Idx)));
+         begin
+            if Clean'Length = 0 or else Clean (Clean'First) = '#' then
+               null;  --  blank or comment line
+            else
+               declare
+                  Eq : constant Natural := Equals_Index (Clean);
+               begin
+                  if Eq = 0 or else Eq = Clean'First then
+                     Add_Load_Diagnostic
+                       (Diagnostics, I18N.Diagnostics.Parse_Error,
+                        "missing '=' separator in " & Source_Name
+                        & Line_Suffix (Line_No),
+                        Clean);
+                     Free_Staged (Staged);
+                     Ok := False;
+                     Error := I18N.Errors.Parse_Error;
+                     return;
+                  end if;
+
+                  declare
+                     Name  : constant String :=
+                       Trimmed (Clean (Clean'First .. Eq - 1));
+                     Value : constant String :=
+                       (if Eq = Clean'Last
+                        then ""
+                        else Unquote (Clean (Eq + 1 .. Clean'Last)));
+                     Dot   : constant Natural := Dot_Index (Name);
+                  begin
+                     if Name = "default_locale" then
+                        null;  --  honored only by Initialize
+                     else
+                        declare
+                           Locale : Unbounded_String;
+                           Key    : Unbounded_String;
+                           Valid_Split : Boolean := True;
+                        begin
+                           if Dot = 0 then
+                              Locale := To_Unbounded_String (Default_Locale);
+                              Key := To_Unbounded_String (Name);
+                           elsif Dot = Name'First or else Dot = Name'Last then
+                              Valid_Split := False;
+                           else
+                              Locale :=
+                                To_Unbounded_String
+                                  (Name (Name'First .. Dot - 1));
+                              Key :=
+                                To_Unbounded_String
+                                  (Name (Dot + 1 .. Name'Last));
+                           end if;
+
+                           if not Valid_Split
+                             or else Length (Locale) = 0
+                             or else Length (Key) = 0
+                             or else not Is_Valid_Locale (To_String (Locale))
+                             or else not Is_Valid_Key (To_String (Key))
+                           then
+                              Add_Load_Diagnostic
+                                (Diagnostics,
+                                 I18N.Diagnostics.Validation_Error,
+                                 "invalid locale prefix or key in "
+                                 & Source_Name & Line_Suffix (Line_No),
+                                 Name);
+                              Free_Staged (Staged);
+                              Ok := False;
+                              Error := I18N.Errors.Validation_Error;
+                              return;
+                           end if;
+
+                           declare
+                              Root      : I18N.AST.Node_Access := null;
+                              Msg_Ok    : Boolean;
+                              Msg_Error : I18N.Errors.Error_Kind;
+                           begin
+                              Compile_One (Value, Root, Msg_Ok, Msg_Error);
+                              if not Msg_Ok then
+                                 Add_Load_Diagnostic
+                                   (Diagnostics,
+                                    I18N.Errors.To_Diagnostic_Kind (Msg_Error),
+                                    "invalid ICU message in " & Source_Name
+                                    & Line_Suffix (Line_No),
+                                    To_String (Key));
+                                 Free_Staged (Staged);
+                                 Ok := False;
+                                 Error := Msg_Error;
+                                 return;
+                              end if;
+
+                              Staged.Append
+                                (Staged_Entry'
+                                   (Locale => Locale,
+                                    Key    => Key,
+                                    Source => To_Unbounded_String (Value),
+                                    Line   => Line_No,
+                                    Root   => Root));
+                           end;
+                        end;
+                     end if;
+                  end;
+               end;
+            end if;
+         end;
+      end loop;
+   end Stage_Lines;
+
+   --  Append one committed entry to the runtime and index it.
+   procedure Commit_Append
+     (Item   : in out Runtime;
+      Locale : Unbounded_String;
+      Key    : Unbounded_String;
+      Source : Unbounded_String;
+      Root   : I18N.AST.Node_Access)
+   is
+   begin
+      Item.Catalog.Append
+        (Catalog_Entry'
+           (Locale      => Locale,
+            Message_Key => Key,
+            Source      => Source,
+            Root        => Root));
+      Item.Index.Insert
+        (Composite (To_String (Locale), To_String (Key)),
+         Item.Catalog.Last_Index);
+   end Commit_Append;
+
+   --  Replace an existing entry in place, releasing the previous compiled AST.
+   procedure Commit_Override
+     (Item  : in out Runtime;
+      Idx   : Natural;
+      Source : Unbounded_String;
+      Root  : I18N.AST.Node_Access)
+   is
+      Existing : Catalog_Entry := Item.Catalog.Element (Idx);
+   begin
+      if Existing.Root /= null then
+         I18N.AST.Free (Existing.Root);
+      end if;
+      Existing.Source := Source;
+      Existing.Root := Root;
+      Item.Catalog.Replace_Element (Idx, Existing);
+   end Commit_Override;
+
+   --  Apply staged entries to the runtime under Policy. Transactional for
+   --  Reject_Duplicates: a duplicate aborts before any mutation. Apply takes
+   --  ownership of every staged root (committed roots are transferred, skipped
+   --  roots are released), so callers may always call Free_Staged afterwards.
+   procedure Apply_Staged
+     (Item     : in out Runtime;
+      Staged   : in out Staged_Vectors.Vector;
+      Policy   : Duplicate_Policy;
+      Status   : out Load_Status;
+      Added    : out Natural;
+      Replaced : out Natural;
+      Ignored  : out Natural)
+   is
+   begin
+      Added := 0;
+      Replaced := 0;
+      Ignored := 0;
+      Status := Loaded;
+
+      if Policy = Reject_Duplicates then
+         --  Pre-check: any collision (with existing entries or within the input)
+         --  aborts without mutating the runtime.
+         declare
+            Seen : Index_Maps.Map;
+         begin
+            for E of Staged loop
+               declare
+                  Comp : constant String :=
+                    Composite (To_String (E.Locale), To_String (E.Key));
+               begin
+                  if Item.Index.Contains (Comp) or else Seen.Contains (Comp)
+                  then
+                     Status := Duplicate_Rejected;
+                     return;
+                  end if;
+                  Seen.Insert (Comp, 0);
+               end;
+            end loop;
+         end;
+      end if;
+
+      for I in Staged.First_Index .. Staged.Last_Index loop
+         declare
+            E    : Staged_Entry := Staged.Element (I);
+            Comp : constant String :=
+              Composite (To_String (E.Locale), To_String (E.Key));
+            Exists : constant Boolean := Item.Index.Contains (Comp);
+         begin
+            case Policy is
+               when Reject_Duplicates =>
+                  Commit_Append (Item, E.Locale, E.Key, E.Source, E.Root);
+                  Added := Added + 1;
+                  E.Root := null;
+
+               when Keep_First =>
+                  if Exists then
+                     I18N.AST.Free (E.Root);
+                     E.Root := null;
+                     Ignored := Ignored + 1;
+                  else
+                     Commit_Append (Item, E.Locale, E.Key, E.Source, E.Root);
+                     Added := Added + 1;
+                     E.Root := null;
+                  end if;
+
+               when Override_Previous =>
+                  if Exists then
+                     Commit_Override
+                       (Item, Item.Index.Element (Comp), E.Source, E.Root);
+                     Replaced := Replaced + 1;
+                  else
+                     Commit_Append (Item, E.Locale, E.Key, E.Source, E.Root);
+                     Added := Added + 1;
+                  end if;
+                  E.Root := null;
+            end case;
+
+            Staged.Replace_Element (I, E);
+         end;
+      end loop;
+   end Apply_Staged;
+
+   --  Original default_locale line handler (Initialize only).
    procedure Parse_Default_Locale_Line (Item : in out Runtime; Line : String)
    is
       Clean : constant String := Trimmed (Line);
@@ -155,174 +560,49 @@ package body I18N.Runtime is
       end if;
    end Parse_Default_Locale_Line;
 
-   procedure Parse_Catalog_Line (Item : in out Runtime; Line : String) is
-      Clean : constant String := Trimmed (Line);
-      Eq    : Natural;
-      Dot   : Natural;
-   begin
-      if Clean'Length = 0 or else Clean (Clean'First) = '#' then
-         return;
-      end if;
-
-      Eq := Equals_Index (Clean);
-      if Eq = 0 or else Eq = Clean'First then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Parse_Error;
-         return;
-      end if;
-
-      declare
-         Name_Text  : constant String :=
-           Trimmed (Clean (Clean'First .. Eq - 1));
-         Value_Text : constant String :=
-           (if Eq = Clean'Last
-            then ""
-            else Unquote (Clean (Eq + 1 .. Clean'Last)));
-      begin
-         if Name_Text = "default_locale" then
-            return;
-         end if;
-
-         Dot := Dot_Index (Name_Text);
-         if Dot = 0 then
-            Add_Catalog_Entry
-              (Item   => Item,
-               Locale => To_String (Item.Default_Locale),
-               Key    => Name_Text,
-               Source => Value_Text);
-         else
-            if Dot = Name_Text'First or else Dot = Name_Text'Last then
-               Item.Valid := False;
-               Item.Error := I18N.Errors.Validation_Error;
-               return;
-            end if;
-
-            Add_Catalog_Entry
-              (Item   => Item,
-               Locale => Name_Text (Name_Text'First .. Dot - 1),
-               Key    => Name_Text (Dot + 1 .. Name_Text'Last),
-               Source => Value_Text);
-         end if;
-      end;
-   end Parse_Catalog_Line;
-
-   procedure Initialize (Item : in out Runtime; Catalog_Path : String) is
-   begin
-      Finalize (Item);
-      Item.Valid := True;
-      Item.Error := I18N.Errors.Parse_Error;
-      Item.Default_Locale :=
-        To_Unbounded_String (I18N.Locales.Default_Locale_Name);
-      Item.Default_Locale_Seen := False;
-
-      if not Ada.Directories.Exists (Catalog_Path) then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Parse_Error;
-         return;
-      elsif Ada.Directories."/="
-              (Ada.Directories.Kind (Catalog_Path),
-               Ada.Directories.Ordinary_File)
-      then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Parse_Error;
-         return;
-      end if;
-
-      declare
-         File : Ada.Text_IO.File_Type;
-      begin
-         Ada.Text_IO.Open
-           (File => File, Mode => Ada.Text_IO.In_File, Name => Catalog_Path);
-
-         while not Ada.Text_IO.End_Of_File (File) loop
-            declare
-               Line : constant String := Ada.Text_IO.Get_Line (File);
-            begin
-               Parse_Default_Locale_Line (Item, Line);
-               exit when not Item.Valid;
-            end;
-         end loop;
-
-         Ada.Text_IO.Close (File);
-
-         if not Item.Valid then
-            return;
-         end if;
-
-         Ada.Text_IO.Open
-           (File => File, Mode => Ada.Text_IO.In_File, Name => Catalog_Path);
-
-         while not Ada.Text_IO.End_Of_File (File) loop
-            declare
-               Line : constant String := Ada.Text_IO.Get_Line (File);
-            begin
-               Parse_Catalog_Line (Item, Line);
-               exit when not Item.Valid;
-            end;
-         end loop;
-
-         Ada.Text_IO.Close (File);
-      exception
-         when others =>
-            if Ada.Text_IO.Is_Open (File) then
-               Ada.Text_IO.Close (File);
-            end if;
-            Item.Valid := False;
-            Item.Error := I18N.Errors.Parse_Error;
-      end;
-
-      if Item.Valid and then Item.Catalog.Is_Empty then
-         Item.Valid := False;
-         Item.Error := I18N.Errors.Validation_Error;
-      end if;
-   end Initialize;
-
-   procedure Find_Source
-     (Item   : Runtime;
-      Locale : String;
-      Key    : String;
-      Found  : out Boolean;
-      Source : out Unbounded_String)
+   --  Detect the first default_locale directive, or return the built-in default.
+   function Detect_Default_Locale
+     (Lines : Line_Vectors.Vector)
+      return String
    is
-      Wanted_Locale : constant String := Trimmed (Locale);
-      Wanted_Key    : constant String := Trimmed (Key);
    begin
-      for Catalog_Item of Item.Catalog loop
-         if To_String (Catalog_Item.Locale) = Wanted_Locale
-           and then To_String (Catalog_Item.Message_Key) = Wanted_Key
-         then
-            Found := True;
-            Source := Catalog_Item.Source;
-            return;
-         end if;
+      for Raw of Lines loop
+         declare
+            Clean : constant String := Trimmed (To_String (Raw));
+         begin
+            if Clean'Length > 0 and then Clean (Clean'First) /= '#' then
+               declare
+                  Eq : constant Natural := Equals_Index (Clean);
+               begin
+                  if Eq /= 0 and then Eq /= Clean'First then
+                     declare
+                        Name : constant String :=
+                          Trimmed (Clean (Clean'First .. Eq - 1));
+                     begin
+                        if Name = "default_locale" and then Eq /= Clean'Last
+                        then
+                           declare
+                              Value : constant String :=
+                                Unquote (Clean (Eq + 1 .. Clean'Last));
+                           begin
+                              if Value'Length > 0 then
+                                 return Value;
+                              end if;
+                           end;
+                        end if;
+                     end;
+                  end if;
+               end;
+            end if;
+         end;
       end loop;
 
-      Found := False;
-      Source := Null_Unbounded_String;
-   end Find_Source;
+      return I18N.Locales.Default_Locale_Name;
+   end Detect_Default_Locale;
 
-   function To_Public_Status
-     (Kind : I18N.Errors.Error_Kind) return I18N.Result.Render_Status is
-   begin
-      case Kind is
-         when I18N.Errors.Missing_Variable                               =>
-            return I18N.Result.Missing_Argument;
-
-         when I18N.Errors.Invalid_Selector | I18N.Errors.Invalid_Ordinal =>
-            return I18N.Result.Invalid_Argument;
-
-         when I18N.Errors.Buffer_Overflow                                =>
-            return I18N.Result.Buffer_Overflow;
-
-         when I18N.Errors.Missing_Branch                                 =>
-            return I18N.Result.Formatting_Error;
-
-         when I18N.Errors.Parse_Error
-            | I18N.Errors.Validation_Error
-            | I18N.Errors.Unbalanced_Braces                              =>
-            return I18N.Result.Execution_Error;
-      end case;
-   end To_Public_Status;
+   ---------------------------------------------------------------------------
+   --  Public status / diagnostics helpers.
+   ---------------------------------------------------------------------------
 
    function Public_Failure
      (Status      : I18N.Result.Render_Status;
@@ -367,6 +647,10 @@ package body I18N.Runtime is
       I18N.Diagnostics.Add
         (List => Diagnostics, Kind => Kind, Message => Message, Key => Key);
    end Add_Runtime_Diagnostic;
+
+   ---------------------------------------------------------------------------
+   --  Compiled-AST rendering (no parsing on the render hot path).
+   ---------------------------------------------------------------------------
 
    function Is_Decimal_Integer (Text : String) return Boolean is
       Start : Positive;
@@ -420,128 +704,104 @@ package body I18N.Runtime is
       return To_String (Result);
    end Substitute_Number;
 
-   function Normalized_Source (Source : String) return String is
-   begin
-      return Unquote (Source);
-   end Normalized_Source;
-
-   function Contains_Complex_ICU (Source : String) return Boolean is
-   begin
-      return
-        Ada.Strings.Fixed.Index (Source, ", plural") /= 0
-        or else Ada.Strings.Fixed.Index (Source, ",plural") /= 0
-        or else Ada.Strings.Fixed.Index (Source, ", select") /= 0
-        or else Ada.Strings.Fixed.Index (Source, ",select") /= 0
-        or else Ada.Strings.Fixed.Index (Source, ", selectordinal") /= 0
-        or else Ada.Strings.Fixed.Index (Source, ",selectordinal") /= 0;
-   end Contains_Complex_ICU;
-
-   function Render_Simple_Source
-     (Source : String; Arguments : I18N.Arguments.Arguments)
-      return I18N.Result.Render_Result
+   --  Split a decimal string ("12.50", "-1.5") into CLDR operands. Requires at
+   --  least one digit on each side of a single '.'; sets Valid := False for any
+   --  other shape (including a plain integer with no fraction).
+   procedure Split_Decimal
+     (Text            : String;
+      Integer_Part    : out Long_Long_Integer;
+      Fraction_Digits : out Natural;
+      Fraction_Value  : out Long_Long_Integer;
+      Valid           : out Boolean)
    is
-      Output      : Unbounded_String;
-      Diagnostics : I18N.Diagnostics.Diagnostic_List;
-      Pos         : Positive := Source'First;
+      Start : Natural := Text'First;
+      Dot   : Natural := 0;
    begin
-      I18N.Observability.Emit (I18N.Observability.Message_Start, "");
+      Integer_Part    := 0;
+      Fraction_Digits := 0;
+      Fraction_Value  := 0;
+      Valid           := False;
 
-      if Source'Length = 0 then
-         I18N.Observability.Emit (I18N.Observability.Message_End, "");
-         return
-           (Status      => I18N.Result.Success,
-            Text        => I18N.Result.To_Output_View (""),
-            Diagnostics => Diagnostics);
+      if Text'Length = 0 then
+         return;
       end if;
 
-      while Pos <= Source'Last loop
-         if Source (Pos) = '{' then
-            declare
-               Close_Pos : Natural := 0;
-            begin
-               for Index in Pos + 1 .. Source'Last loop
-                  if Source (Index) = '}' then
-                     Close_Pos := Index;
-                     exit;
-                  elsif Source (Index) = '{' then
-                     return
-                       Public_Failure
-                         (Status      => I18N.Result.Execution_Error,
-                          Diagnostics => Diagnostics);
-                  end if;
-               end loop;
+      if Text (Start) = '-' or else Text (Start) = '+' then
+         if Text'Length = 1 then
+            return;
+         end if;
+         Start := Start + 1;
+      end if;
 
-               if Close_Pos = 0 then
-                  return
-                    Public_Failure
-                      (Status      => I18N.Result.Execution_Error,
-                       Diagnostics => Diagnostics);
-               end if;
-
-               declare
-                  Name : constant String :=
-                    Trimmed (Source (Pos + 1 .. Close_Pos - 1));
-               begin
-                  if Name'Length = 0
-                    or else Ada.Strings.Fixed.Index (Name, ",") /= 0
-                  then
-                     return
-                       Public_Failure
-                         (Status      => I18N.Result.Execution_Error,
-                          Diagnostics => Diagnostics);
-                  end if;
-
-                  I18N.Observability.Emit
-                    (I18N.Observability.Op_Variable, Name);
-                  if I18N.Arguments.Has (Arguments, Name) then
-                     Append (Output, I18N.Arguments.Get (Arguments, Name));
-                  else
-                     Add_Runtime_Diagnostic
-                       (Diagnostics => Diagnostics,
-                        Status      => I18N.Result.Missing_Argument,
-                        Key         => Name);
-                     return
-                       Public_Failure
-                         (Status      => I18N.Result.Missing_Argument,
-                          Diagnostics => Diagnostics);
-                  end if;
-               end;
-
-               Pos := Close_Pos + 1;
-            end;
-         elsif Source (Pos) = '}' then
-            return
-              Public_Failure
-                (Status      => I18N.Result.Execution_Error,
-                 Diagnostics => Diagnostics);
-         else
-            I18N.Observability.Emit (I18N.Observability.Op_Text, "");
-            Append (Output, Source (Pos));
-            Pos := Pos + 1;
+      for Index in Start .. Text'Last loop
+         if Text (Index) = '.' then
+            if Dot /= 0 then
+               return;  --  more than one '.'
+            end if;
+            Dot := Index;
+         elsif Text (Index) not in '0' .. '9' then
+            return;     --  non-digit
          end if;
       end loop;
 
-      I18N.Observability.Emit (I18N.Observability.Message_End, "");
-
-      if Length (Output) > I18N.Result.Max_Output_Length then
-         Add_Runtime_Diagnostic
-           (Diagnostics => Diagnostics,
-            Status      => I18N.Result.Buffer_Overflow,
-            Key         => "output");
-         return
-           Public_Failure
-             (Status      => I18N.Result.Buffer_Overflow,
-              Diagnostics => Diagnostics);
+      --  Need digits before and after a single dot.
+      if Dot = 0 or else Dot = Start or else Dot = Text'Last then
+         return;
       end if;
 
-      return
-        (Status      => I18N.Result.Success,
-         Text        => I18N.Result.To_Output_View (To_String (Output)),
-         Diagnostics => Diagnostics);
+      Integer_Part    := Long_Long_Integer'Value (Text (Start .. Dot - 1));
+      Fraction_Digits := Text'Last - Dot;
+      Fraction_Value  := Long_Long_Integer'Value (Text (Dot + 1 .. Text'Last));
+      Valid           := True;
    exception
-      when others =>
-         return I18N.Result.Failure (I18N.Result.Internal_Error);
-   end Render_Simple_Source;
+      when Constraint_Error =>
+         Valid := False;
+   end Split_Decimal;
+
+   --  Classify a plural selector argument, accepting both whole numbers and
+   --  decimal quantities (the latter via CLDR fractional operands). Sets
+   --  Valid := False when the argument is neither.
+   procedure Classify_Plural_Argument
+     (Raw      : String;
+      Locale   : String;
+      Category : out I18N.Plurals.Plural_Category;
+      Rendered : out Unbounded_String;
+      Valid    : out Boolean)
+   is
+   begin
+      Category := I18N.Plurals.Other;
+      Rendered := Null_Unbounded_String;
+      Valid    := True;
+
+      if Is_Decimal_Integer (Raw) then
+         declare
+            Value : constant Long_Long_Integer := Long_Long_Integer'Value (Raw);
+         begin
+            Category := I18N.Plurals.Cardinal (Locale, Value);
+            Rendered :=
+              To_Unbounded_String (Integer_Image_No_Leading_Space (Value));
+         end;
+      else
+         declare
+            I_Part     : Long_Long_Integer;
+            Digit_Count : Natural;
+            F_Val      : Long_Long_Integer;
+            OK         : Boolean;
+         begin
+            Split_Decimal (Raw, I_Part, Digit_Count, F_Val, OK);
+            if OK then
+               Category :=
+                 I18N.Plurals.Cardinal (Locale, I_Part, Digit_Count, F_Val);
+               Rendered := To_Unbounded_String (Raw);
+            else
+               Valid := False;
+            end if;
+         end;
+      end if;
+   exception
+      when Constraint_Error =>
+         Valid := False;
+   end Classify_Plural_Argument;
 
    procedure Render_Public_Nodes
      (Root          : I18N.AST.Node_Access;
@@ -549,6 +809,7 @@ package body I18N.Runtime is
       Output        : in out Unbounded_String;
       Status        : in out I18N.Result.Render_Status;
       Diagnostics   : in out I18N.Diagnostics.Diagnostic_List;
+      Locale        : String;
       Number_Text   : String := "";
       Number_Active : Boolean := False)
    is
@@ -591,20 +852,28 @@ package body I18N.Runtime is
                      Add_Runtime_Diagnostic (Diagnostics, Status, Key);
                   else
                      declare
-                        Raw : constant String :=
-                          I18N.Arguments.Get (Arguments, Key);
+                        Category : I18N.Plurals.Plural_Category;
+                        Rendered : Unbounded_String;
+                        Valid    : Boolean;
                      begin
-                        if not Is_Decimal_Integer (Raw) then
+                        --  Accept whole numbers and decimal quantities (the
+                        --  latter via CLDR fractional operands).
+                        Classify_Plural_Argument
+                          (Raw      => I18N.Arguments.Get (Arguments, Key),
+                           Locale   => Locale,
+                           Category => Category,
+                           Rendered => Rendered,
+                           Valid    => Valid);
+                        if not Valid then
                            Status := I18N.Result.Invalid_Argument;
                            Add_Runtime_Diagnostic (Diagnostics, Status, Key);
                         else
                            declare
-                              Value    : constant Long_Long_Integer :=
-                                Long_Long_Integer'Value (Raw);
-                              Rendered : constant String :=
-                                Integer_Image_No_Leading_Space (Value);
-                              Branch   : constant I18N.AST.Node_Access :=
-                                (if Value = 1
+                              --  Only "other" is guaranteed present; an absent
+                              --  "one" branch falls back to "other".
+                              Branch : constant I18N.AST.Node_Access :=
+                                (if Category = I18N.Plurals.One
+                                   and then Current.One /= null
                                  then Current.One
                                  else Current.Other);
                            begin
@@ -619,15 +888,12 @@ package body I18N.Runtime is
                                     Output        => Output,
                                     Status        => Status,
                                     Diagnostics   => Diagnostics,
-                                    Number_Text   => Rendered,
+                                    Locale        => Locale,
+                                    Number_Text   => To_String (Rendered),
                                     Number_Active => True);
                               end if;
                            end;
                         end if;
-                     exception
-                        when Constraint_Error =>
-                           Status := I18N.Result.Invalid_Argument;
-                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
                      end;
                   end if;
                end;
@@ -642,25 +908,32 @@ package body I18N.Runtime is
                      Add_Runtime_Diagnostic (Diagnostics, Status, Key);
                   else
                      declare
-                        Value  : constant String :=
+                        Value   : constant String :=
                           I18N.Arguments.Get (Arguments, Key);
-                        Branch : constant I18N.AST.Node_Access :=
-                          (if Value = "male"
-                           then Current.Male
-                           elsif Value = "female"
-                           then Current.Female
-                           else Current.Select_Other);
+                        Matched : constant Boolean :=
+                          I18N.AST.Has_Branch (Current.Branches, Value);
+                        Branch  : constant I18N.AST.Node_Access :=
+                          (if Matched
+                           then I18N.AST.Branch_Body (Current.Branches, Value)
+                           else
+                             I18N.AST.Branch_Body (Current.Branches, "other"));
                      begin
-                        if Branch = null then
+                        if not Matched
+                          and then not I18N.AST.Has_Branch
+                                         (Current.Branches, "other")
+                        then
                            Status := I18N.Result.Formatting_Error;
                            Add_Runtime_Diagnostic (Diagnostics, Status, Key);
-                        else
+                        elsif Branch /= null then
+                           --  A present-but-empty branch (Branch = null)
+                           --  renders as empty text with Success.
                            Render_Public_Nodes
                              (Root          => Branch,
                               Arguments     => Arguments,
                               Output        => Output,
                               Status        => Status,
                               Diagnostics   => Diagnostics,
+                              Locale        => Locale,
                               Number_Text   => Number_Text,
                               Number_Active => Number_Active);
                         end if;
@@ -690,15 +963,25 @@ package body I18N.Runtime is
                                 Long_Long_Integer'Value (Raw);
                               Rendered : constant String :=
                                 Integer_Image_No_Leading_Space (Value);
-                              Branch   : I18N.AST.Node_Access :=
-                                Current.Ord_Other;
+                              --  Select the ordinal branch by the locale's CLDR
+                              --  ordinal category. Categories without a matching
+                              --  branch fall back to other.
+                              Branch   : I18N.AST.Node_Access;
                            begin
-                              if Value = 1 then
-                                 Branch := Current.Ord_One;
-                              elsif Value = 2 then
-                                 Branch := Current.Ord_Two;
-                              elsif Value = 3 then
-                                 Branch := Current.Ord_Few;
+                              case I18N.Plurals.Ordinal (Locale, Value) is
+                                 when I18N.Plurals.One =>
+                                    Branch := Current.Ord_One;
+                                 when I18N.Plurals.Two =>
+                                    Branch := Current.Ord_Two;
+                                 when I18N.Plurals.Few =>
+                                    Branch := Current.Ord_Few;
+                                 when others =>
+                                    Branch := Current.Ord_Other;
+                              end case;
+
+                              --  An absent category branch falls back to "other".
+                              if Branch = null then
+                                 Branch := Current.Ord_Other;
                               end if;
 
                               if Branch = null then
@@ -712,6 +995,7 @@ package body I18N.Runtime is
                                     Output        => Output,
                                     Status        => Status,
                                     Diagnostics   => Diagnostics,
+                                    Locale        => Locale,
                                     Number_Text   => Rendered,
                                     Number_Active => True);
                               end if;
@@ -730,62 +1014,26 @@ package body I18N.Runtime is
       end loop;
    end Render_Public_Nodes;
 
-   function Render_Source
-     (Source : String; Arguments : I18N.Arguments.Arguments)
+   --  Execute a precompiled catalog entry. No parsing or compilation occurs on
+   --  this path: complexity is O(output length).
+   function Render_Compiled
+     (Root      : I18N.AST.Node_Access;
+      Arguments : I18N.Arguments.Arguments;
+      Locale    : String)
       return I18N.Result.Render_Result
    is
-      Normal_Source : constant String := Normalized_Source (Source);
-      Root          : I18N.AST.Node_Access := null;
-      Output        : Unbounded_String;
-      Status        : I18N.Result.Render_Status := I18N.Result.Success;
-      Diagnostics   : I18N.Diagnostics.Diagnostic_List;
+      Output      : Unbounded_String;
+      Status      : I18N.Result.Render_Status := I18N.Result.Success;
+      Diagnostics : I18N.Diagnostics.Diagnostic_List;
    begin
-      if Normal_Source'Length = 0 then
-         return
-           (Status      => I18N.Result.Success,
-            Text        => I18N.Result.To_Output_View (""),
-            Diagnostics => Diagnostics);
-      elsif not Contains_Complex_ICU (Normal_Source) then
-         return Render_Simple_Source (Normal_Source, Arguments);
-      end if;
-
       I18N.Observability.Emit (I18N.Observability.Message_Start, "");
-
-      begin
-         Root := I18N.Parser.Parse (Normal_Source);
-      exception
-         when I18N.Parser.Parse_Error =>
-            I18N.AST.Free (Root);
-            return
-              Public_Failure
-                (Status      => I18N.Result.Execution_Error,
-                 Diagnostics => Diagnostics);
-         when others =>
-            I18N.AST.Free (Root);
-            return I18N.Result.Failure (I18N.Result.Execution_Error);
-      end;
-
-      declare
-         Validation_Result : constant I18N.Errors.Result :=
-           I18N.Validation.Validate (Root);
-      begin
-         if not Validation_Result.Ok then
-            I18N.AST.Free (Root);
-            return
-              Public_Failure
-                (Status      => To_Public_Status (Validation_Result.Error),
-                 Diagnostics => Validation_Result.Diagnostics);
-         end if;
-      end;
-
       Render_Public_Nodes
         (Root        => Root,
          Arguments   => Arguments,
          Output      => Output,
          Status      => Status,
-         Diagnostics => Diagnostics);
-
-      I18N.AST.Free (Root);
+         Diagnostics => Diagnostics,
+         Locale      => Locale);
       I18N.Observability.Emit (I18N.Observability.Message_End, "");
 
       if Status /= I18N.Result.Success then
@@ -807,34 +1055,276 @@ package body I18N.Runtime is
       end if;
    exception
       when others =>
-         I18N.AST.Free (Root);
          return I18N.Result.Failure (I18N.Result.Internal_Error);
-   end Render_Source;
+   end Render_Compiled;
 
-   function Render
-     (Item      : Instance;
-      Locale    : I18N.Locales.Locale_Id;
-      Key       : String;
-      Arguments : I18N.Arguments.Arguments) return I18N.Result.Render_Result
+   --  Append Text into caller-owned Target, tracking the written count and a
+   --  saturating overflow flag. No allocation occurs.
+   procedure Append_Bounded
+     (Target   : in out String;
+      Count    : in out Natural;
+      Overflow : in out Boolean;
+      Text     : String)
+   is
+   begin
+      for C of Text loop
+         if Count >= Target'Length then
+            Overflow := True;
+            return;
+         end if;
+         Target (Target'First + Count) := C;
+         Count := Count + 1;
+      end loop;
+   end Append_Bounded;
+
+   --  Append text into Target, substituting '#' with Number_Text when active.
+   procedure Append_Text_Bounded
+     (Target        : in out String;
+      Count         : in out Natural;
+      Overflow      : in out Boolean;
+      Text          : String;
+      Number_Text   : String;
+      Number_Active : Boolean)
+   is
+   begin
+      for C of Text loop
+         if C = '#' and then Number_Active then
+            Append_Bounded (Target, Count, Overflow, Number_Text);
+         else
+            Append_Bounded (Target, Count, Overflow, [1 => C]);
+         end if;
+         exit when Overflow;
+      end loop;
+   end Append_Text_Bounded;
+
+   --  Render an AST directly into caller-owned fixed storage. This is the true
+   --  no-heap render path: it never materializes an Unbounded_String. It mirrors
+   --  Render_Public_Nodes branch-selection semantics, including locale-aware
+   --  plural/ordinal categories.
+   procedure Render_Bounded_Nodes
+     (Root          : I18N.AST.Node_Access;
+      Arguments     : I18N.Arguments.Arguments;
+      Target        : in out String;
+      Count         : in out Natural;
+      Overflow      : in out Boolean;
+      Status        : in out I18N.Result.Render_Status;
+      Diagnostics   : in out I18N.Diagnostics.Diagnostic_List;
+      Locale        : String;
+      Number_Text   : String := "";
+      Number_Active : Boolean := False)
+   is
+      Current : I18N.AST.Node_Access := Root;
+   begin
+      while Current /= null loop
+         exit when Status /= I18N.Result.Success or else Overflow;
+
+         case Current.Kind is
+            when I18N.AST.Text          =>
+               I18N.Observability.Emit (I18N.Observability.Op_Text, "");
+               Append_Text_Bounded
+                 (Target, Count, Overflow,
+                  To_String (Current.Text), Number_Text, Number_Active);
+
+            when I18N.AST.Variable      =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     Append_Bounded
+                       (Target, Count, Overflow,
+                        I18N.Arguments.Get (Arguments, Key));
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Plural        =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit (I18N.Observability.Op_Plural, Key);
+                  if not I18N.Arguments.Has (Arguments, Key) then
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  else
+                     declare
+                        Category : I18N.Plurals.Plural_Category;
+                        Rendered : Unbounded_String;
+                        Valid    : Boolean;
+                     begin
+                        Classify_Plural_Argument
+                          (Raw      => I18N.Arguments.Get (Arguments, Key),
+                           Locale   => Locale,
+                           Category => Category,
+                           Rendered => Rendered,
+                           Valid    => Valid);
+                        if not Valid then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        else
+                           declare
+                              Branch : constant I18N.AST.Node_Access :=
+                                (if Category = I18N.Plurals.One
+                                   and then Current.One /= null
+                                 then Current.One
+                                 else Current.Other);
+                           begin
+                              if Branch = null then
+                                 Status := I18N.Result.Formatting_Error;
+                                 Add_Runtime_Diagnostic
+                                   (Diagnostics, Status, Key);
+                              else
+                                 Render_Bounded_Nodes
+                                   (Branch, Arguments, Target, Count, Overflow,
+                                    Status, Diagnostics, Locale,
+                                    To_String (Rendered), True);
+                              end if;
+                           end;
+                        end if;
+                     end;
+                  end if;
+               end;
+
+            when I18N.AST.Select_Node   =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit (I18N.Observability.Op_Select, Key);
+                  if not I18N.Arguments.Has (Arguments, Key) then
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  else
+                     declare
+                        Value   : constant String :=
+                          I18N.Arguments.Get (Arguments, Key);
+                        Matched : constant Boolean :=
+                          I18N.AST.Has_Branch (Current.Branches, Value);
+                        Branch  : constant I18N.AST.Node_Access :=
+                          (if Matched
+                           then I18N.AST.Branch_Body (Current.Branches, Value)
+                           else
+                             I18N.AST.Branch_Body (Current.Branches, "other"));
+                     begin
+                        if not Matched
+                          and then not I18N.AST.Has_Branch
+                                         (Current.Branches, "other")
+                        then
+                           Status := I18N.Result.Formatting_Error;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Branch /= null then
+                           Render_Bounded_Nodes
+                             (Branch, Arguments, Target, Count, Overflow,
+                              Status, Diagnostics, Locale, Number_Text,
+                              Number_Active);
+                        end if;
+                     end;
+                  end if;
+               end;
+
+            when I18N.AST.SelectOrdinal =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit (I18N.Observability.Op_Ordinal, Key);
+                  if not I18N.Arguments.Has (Arguments, Key) then
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  elsif not Is_Decimal_Integer
+                              (I18N.Arguments.Get (Arguments, Key))
+                  then
+                     Status := I18N.Result.Invalid_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  else
+                     declare
+                        Value    : constant Long_Long_Integer :=
+                          Long_Long_Integer'Value
+                            (I18N.Arguments.Get (Arguments, Key));
+                        Rendered : constant String :=
+                          Integer_Image_No_Leading_Space (Value);
+                        Branch   : I18N.AST.Node_Access;
+                     begin
+                        case I18N.Plurals.Ordinal (Locale, Value) is
+                           when I18N.Plurals.One =>
+                              Branch := Current.Ord_One;
+                           when I18N.Plurals.Two =>
+                              Branch := Current.Ord_Two;
+                           when I18N.Plurals.Few =>
+                              Branch := Current.Ord_Few;
+                           when others =>
+                              Branch := Current.Ord_Other;
+                        end case;
+
+                        --  An absent category branch falls back to "other".
+                        if Branch = null then
+                           Branch := Current.Ord_Other;
+                        end if;
+
+                        if Branch = null then
+                           Status := I18N.Result.Formatting_Error;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        else
+                           Render_Bounded_Nodes
+                             (Branch, Arguments, Target, Count, Overflow,
+                              Status, Diagnostics, Locale, Rendered, True);
+                        end if;
+                     exception
+                        when Constraint_Error =>
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                     end;
+                  end if;
+               end;
+         end case;
+
+         Current := Current.Next;
+      end loop;
+   end Render_Bounded_Nodes;
+
+   ---------------------------------------------------------------------------
+   --  Locale fallback resolution (shared by Render, Resolve, Render_Into).
+   ---------------------------------------------------------------------------
+
+   procedure Index_Lookup
+     (Item   : Runtime;
+      Locale : String;
+      Key    : String;
+      Hit    : out Boolean;
+      Idx    : out Natural)
+   is
+      Comp : constant String := Composite (Trimmed (Locale), Trimmed (Key));
+   begin
+      if Item.Index.Contains (Comp) then
+         Hit := True;
+         Idx := Item.Index.Element (Comp);
+      else
+         Hit := False;
+         Idx := 0;
+      end if;
+   end Index_Lookup;
+
+   --  Walk the deterministic fallback chain (locale -> parent -> ... -> default
+   --  locale). Bounded by locale fallback depth with O(1) per-locale lookup.
+   procedure Resolve_Entry
+     (Item            : Runtime;
+      Locale          : String;
+      Key             : String;
+      Hit             : out Boolean;
+      Resolved_Locale : out Unbounded_String;
+      Idx             : out Natural)
    is
       Current : Unbounded_String := To_Unbounded_String (Locale);
-      Source  : Unbounded_String;
-      Found   : Boolean := False;
    begin
-      if not Item.Valid then
-         return I18N.Result.Failure (I18N.Result.Execution_Error);
-      end if;
+      Resolved_Locale := Null_Unbounded_String;
+      Idx := 0;
 
       loop
-         Find_Source
-           (Item   => Item,
-            Locale => Trimmed (To_String (Current)),
-            Key    => Trimmed (Key),
-            Found  => Found,
-            Source => Source);
-
-         if Found then
-            return Render_Source (To_String (Source), Arguments);
+         Index_Lookup (Item, To_String (Current), Key, Hit, Idx);
+         if Hit then
+            Resolved_Locale := Current;
+            return;
          end if;
 
          declare
@@ -847,16 +1337,397 @@ package body I18N.Runtime is
       end loop;
 
       if To_String (Item.Default_Locale) /= Locale then
-         Find_Source
-           (Item   => Item,
-            Locale => Trimmed (To_String (Item.Default_Locale)),
-            Key    => Trimmed (Key),
-            Found  => Found,
-            Source => Source);
-
-         if Found then
-            return Render_Source (To_String (Source), Arguments);
+         Index_Lookup
+           (Item, To_String (Item.Default_Locale), Key, Hit, Idx);
+         if Hit then
+            Resolved_Locale := Item.Default_Locale;
+            return;
          end if;
+      end if;
+
+      Hit := False;
+   end Resolve_Entry;
+
+   ---------------------------------------------------------------------------
+   --  Initialization and legacy loading.
+   ---------------------------------------------------------------------------
+
+   procedure Reset_Defaults (Item : in out Runtime) is
+   begin
+      Item.Valid := True;
+      Item.Error := I18N.Errors.Parse_Error;
+      Item.Default_Locale :=
+        To_Unbounded_String (I18N.Locales.Default_Locale_Name);
+      Item.Default_Locale_Seen := False;
+   end Reset_Defaults;
+
+   --  Strict ingest used by Initialize and the legacy Load: stage the lines,
+   --  apply them under Reject_Duplicates, and mark the runtime invalid on any
+   --  failure. Succeeded reports whether every entry was committed.
+   procedure Ingest_Strict
+     (Item        : in out Runtime;
+      Lines       : Line_Vectors.Vector;
+      Source_Name : String;
+      Succeeded   : out Boolean)
+   is
+      Staged      : Staged_Vectors.Vector;
+      Stage_Ok    : Boolean;
+      Stage_Error : I18N.Errors.Error_Kind;
+      Diagnostics : I18N.Diagnostics.Diagnostic_List;
+      Status      : Load_Status;
+      Added       : Natural;
+      Replaced    : Natural;
+      Ignored     : Natural;
+   begin
+      Stage_Lines
+        (Lines          => Lines,
+         Default_Locale => To_String (Item.Default_Locale),
+         Source_Name    => Source_Name,
+         Staged         => Staged,
+         Ok             => Stage_Ok,
+         Error          => Stage_Error,
+         Diagnostics    => Diagnostics);
+
+      if not Stage_Ok then
+         Free_Staged (Staged);
+         Item.Valid := False;
+         Item.Error := Stage_Error;
+         Succeeded := False;
+         return;
+      end if;
+
+      Apply_Staged
+        (Item, Staged, Reject_Duplicates, Status, Added, Replaced, Ignored);
+      Free_Staged (Staged);
+
+      if Status /= Loaded then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Validation_Error;
+         Succeeded := False;
+         return;
+      end if;
+
+      Succeeded := True;
+   end Ingest_Strict;
+
+   procedure Initialize (Item : in out Runtime; Catalog_Path : String) is
+      Found     : Boolean;
+      Lines     : Line_Vectors.Vector;
+      Succeeded : Boolean;
+   begin
+      Finalize (Item);
+      Reset_Defaults (Item);
+
+      Read_File_Lines (Catalog_Path, Found, Lines);
+      if not Found then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Parse_Error;
+         return;
+      end if;
+
+      --  Establish the default locale before binding unqualified keys.
+      for Raw of Lines loop
+         Parse_Default_Locale_Line (Item, To_String (Raw));
+         exit when not Item.Valid;
+      end loop;
+
+      if not Item.Valid then
+         return;
+      end if;
+
+      Ingest_Strict (Item, Lines, Catalog_Path, Succeeded);
+      if not Succeeded then
+         return;
+      end if;
+
+      if Item.Catalog.Is_Empty then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Validation_Error;
+      end if;
+   end Initialize;
+
+   procedure Load (Item : in out Runtime; Catalog_Path : String) is
+      Found     : Boolean;
+      Lines     : Line_Vectors.Vector;
+      Succeeded : Boolean;
+   begin
+      if not Item.Valid then
+         return;
+      end if;
+
+      Read_File_Lines (Catalog_Path, Found, Lines);
+      if not Found then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Parse_Error;
+         return;
+      end if;
+
+      Ingest_Strict (Item, Lines, Catalog_Path, Succeeded);
+   end Load;
+
+   ---------------------------------------------------------------------------
+   --  Stable shard loading (non-destructive).
+   ---------------------------------------------------------------------------
+
+   procedure Ingest_Lines
+     (Item   : in out Runtime;
+      Lines  : Line_Vectors.Vector;
+      Source_Name : String;
+      Policy : Duplicate_Policy;
+      Result : in out Load_Result)
+   is
+      Staged            : Staged_Vectors.Vector;
+      Stage_Ok          : Boolean;
+      Stage_Error       : I18N.Errors.Error_Kind;
+      Status            : Load_Status;
+      Added             : Natural;
+      Replaced          : Natural;
+      Ignored           : Natural;
+      Effective_Default : Unbounded_String := Item.Default_Locale;
+      Set_Default       : Boolean := False;
+   begin
+      --  A runtime that has not established a default locale yet adopts a
+      --  default_locale directive from this input, so Load_Text/Load_File can
+      --  build a runtime from scratch. The change is committed only if the load
+      --  succeeds. Once Initialize (or a prior load) has set the default locale,
+      --  shard default_locale directives are ignored.
+      if not Item.Default_Locale_Seen then
+         declare
+            Detected : constant String := Detect_Default_Locale (Lines);
+         begin
+            if Detected /= I18N.Locales.Default_Locale_Name then
+               if not Is_Valid_Locale (Detected) then
+                  Add_Load_Diagnostic
+                    (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
+                     "invalid default_locale in " & Source_Name, Detected);
+                  Result.Status := Invalid_Catalog;
+                  return;
+               end if;
+               Effective_Default := To_Unbounded_String (Detected);
+               Set_Default := True;
+            end if;
+         end;
+      end if;
+
+      Stage_Lines
+        (Lines          => Lines,
+         Default_Locale => To_String (Effective_Default),
+         Source_Name    => Source_Name,
+         Staged         => Staged,
+         Ok             => Stage_Ok,
+         Error          => Stage_Error,
+         Diagnostics    => Result.Diagnostics);
+
+      if not Stage_Ok then
+         Free_Staged (Staged);
+         Result.Status := Invalid_Catalog;
+         return;
+      end if;
+
+      Apply_Staged (Item, Staged, Policy, Status, Added, Replaced, Ignored);
+      Free_Staged (Staged);
+
+      Result.Status := Status;
+      Result.Entries_Added := Added;
+      Result.Entries_Replaced := Replaced;
+      Result.Entries_Ignored := Ignored;
+
+      if Status = Loaded and then Set_Default then
+         Item.Default_Locale := Effective_Default;
+         Item.Default_Locale_Seen := True;
+      end if;
+   end Ingest_Lines;
+
+   procedure Load_File
+     (Item   : in out Instance;
+      Path   : String;
+      Result : out Load_Result;
+      Policy : Duplicate_Policy := Reject_Duplicates)
+   is
+      Found : Boolean;
+      Lines : Line_Vectors.Vector;
+   begin
+      Result := (Status => Invalid_Catalog, Entries_Added => 0, others => <>);
+
+      if not Item.Valid then
+         Result.Status := Runtime_Invalid;
+         return;
+      end if;
+
+      Read_File_Lines (Path, Found, Lines);
+      if not Found then
+         Add_Load_Diagnostic
+           (Result.Diagnostics, I18N.Diagnostics.Parse_Error,
+            "catalog file not found", Path);
+         Result.Status := Source_Not_Found;
+         return;
+      end if;
+
+      Ingest_Lines (Item, Lines, Path, Policy, Result);
+   exception
+      when others =>
+         Result.Status := Invalid_Catalog;
+   end Load_File;
+
+   procedure Load_Text
+     (Item        : in out Instance;
+      Source_Name : String;
+      Text        : String;
+      Result      : out Load_Result;
+      Policy      : Duplicate_Policy := Reject_Duplicates)
+   is
+      Lines : constant Line_Vectors.Vector := Split_Text_Lines (Text);
+   begin
+      Result := (Status => Invalid_Catalog, Entries_Added => 0, others => <>);
+
+      if not Item.Valid then
+         Result.Status := Runtime_Invalid;
+         return;
+      end if;
+
+      Ingest_Lines (Item, Lines, Source_Name, Policy, Result);
+   exception
+      when others =>
+         Result.Status := Invalid_Catalog;
+   end Load_Text;
+
+   ---------------------------------------------------------------------------
+   --  Non-destructive validation.
+   ---------------------------------------------------------------------------
+
+   function Validate_Lines
+     (Lines       : Line_Vectors.Vector;
+      Source_Name : String)
+      return Catalog_Validation_Result
+   is
+      Result      : Catalog_Validation_Result;
+      Staged      : Staged_Vectors.Vector;
+      Stage_Ok    : Boolean;
+      Stage_Error : I18N.Errors.Error_Kind;
+      Default     : constant String := Detect_Default_Locale (Lines);
+   begin
+      Stage_Lines
+        (Lines          => Lines,
+         Default_Locale => Default,
+         Source_Name    => Source_Name,
+         Staged         => Staged,
+         Ok             => Stage_Ok,
+         Error          => Stage_Error,
+         Diagnostics    => Result.Diagnostics);
+
+      if not Stage_Ok then
+         Free_Staged (Staged);
+         Result.Valid := False;
+         return Result;
+      end if;
+
+      --  Reject duplicate keys within the validated input. Detection must not
+      --  mutate Staged while iterating it, so duplicates are flagged first and
+      --  the staged roots are released afterwards.
+      declare
+         Seen      : Index_Maps.Map;
+         Duplicate : Boolean := False;
+      begin
+         for E of Staged loop
+            declare
+               Comp : constant String :=
+                 Composite (To_String (E.Locale), To_String (E.Key));
+            begin
+               if Seen.Contains (Comp) then
+                  Add_Load_Diagnostic
+                    (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
+                     "duplicate key within catalog " & Source_Name
+                     & Line_Suffix (E.Line),
+                     To_String (E.Key));
+                  Duplicate := True;
+                  exit;
+               end if;
+               Seen.Insert (Comp, 0);
+            end;
+         end loop;
+
+         if Duplicate then
+            Free_Staged (Staged);
+            Result.Valid := False;
+            return Result;
+         end if;
+      end;
+
+      Result.Entry_Count := Natural (Staged.Length);
+      Result.Valid := True;
+      Free_Staged (Staged);
+      return Result;
+   end Validate_Lines;
+
+   function Validate_Catalog_File
+     (Path : String)
+      return Catalog_Validation_Result
+   is
+      Result : Catalog_Validation_Result;
+      Found  : Boolean;
+      Lines  : Line_Vectors.Vector;
+   begin
+      Read_File_Lines (Path, Found, Lines);
+      if not Found then
+         Add_Load_Diagnostic
+           (Result.Diagnostics, I18N.Diagnostics.Parse_Error,
+            "catalog file not found", Path);
+         Result.Valid := False;
+         return Result;
+      end if;
+
+      return Validate_Lines (Lines, Path);
+   exception
+      when others =>
+         Result.Valid := False;
+         return Result;
+   end Validate_Catalog_File;
+
+   function Validate_Catalog_Text
+     (Source_Name : String;
+      Text        : String)
+      return Catalog_Validation_Result
+   is
+   begin
+      return Validate_Lines (Split_Text_Lines (Text), Source_Name);
+   exception
+      when others =>
+         declare
+            Result : Catalog_Validation_Result;
+         begin
+            Result.Valid := False;
+            return Result;
+         end;
+   end Validate_Catalog_Text;
+
+   ---------------------------------------------------------------------------
+   --  Rendering, resolution, and bounded rendering.
+   ---------------------------------------------------------------------------
+
+   function Render
+     (Item      : Instance;
+      Locale    : I18N.Locales.Locale_Id;
+      Key       : String;
+      Arguments : I18N.Arguments.Arguments) return I18N.Result.Render_Result
+   is
+      Hit             : Boolean;
+      Resolved_Locale : Unbounded_String;
+      Idx             : Natural;
+   begin
+      if not Item.Valid then
+         return I18N.Result.Failure (I18N.Result.Execution_Error);
+      end if;
+
+      Resolve_Entry (Item, Locale, Key, Hit, Resolved_Locale, Idx);
+
+      if Hit then
+         --  Plural/ordinal selection uses the locale the message resolved in
+         --  (for example a de message resolved for de-AT uses de rules).
+         return
+           Render_Compiled
+             (Root      => Item.Catalog.Element (Idx).Root,
+              Arguments => Arguments,
+              Locale    => To_String (Resolved_Locale));
       end if;
 
       return I18N.Result.Failure (I18N.Result.Missing_Key);
@@ -864,6 +1735,117 @@ package body I18N.Runtime is
       when others =>
          return I18N.Result.Failure (I18N.Result.Internal_Error);
    end Render;
+
+   function Resolve
+     (Item   : Instance;
+      Locale : I18N.Locales.Locale_Id;
+      Key    : String)
+      return Resolve_Result
+   is
+      Result          : Resolve_Result;
+      Hit             : Boolean;
+      Resolved_Locale : Unbounded_String;
+      Idx             : Natural;
+   begin
+      if not Item.Valid then
+         Result.Status := Runtime_Invalid;
+         return Result;
+      end if;
+
+      Resolve_Entry (Item, Locale, Key, Hit, Resolved_Locale, Idx);
+
+      if Hit then
+         Result.Status := Found;
+         declare
+            S : constant String := To_String (Resolved_Locale);
+            N : constant Natural :=
+              Natural'Min (S'Length, Max_Resolved_Locale_Length);
+         begin
+            if N > 0 then
+               Result.Resolved_Locale_Text (1 .. N) :=
+                 S (S'First .. S'First + N - 1);
+            end if;
+            Result.Resolved_Locale_Last := N;
+         end;
+      else
+         Result.Status := Missing_Key;
+      end if;
+
+      return Result;
+   exception
+      when others =>
+         declare
+            Failed : Resolve_Result;
+         begin
+            Failed.Status := Runtime_Invalid;
+            return Failed;
+         end;
+   end Resolve;
+
+   procedure Render_Into
+     (Item      : Instance;
+      Locale    : I18N.Locales.Locale_Id;
+      Key       : String;
+      Arguments : I18N.Arguments.Arguments;
+      Target    : in out String;
+      Last      : out Natural;
+      Status    : out I18N.Result.Render_Status)
+   is
+      Hit             : Boolean;
+      Resolved_Locale : Unbounded_String;
+      Idx             : Natural;
+   begin
+      Last := 0;
+
+      if not Item.Valid then
+         Status := I18N.Result.Execution_Error;
+         return;
+      end if;
+
+      Resolve_Entry (Item, Locale, Key, Hit, Resolved_Locale, Idx);
+      if not Hit then
+         Status := I18N.Result.Missing_Key;
+         return;
+      end if;
+
+      declare
+         Count       : Natural := 0;
+         Overflow    : Boolean := False;
+         RStatus     : I18N.Result.Render_Status := I18N.Result.Success;
+         Diagnostics : I18N.Diagnostics.Diagnostic_List;
+      begin
+         I18N.Observability.Emit (I18N.Observability.Message_Start, "");
+         Render_Bounded_Nodes
+           (Root        => Item.Catalog.Element (Idx).Root,
+            Arguments   => Arguments,
+            Target      => Target,
+            Count       => Count,
+            Overflow    => Overflow,
+            Status      => RStatus,
+            Diagnostics => Diagnostics,
+            Locale      => To_String (Resolved_Locale));
+         I18N.Observability.Emit (I18N.Observability.Message_End, "");
+
+         if RStatus /= I18N.Result.Success then
+            Last := 0;
+            Status := RStatus;
+         elsif Overflow then
+            Last := (if Count = 0 then 0 else Target'First + Count - 1);
+            Status := I18N.Result.Buffer_Overflow;
+         else
+            Last := (if Count = 0 then 0 else Target'First + Count - 1);
+            Status := I18N.Result.Success;
+         end if;
+      end;
+   exception
+      when others =>
+         Last := 0;
+         Status := I18N.Result.Internal_Error;
+   end Render_Into;
+
+   ---------------------------------------------------------------------------
+   --  Validity and lifecycle.
+   ---------------------------------------------------------------------------
 
    function Is_Valid (Item : Runtime) return Boolean is
    begin
@@ -876,7 +1858,21 @@ package body I18N.Runtime is
       Item.Error := I18N.Errors.Parse_Error;
       I18N.Compiled.Clear (Item.Message);
       Item.Has_Message := False;
+
+      for I in Item.Catalog.First_Index .. Item.Catalog.Last_Index loop
+         declare
+            E : Catalog_Entry := Item.Catalog.Element (I);
+         begin
+            if E.Root /= null then
+               I18N.AST.Free (E.Root);
+               E.Root := null;
+               Item.Catalog.Replace_Element (I, E);
+            end if;
+         end;
+      end loop;
+
       Item.Catalog.Clear;
+      Item.Index.Clear;
       Item.Default_Locale :=
         To_Unbounded_String (I18N.Locales.Default_Locale_Name);
       Item.Default_Locale_Seen := False;

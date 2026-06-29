@@ -25,10 +25,11 @@ ICU Messages Ada is a GNAT/GPRbuild-verified release-candidate Ada 2022 library 
 | Package | File | Purpose |
 | --- | --- | --- |
 | `I18N` | `src/i18n.ads` | Root namespace. |
-| `I18N.Runtime` | `src/i18n-runtime.ads` | Initialize catalog-backed runtime and render messages. |
+| `I18N.Runtime` | `src/i18n-runtime.ads` | Catalog/shard loading, validation, resolution, and rendering (`Initialize`, `Load_File`/`Load_Text`, `Validate_Catalog_*`, `Resolve`, `Render`, `Render_Into`). |
 | `I18N.Result` | `src/i18n-result.ads` | Stable render status and result shape. |
-| `I18N.Arguments` | `src/i18n-arguments.ads` | Public argument map facade. |
+| `I18N.Arguments` | `src/i18n-arguments.ads` | Public argument map facade (`Set`, `Set_Integer`/`Set_Natural`/`Set_Boolean`). |
 | `I18N.Locales` | `src/i18n-locales.ads` | Locale identifier type and fallback helpers. |
+| `I18N.Plurals` | `src/i18n-plurals.ads` | CLDR plural-category classification (`Cardinal`, `Ordinal`). |
 | `I18N.Diagnostics` | `src/i18n-diagnostics.ads` | Optional non-interfering diagnostics facade. |
 
 ## Internal implementation packages

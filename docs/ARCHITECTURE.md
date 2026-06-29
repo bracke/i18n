@@ -38,6 +38,7 @@ Public packages:
 * `I18N.Diagnostics`
 * `I18N.Arguments`
 * `I18N.Locales`
+* `I18N.Plurals`
 
 Internal or compatibility-only packages:
 

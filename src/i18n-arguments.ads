@@ -45,6 +45,48 @@ package I18N.Arguments is
       Key   : String;
       Value : String);
 
+   --  Store or replace a signed integer argument value.
+   --
+   --  The value is serialized as a strict decimal string with no Ada 'Image
+   --  leading space (for example -3, 0, 42). Negative values keep a leading
+   --  '-'. This helper is intentionally not locale-aware: it produces the
+   --  canonical selector/argument text consumed by the message engine.
+   --
+   --  @param Args Argument map to update.
+   --  @param Key Variable name. Must not be empty.
+   --  @param Value Signed integer value to store.
+   procedure Set_Integer
+     (Args  : in out Arguments;
+      Key   : String;
+      Value : Long_Long_Integer);
+
+   --  Store or replace a non-negative integer argument value.
+   --
+   --  The value is serialized as a strict decimal string with no Ada 'Image
+   --  leading space. This helper is not locale-aware.
+   --
+   --  @param Args Argument map to update.
+   --  @param Key Variable name. Must not be empty.
+   --  @param Value Non-negative integer value to store.
+   procedure Set_Natural
+     (Args  : in out Arguments;
+      Key   : String;
+      Value : Natural);
+
+   --  Store or replace a boolean argument value.
+   --
+   --  The value is serialized deterministically as the lowercase text "true"
+   --  or "false". This helper is not locale-aware and is intended to feed
+   --  generic select branches.
+   --
+   --  @param Args Argument map to update.
+   --  @param Key Variable name. Must not be empty.
+   --  @param Value Boolean value to store.
+   procedure Set_Boolean
+     (Args  : in out Arguments;
+      Key   : String;
+      Value : Boolean);
+
    --  Replace Destination with a copy of Source.
    --
    --  @param Source Argument map to copy from.

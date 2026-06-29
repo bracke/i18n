@@ -75,9 +75,7 @@ package body I18N.Parser is
            Name         => Null_Unbounded_String,
            One          => null,
            Other        => null,
-           Male         => null,
-           Female       => null,
-           Select_Other => null,
+           Branches     => null,
            Ord_One      => null,
            Ord_Two      => null,
            Ord_Few      => null,
@@ -206,12 +204,8 @@ package body I18N.Parser is
       Head   : in out I18N.AST.Node_Access;
       Tail   : in out I18N.AST.Node_Access)
    is
-      Male_Branch   : I18N.AST.Node_Access := null;
-      Female_Branch : I18N.AST.Node_Access := null;
-      Other_Branch  : I18N.AST.Node_Access := null;
-      Have_Male     : Boolean := False;
-      Have_Female   : Boolean := False;
-      Have_Other    : Boolean := False;
+      Branches      : I18N.AST.Branch_Access := null;
+      Branches_Tail : I18N.AST.Branch_Access := null;
    begin
       Skip_Whitespace (Source, Pos);
 
@@ -231,63 +225,39 @@ package body I18N.Parser is
          end if;
 
          declare
+            --  Branch names are arbitrary validated identifiers. Read_Identifier
+            --  already rejects non-identifier characters, so any well-formed
+            --  identifier is accepted here; completeness ("other" required) is
+            --  enforced by I18N.Validation.
             Branch_Name : constant String := Read_Identifier (Source, Pos);
             Branch_AST  : I18N.AST.Node_Access := null;
          begin
-            if Branch_Name /= "male"
-              and then Branch_Name /= "female"
-              and then Branch_Name /= "other"
-            then
-               raise Parse_Error
-                 with "Expected male, female, or other select branch";
+            if I18N.AST.Has_Branch (Branches, Branch_Name) then
+               raise Parse_Error with "Duplicate select branch";
             end if;
 
             Branch_AST := Parse_Branch_Message (Source => Source, Pos => Pos);
 
-            if Branch_Name = "male" then
-               if Have_Male then
-                  I18N.AST.Free (Branch_AST);
-                  raise Parse_Error with "Duplicate male select branch";
-               end if;
-
-               Male_Branch := Branch_AST;
-               Have_Male := True;
-            elsif Branch_Name = "female" then
-               if Have_Female then
-                  I18N.AST.Free (Branch_AST);
-                  raise Parse_Error with "Duplicate female select branch";
-               end if;
-
-               Female_Branch := Branch_AST;
-               Have_Female := True;
-            else
-               if Have_Other then
-                  I18N.AST.Free (Branch_AST);
-                  raise Parse_Error with "Duplicate other select branch";
-               end if;
-
-               Other_Branch := Branch_AST;
-               Have_Other := True;
-            end if;
-
+            I18N.AST.Append_Branch
+              (Head      => Branches,
+               Tail      => Branches_Tail,
+               Name      => Branch_Name,
+               Body_Root => Branch_AST);
          end;
       end loop;
 
-      --  Validation enforces mandatory fallback branches after parsing.
+      --  Validation enforces the mandatory "other" fallback branch after
+      --  parsing.
       Pos := Pos + 1;
 
       I18N.AST.Append_Select
-        (Head   => Head,
-         Tail   => Tail,
-         Name   => Name,
-         Male   => Male_Branch,
-         Female => Female_Branch,
-         Other  => Other_Branch);
+        (Head     => Head,
+         Tail     => Tail,
+         Name     => Name,
+         Branches => Branches);
    exception
       when others =>
-         I18N.AST.Free (Male_Branch);
-         I18N.AST.Free (Female_Branch);
-         I18N.AST.Free (Other_Branch);
+         I18N.AST.Free_Branches (Branches);
          raise;
    end Parse_Select;
 

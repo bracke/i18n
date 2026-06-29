@@ -1,6 +1,6 @@
 # Public API Boundary
 
-This document records the v1.0 API boundary in a form that is easy to audit.
+This document records the public API boundary in a form that is easy to audit.
 
 ## Stable application-facing packages
 
@@ -12,36 +12,57 @@ with I18N.Runtime;
 with I18N.Result;
 with I18N.Arguments;
 with I18N.Locales;
+with I18N.Plurals;
 with I18N.Diagnostics;
 ```
 
-`I18N.Runtime` is the catalog-backed facade. `I18N.Arguments` is the stable argument-map facade. `I18N.Result` is the frozen render-status/result model. `I18N.Locales` defines locale identifiers and fallback helpers. `I18N.Diagnostics` exposes optional non-interfering trace/diagnostic hooks.
+`I18N.Runtime` is the catalog-backed facade (loading, validation, resolution, rendering). `I18N.Arguments` is the stable argument-map facade. `I18N.Result` is the frozen render-status/result model. `I18N.Locales` defines locale identifiers and fallback helpers. `I18N.Plurals` classifies integers into CLDR plural categories. `I18N.Diagnostics` exposes optional non-interfering trace/diagnostic hooks.
 
 ## Stable runtime surface
 
-The stable `I18N.Runtime` visible surface is intentionally small:
+The stable `I18N.Runtime` visible surface is small and additive:
 
 ```ada
 type Runtime is tagged limited private;
 subtype Instance is Runtime;
 
-procedure Initialize
-  (Item         : in out Runtime;
-   Catalog_Path : String);
+--  Loading
+procedure Initialize (Item : in out Runtime; Catalog_Path : String);
+procedure Load       (Item : in out Runtime; Catalog_Path : String);  -- legacy append
+type Duplicate_Policy is (Reject_Duplicates, Keep_First, Override_Previous);
+type Load_Status is (Loaded, Source_Not_Found, Invalid_Catalog, Duplicate_Rejected, Runtime_Invalid);
+type Load_Result is record
+   Status : Load_Status; Entries_Added, Entries_Replaced, Entries_Ignored : Natural;
+   Diagnostics : I18N.Diagnostics.Diagnostic_List;
+end record;
+procedure Load_File (Item : in out Instance; Path : String;
+                     Result : out Load_Result; Policy : Duplicate_Policy := Reject_Duplicates);
+procedure Load_Text (Item : in out Instance; Source_Name, Text : String;
+                     Result : out Load_Result; Policy : Duplicate_Policy := Reject_Duplicates);
 
-function Render
-  (Item      : Instance;
-   Locale    : I18N.Locales.Locale_Id;
-   Key       : String;
-   Arguments : I18N.Arguments.Arguments)
-   return I18N.Result.Render_Result;
+--  Validation (non-destructive)
+type Catalog_Validation_Result is record
+   Valid : Boolean; Entry_Count : Natural; Diagnostics : I18N.Diagnostics.Diagnostic_List;
+end record;
+function Validate_Catalog_File (Path : String) return Catalog_Validation_Result;
+function Validate_Catalog_Text (Source_Name, Text : String) return Catalog_Validation_Result;
 
-function Is_Valid
-  (Item : Runtime)
-   return Boolean;
+--  Resolution (no render)
+type Resolve_Status is (Found, Missing_Key, Runtime_Invalid);
+type Resolve_Result is private-ish record with Status and a bounded resolved locale;
+function Resolved_Locale (Item : Resolve_Result) return I18N.Locales.Locale_Id;
+function Resolve (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String) return Resolve_Result;
 
-procedure Finalize
-  (Item : in out Runtime);
+--  Rendering
+function Render (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String;
+                Arguments : I18N.Arguments.Arguments) return I18N.Result.Render_Result;
+procedure Render_Into (Item : Instance; Locale : I18N.Locales.Locale_Id; Key : String;
+                       Arguments : I18N.Arguments.Arguments;
+                       Target : in out String; Last : out Natural;
+                       Status : out I18N.Result.Render_Status);  -- allocation-free
+
+function Is_Valid (Item : Runtime) return Boolean;
+procedure Finalize (Item : in out Runtime);
 ```
 
 No application-facing runtime declaration exposes parser state, AST nodes, compiler state, IR opcode arrays, cache maps, buffer internals, or internal error enums.

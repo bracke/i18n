@@ -19,14 +19,16 @@ with I18N.Diagnostics;
 --
 --  Allocation behavior:
 --  Output_View stores the materialized final String in bounded public result
---  storage. Output_Text returns the meaningful prefix. The lower-level
---  Render_Into path is the checked fixed-buffer no-allocation render path.
+--  storage. Output_Text returns the meaningful prefix. The public
+--  I18N.Runtime.Render_Into facade is the allocation-free render path: it
+--  writes directly into caller-owned fixed storage.
 --
 --  Example:
 --     if Result.Status = I18N.Result.Success then
 --        Put_Line (I18N.Result.Output_Text (Result.Text));
 --     end if;
 package I18N.Result is
+   pragma SPARK_Mode (On);
    --  Frozen public render status set.
    type Render_Status is
      (Success,
@@ -65,7 +67,10 @@ package I18N.Result is
    --  @return Bounded public output view. Text longer than Max_Output_Length is truncated.
    function To_Output_View
      (Text : String)
-      return Output_View;
+      return Output_View
+   with
+     Global => null,
+     Post   => To_Output_View'Result.Length <= Max_Output_Length;
 
    --  Return the meaningful prefix of an output view.
    --
@@ -73,7 +78,11 @@ package I18N.Result is
    --  @return Rendered output text without fixed-storage padding.
    function Output_Text
      (View : Output_View)
-      return String;
+      return String
+   with
+     Global => null,
+     Pre    => View.Length <= Max_Output_Length,
+     Post   => Output_Text'Result'Length = View.Length;
 
    --  Build a public failure without rendered text.
    --
@@ -81,6 +90,11 @@ package I18N.Result is
    --  @return Public failed render result with empty text and empty diagnostics.
    function Failure
      (Status : Render_Status)
-      return Render_Result;
+      return Render_Result
+   with
+     Global => null,
+     Post   => Failure'Result.Status = Status
+       and then Failure'Result.Text.Length = 0
+       and then I18N.Diagnostics.Length (Failure'Result.Diagnostics) = 0;
 
 end I18N.Result;
