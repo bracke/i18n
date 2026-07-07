@@ -6,6 +6,16 @@ private package I18N.Compiled is
    type Op_Kind is
      (Text,
       Var,
+      Number,
+      Date_Format,
+      Time_Format,
+      Date_Time_Format,
+      Currency,
+      Duration_Format,
+      Byte_Size_Format,
+      Unit_Format,
+      Relative_Time_Format,
+      List_Format,
       Jump_Plural,
       Jump_Select,
       Jump_Ordinal,
@@ -20,21 +30,47 @@ private package I18N.Compiled is
    --  them directly and never materializes Unbounded_String values.
    type Interned_String is access constant String;
 
+   type Exact_Target is record
+      Value  : Long_Long_Integer := 0;
+      Target : Op_Index := 0;
+   end record;
+
+   type Exact_Target_Array is array (Positive range <>) of Exact_Target;
+   type Exact_Target_Array_Access is access constant Exact_Target_Array;
+
+   type Select_Target is record
+      Name   : Interned_String := null;
+      Hash   : Ada.Containers.Hash_Type := 0;
+      Target : Op_Index := 0;
+   end record;
+
+   type Select_Target_Array is array (Positive range <>) of Select_Target;
+   type Select_Target_Array_Access is access constant Select_Target_Array;
+
    --  One flattened operation in a compiled ICU message.
    --
-   --  Text operations use Text_Value. Var and branch operations use Key. Branch
-   --  operations use precomputed target indexes. Select operations also store
-   --  precomputed selector hashes for constant-time branch dispatch. Stop_Branch jumps to End_Target
-   --  and optionally restores the previous active number substitution context.
-   --  Text_Value and Key are immutable references allocated during compilation.
+   --  Text operations use Text_Value. Var, Number, Date_Format, Time_Format,
+   --  Date_Time_Format, and branch operations use Key. Currency operations use Key plus
+   --  Currency_Code. Branch operations use
+   --  precomputed target indexes. Select operations also store precomputed
+   --  selector hashes for constant-time branch dispatch. Stop_Branch jumps to
+   --  End_Target and optionally restores the previous active number substitution
+   --  context. Text_Value, Key, and Currency_Code are immutable references
+   --  allocated during compilation.
    type Op is record
       Kind : Op_Kind := Text;
       Text_Value : Interned_String := null;
       Key  : Interned_String := null;
+      Currency_Code : Interned_String := null;
+      Plural_Offset : Long_Long_Integer := 0;
+      Zero_Target   : Op_Index := 0;
       One_Target    : Op_Index := 0;
       Two_Target    : Op_Index := 0;
       Few_Target    : Op_Index := 0;
+      Many_Target   : Op_Index := 0;
       Other_Target  : Op_Index := 0;
+      Exact_Targets : Exact_Target_Array_Access := null;
+      Select_Targets : Select_Target_Array_Access := null;
       Male_Target   : Op_Index := 0;
       Female_Target : Op_Index := 0;
       Male_Hash     : Ada.Containers.Hash_Type := 0;

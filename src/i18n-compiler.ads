@@ -11,8 +11,7 @@ private package I18N.Compiler is
    --  regression suites. They are NOT the stable public render path. Compared
    --  with the authoritative public I18N.Runtime path they are intentionally
    --  legacy:
-   --    * select dispatches only the male/female/other branches (the compiled
-   --      IR has no generalized named-branch table);
+   --    * select dispatch uses generalized named branches;
    --    * plural/selectordinal category selection is locale-agnostic (one iff
    --      n = 1; ordinal by the literal 1/2/3 mapping), not the locale-aware
    --      I18N.Plurals rules used by the public path.

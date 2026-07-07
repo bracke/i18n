@@ -26,10 +26,15 @@ The following units are Ada private child packages and are not legal ordinary ap
 with I18N.AST;
 with I18N.Buffer;
 with I18N.Cache;
+with I18N.CLDR_Data;
 with I18N.Compiled;
 with I18N.Compiler;
+with I18N.Currency;
+with I18N.Date_Time_Format;
 with I18N.Errors;
+with I18N.Extra_Format;
 with I18N.Fast_Render;
+with I18N.Number_Format;
 with I18N.Observability;
 with I18N.Parser;
 with I18N.Render;
@@ -37,7 +42,7 @@ with I18N.Runtime.Compatibility;
 with I18N.Validation;
 ```
 
-These units exist for implementation internals and in-tree descendant regression tests. Their declarations may change without breaking the v1.0 public compatibility contract.
+These units exist for implementation internals and in-tree descendant regression tests. Their declarations may change without breaking the v1.1.0 public compatibility contract.
 
 ## Regression tests
 
@@ -50,4 +55,4 @@ The AUnit regression suites are declared under the `I18N.Runtime.Tests.*` namesp
 
 ## Verification
 
-These import rules are intended to be compiler-enforced. Run the commands in `docs/RELEASE_VERIFICATION.md` before tagging v1.0 so GNAT confirms both public-example imports and private-child regression-test access.
+These import rules are intended to be compiler-enforced. Run the commands in `docs/RELEASE_VERIFICATION.md` before tagging v1.1.0 so GNAT confirms both public-example imports and private-child regression-test access.

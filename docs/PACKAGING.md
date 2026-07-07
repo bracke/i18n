@@ -7,7 +7,7 @@ Alire source crate.
 
 ```toml
 name = "i18n"
-version = "1.0.0"
+version = "1.1.0"
 project-files = ["i18n.gpr"]
 ```
 
@@ -25,6 +25,7 @@ with I18N.Runtime;
 with I18N.Result;
 with I18N.Arguments;
 with I18N.Locales;
+with I18N.Plurals;
 with I18N.Diagnostics;
 ```
 
@@ -49,6 +50,19 @@ version used for publication.
 The package metadata declares the crate license as MIT and the release archive
 includes the corresponding `LICENSE` file.
 
+## Publication readiness audit
+
+The `alr test` release gate runs an Alire publication readiness audit through
+the project-tools-based `check_i18n` guard. The audit requires the root
+`alire.toml` to be pin-free, named `i18n`, declare publication metadata
+(`description`, `version`, authors, maintainers, maintainer logins, MIT license,
+tags, `project-files = ["i18n.gpr"]`, and `gnat = ">=12"`), and route the Alire
+test action through `check_i18n`.
+
+The audit also verifies that `LICENSE`, `i18n.gpr`, and the release packaging
+documentation are present and consistent, and that the Alire manifest does not
+publish the test or example project files as primary project files.
+
 ## Local consumption
 
 From another Alire workspace, use the crate as a local dependency during testing:
@@ -61,5 +75,6 @@ Then import only the stable public packages listed above.
 
 ## Release verification
 
-Before publication, run the commands in `docs/RELEASE_VERIFICATION.md`, including
-library build, test build, test execution, and example builds.
+Before publication, run `alr test`. The manifest test action invokes the
+project-tools-based `check_i18n` guard described in
+`docs/RELEASE_VERIFICATION.md`.

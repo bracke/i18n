@@ -2,7 +2,7 @@
 #ifndef I18N_CONFIG_H
 #define I18N_CONFIG_H
 
-#define CRATE_VERSION "1.0.0"
+#define CRATE_VERSION "1.1.0"
 #define CRATE_NAME "i18n"
 
 #define ALIRE_HOST_OS "linux"
@@ -15,6 +15,6 @@
 #define BUILD_PROFILE_VALIDATION 2
 #define BUILD_PROFILE_DEVELOPMENT 3
 
-#define BUILD_PROFILE  1
+#define BUILD_PROFILE  3
 
 #endif

@@ -1,0 +1,14 @@
+project Project_Tools is
+
+   for Source_Dirs use ("project_tools_stub");
+   for Object_Dir use "obj/project_tools_stub";
+   for Library_Dir use "lib/project_tools_stub";
+   for Library_Name use "project_tools";
+   for Library_Kind use "static";
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnat2022", "-gnatp");
+   end Compiler;
+
+end Project_Tools;
+

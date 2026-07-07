@@ -1,0 +1,19 @@
+with "../../project_tools/project_tools.gpr";
+
+project CLDR_Tools is
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Main use
+     ("check_cldr_sources.adb",
+      "check_tzdb_sources.adb",
+      "generate_cldr_export.adb",
+      "import_cldr_raw.adb",
+      "extract_cldr_normalized.adb",
+      "generate_cldr_data.adb",
+      "import_cldr_subset.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnat2022", "-gnatyM120", "-gnatX", "-gnata");
+   end Compiler;
+end CLDR_Tools;

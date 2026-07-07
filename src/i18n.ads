@@ -9,8 +9,9 @@
 --  * I18N.Locales
 --  * I18N.Plurals
 --
---  Parser, validator, compiler, IR, AST, cache, and execution child packages are
---  internal implementation details and are not part of the application-facing
+--  Parser, validator, compiler, IR, AST, cache, execution, formatter
+--  implementation, and generated CLDR data child packages are internal
+--  implementation details and are not part of the application-facing
 --  compatibility contract.
 package I18N is
    pragma Preelaborate;

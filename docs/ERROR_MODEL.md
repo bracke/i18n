@@ -6,14 +6,14 @@ Normal catalog, parse, validation, and render failures are reported through dete
 
 * `Success` — render succeeded and `I18N.Result.Output_Text (Result.Text)` returns the rendered message.
 * `Missing_Key` — locale fallback completed but no entry for the key existed.
-* `Missing_Argument` — a variable, plural selector, select selector, or selectordinal selector argument was absent.
-* `Invalid_Argument` — a selector argument had the wrong syntax, for example a non-decimal plural value.
+* `Missing_Argument` — a variable, number value, currency amount, date value, time value, plural selector, select selector, or selectordinal selector argument was absent.
+* `Invalid_Argument` — a selector or formatted argument had the wrong syntax, for example a non-decimal plural value, a grouped number input, an invalid calendar date, an out-of-range time, or a currency amount with too many fractional digits.
 * `Formatting_Error` — a compiled message could not select a required branch.
 * `Execution_Error` — deterministic initialization, validation, or execution failure outside the above public categories.
 * `Buffer_Overflow` — render output exceeded the supported output buffer.
 * `Internal_Error` — unexpected implementation failure contained by the facade.
 
-The meaning of these statuses is frozen for v1.0.
+The meaning of these statuses is frozen for v1.1.0.
 
 ## Initialization errors
 
@@ -21,7 +21,7 @@ Invalid catalogs do not produce a partially valid public runtime. After invalid 
 
 * `I18N.Runtime.Is_Valid` returns `False`;
 * public catalog `Render` returns `Execution_Error`;
-* `private child I18N.Runtime.Compatibility.Last_Error` is available only for regression tests that inspect pre-v1.0 internal classifications. Application code should rely on the public render status.
+* `private child I18N.Runtime.Compatibility.Last_Error` is available only for regression tests that inspect legacy internal classifications. Application code should rely on the public render status.
 
 ## Render errors
 

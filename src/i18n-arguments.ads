@@ -1,7 +1,7 @@
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Strings.Hash;
 
---  Stable v1.0 public argument-map API.
+--  Stable v1.1.0 public argument-map API.
 --
 --  Purpose:
 --  This package is the public namespace applications use for render arguments.
@@ -13,8 +13,14 @@ with Ada.Strings.Hash;
 --  Error behavior:
 --  Missing render arguments are reported by I18N.Runtime.Render as
 --  Missing_Argument. Plural and selectordinal arguments are supplied as strings
---  and parsed as strict decimal integers during render; invalid numeric syntax
---  is reported as Invalid_Argument.
+--  and parsed as strict decimal integers during render. Number, currency,
+--  duration, byte-size, unit, measure-unit, and relative-time values are also
+--  supplied as strict integer or decimal strings. Date values use YYYY-MM-DD or
+--  ISO instant text; time values use HH:MM, HH:MM:SS, or ISO instant text;
+--  datetime values use ISO instant text. List values use non-empty
+--  pipe-delimited item text. Invalid numeric, number, currency, date, time,
+--  datetime, duration, byte-size, unit, relative-time, or list syntax is
+--  reported as Invalid_Argument.
 --
 --  Thread-safety and allocation:
 --  Argument maps are mutable, noncopyable containers. Do not mutate the same
@@ -25,6 +31,11 @@ with Ada.Strings.Hash;
 --  Example:
 --     I18N.Arguments.Set (Args, "name", "Ada");
 --     I18N.Arguments.Set (Args, "count", "3");
+--     I18N.Arguments.Set (Args, "value", "12345.67");
+--     I18N.Arguments.Set (Args, "amount", "12.30");
+--     I18N.Arguments.Set (Args, "day", "2024-02-29");
+--     I18N.Arguments.Set (Args, "clock", "09:05:07");
+--     I18N.Arguments.Set (Args, "items", "one|two|three");
 package I18N.Arguments is
 
    type Arguments is tagged limited private;

@@ -27,6 +27,26 @@
       "topic": "Nested select/plural rendering"
     },
     {
+      "file": "examples/number_formatting.adb",
+      "topic": "Locale-specific number formatting with Arabic digits Indian grouping percent permille compact scientific engineering sign-accounting trailing-zero-display scale and spellout skeleton output"
+    },
+    {
+      "file": "examples/currency_formatting.adb",
+      "topic": "Locale-specific currency formatting with narrow symbols ISO-code output display names cash rounding accounting and zero-minor-unit metadata"
+    },
+    {
+      "file": "examples/date_formatting.adb",
+      "topic": "Date formatting styles named numeric and locale week skeleton output plus Japanese Buddhist and Persian calendar names"
+    },
+    {
+      "file": "examples/time_formatting.adb",
+      "topic": "Time formatting styles day-period fractional-second zone width UTC width and datetime style alias skeleton output"
+    },
+    {
+      "file": "examples/domain_formatting.adb",
+      "topic": "Deterministic duration byte-size unit short-rate relative-time localized relative-time and localized list formatting"
+    },
+    {
       "file": "examples/locale_fallback.adb",
       "topic": "Locale fallback"
     },

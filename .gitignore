@@ -2,6 +2,8 @@
 obj/
 lib/
 tests/bin/
+/*.ali
+/*.o
 
 # Alire/local tool state
 alire/
@@ -9,6 +11,14 @@ alire/
 
 # Example executables emitted by examples/examples.gpr
 examples/bin/
+
+# Benchmark executables emitted by benchmarks/benchmarks.gpr
+benchmarks/bin/
+benchmarks/obj/
+
+# CLDR tool executables emitted by cldr/cldr_tools.gpr
+cldr/bin/
+cldr/obj/
 
 # check_i18n generated output
 check_i18n/bin/

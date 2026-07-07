@@ -14,7 +14,7 @@ Application code may depend on:
 - `I18N.Locales`
 - `I18N.Plurals`
 
-Do not present parser, AST, validation, compiler, compiled IR, cache, buffer, render internals, fast-render internals, errors, observability, or `I18N.Runtime.Compatibility` as application-facing API. Those units are implementation or regression-test support and are sealed with Ada private child package visibility where appropriate.
+Do not present parser, AST, validation, compiler, compiled IR, cache, buffer, render internals, fast-render internals, formatter implementation packages, generated CLDR data, errors, observability, or `I18N.Runtime.Compatibility` as application-facing API. Those units are implementation or regression-test support and are sealed with Ada private child package visibility where appropriate.
 
 ## Start Here
 
@@ -41,15 +41,12 @@ Metadata helps navigation but does not override Ada specs, documentation, tests,
 ## Build And Test
 
 ```sh
-gprbuild -P i18n.gpr
-cd tests
-alr exec -- gprbuild -P tests.gpr
-./bin/tests
-cd ..
-gprbuild -P examples/examples.gpr
+alr test
 ```
 
-For release candidates, also run the Alire and documentation checks listed in `docs/RELEASE_VERIFICATION.md`.
+The manifest test action routes through `check_i18n`, the release guard backed
+by the sibling `project_tools` crate. Use lower-level build commands only for
+focused debugging.
 
 ## Behavioral Rules
 

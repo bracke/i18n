@@ -1,0 +1,9 @@
+default_locale = en
+en.simple = "Hello {name}"
+en.plural = "{count, plural, offset:1 one {One item for {name}} other {# items for {name}}}"
+en.select = "{gender, select, female {{name} updated her file} male {{name} updated his file} other {{name} updated their file}}"
+en.nested = "{gender, select, female {{count, plural, one {{name} has one item} other {{name} has # items}}} male {{count, plural, one {{name} has one item} other {{name} has # items}}} other {{count, plural, one {{name} has one item} other {{name} has # items}}}}"
+en.number = "Total {value, number}"
+en.currency = "Due {amount, currency, USD}"
+en.date = "Due {day, date, medium}"
+en.time = "At {clock, time, medium}"

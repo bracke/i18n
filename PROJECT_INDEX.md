@@ -34,7 +34,7 @@ ICU Messages Ada is a GNAT/GPRbuild-verified release-candidate Ada 2022 library 
 
 ## Internal implementation packages
 
-These files may exist in the source tree but are not part of the application-facing v1.0 compatibility contract:
+These files may exist in the source tree but are not part of the application-facing v1.1.0 compatibility contract:
 
 | Area | Representative files |
 | --- | --- |
@@ -42,7 +42,7 @@ These files may exist in the source tree but are not part of the application-fac
 | Validation | `src/i18n-validation.*` |
 | Compilation and IR | `src/i18n-compiler.*`, `src/i18n-compiled.*` |
 | Cache/store | `src/i18n-cache.*` |
-| Buffer/render internals | `src/i18n-buffer.*`, `src/i18n-render.*`, `src/i18n-fast_render.*` |
+| Buffer/render internals | `src/i18n-buffer.*`, `src/i18n-number_format.*`, `src/i18n-date_time_format.*`, `src/i18n-currency.*`, `src/i18n-extra_format.*`, `src/i18n-render.*`, `src/i18n-fast_render.*` |
 | Error internals | `src/i18n-errors.*` |
 | Regression compatibility | `src/i18n-runtime-compatibility.*` |
 
@@ -54,7 +54,9 @@ Application examples must not `with` these internal packages.
 | --- | --- |
 | `i18n.gpr` | Main library project. |
 | `tests/tests.gpr` | AUnit release-gate test project. |
-| `examples/examples.gpr` | v1.0 public API examples project. |
+| `examples/examples.gpr` | v1.1.0 public API examples project, including number/currency/date/time and domain formatter examples. |
+| `benchmarks/benchmarks.gpr` | Render hot-path and bounded `Render_Into` benchmark project. |
+| `cldr/cldr_tools.gpr` | CLDR import and generated-data checker project. |
 | `examples/README.md` | Example directory orientation and public API import rule. |
 | `examples/EXPECTED_OUTPUT.md` | Typical example output notes. |
 | `MANIFEST.txt` | Full release file listing. |
@@ -69,14 +71,24 @@ Application examples must not `with` these internal packages.
 | `docs/ARCHITECTURE.md` | Runtime structure and internal boundary. |
 | `docs/CATALOG_FORMAT.md` | Canonical catalog authoring format. |
 | `docs/ICU_SUBSET.md` | Supported/unsupported ICU subset. |
+| `cldr/CLDR_DATA.md` | Manifest for the deterministic CLDR-derived data subset and generated-data boundary. |
+| `cldr/upstream/source_manifest.txt` | Provenance and record-count guard for the staged CLDR export. |
+| `cldr/upstream/source_files.txt` | CLDR JSON package path inventory for the staged export. |
+| `cldr/upstream/tzdb/` | Checked IANA tzdb 2026a source fixtures (`tzdata.zi`, zone tables, leap seconds) for deterministic timezone-source validation. |
+| `cldr/upstream/cldr_export.jsonl` | Staged upstream CLDR JSONL export imported into the raw extract fixture. |
+| `cldr/raw/cldr_records.txt` | Raw CLDR-family extract fixture normalized by the CLDR extractor. |
+| `cldr/raw/coverage.txt` | Required raw CLDR family/locale/currency coverage checked by the extractor. |
+| `cldr/import/normalized_cldr.txt` | Normalized CLDR-derived import source expanded into the pinned subset. |
+| `cldr/data/cldr_subset.txt` | Pinned CLDR-derived subset source checked against `I18N.CLDR_Data`. |
 | `docs/ERROR_MODEL.md` | Status semantics and deterministic failure model. |
 | `docs/THREADING.md` | Threading and allocation behavior. |
 | `docs/VALIDATION.md` | Validation rules. |
 | `docs/TEST_MATRIX.md` | Test coverage matrix. |
 | `docs/EXAMPLES.md` | Example suite guide. |
 | `docs/COMPATIBILITY.md` | Source/runtime compatibility policy. |
+| `docs/COMPLETION_MILESTONES.md` | Concrete implementation milestones by subsystem and file slices for completion. |
 | `docs/RELEASE_CHECKLIST.md` | Release audit checklist. |
-| `docs/RELEASE_VERIFICATION.md` | GNAT/GPRbuild commands required before tagging v1.0. |
+| `docs/RELEASE_VERIFICATION.md` | GNAT/GPRbuild commands required before tagging v1.1.0. |
 | `docs/AI_CONSUMPTION_GUIDE.md` | AI-oriented project consumption guide. |
 
 ## Machine-readable AI metadata
@@ -84,7 +96,7 @@ Application examples must not `with` these internal packages.
 | File | Purpose |
 | --- | --- |
 | `ai/API_MANIFEST.json` | Public package/subprogram/status manifest. |
-| `ai/CONTRACT_SUMMARY.yaml` | Compact v1.0 behavior contract. |
+| `ai/CONTRACT_SUMMARY.yaml` | Compact v1.1.0 behavior contract. |
 | `ai/EXAMPLE_CATALOG.json` | Example and catalog inventory. |
 | `ai/FILE_ROLE_MAP.json` | File-to-role classification. |
 
@@ -102,4 +114,5 @@ Application examples must not `with` these internal packages.
 
 | File | Purpose |
 | --- | --- |
+| `.github/workflows/ci.yml` | Hosted CI workflow for check_i18n, tests, examples, GNATdoc, and Alire packaging checks. |
 | `.gitignore` | Keeps GNAT/GPRbuild, Alire, test, and example build outputs out of the source release tree. |

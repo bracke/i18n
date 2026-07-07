@@ -1,8 +1,15 @@
 with Ada.Strings.Unbounded;
 with I18N.AST; use I18N.AST;
 with I18N.Buffer;
+with I18N.Currency;
+with I18N.Date_Time_Format;
+with I18N.Extra_Format;
+with I18N.Number_Format;
+with I18N.Plurals;
 
 package body I18N.Render is
+
+   Escaped_Number_Sign : constant Character := Character'Val (1);
 
    use Ada.Strings.Unbounded;
 
@@ -69,8 +76,58 @@ package body I18N.Render is
    exception
       when Constraint_Error =>
          Fail (State, Kind);
-         return 0;
+      return 0;
    end To_Long_Long_Integer_Strict;
+
+   procedure Split_Decimal
+     (Text            : String;
+      Integer_Part    : out Long_Long_Integer;
+      Fraction_Digits : out Natural;
+      Fraction_Value  : out Long_Long_Integer;
+      Valid           : out Boolean)
+   is
+      Start : Natural := Text'First;
+      Dot   : Natural := 0;
+   begin
+      Integer_Part := 0;
+      Fraction_Digits := 0;
+      Fraction_Value := 0;
+      Valid := False;
+
+      if Text'Length = 0 then
+         return;
+      end if;
+
+      if Text (Start) = '-' or else Text (Start) = '+' then
+         if Text'Length = 1 then
+            return;
+         end if;
+         Start := Start + 1;
+      end if;
+
+      for Index in Start .. Text'Last loop
+         if Text (Index) = '.' then
+            if Dot /= 0 then
+               return;
+            end if;
+            Dot := Index;
+         elsif Text (Index) not in '0' .. '9' then
+            return;
+         end if;
+      end loop;
+
+      if Dot = 0 or else Dot = Start or else Dot = Text'Last then
+         return;
+      end if;
+
+      Integer_Part := Long_Long_Integer'Value (Text (Start .. Dot - 1));
+      Fraction_Digits := Text'Last - Dot;
+      Fraction_Value := Long_Long_Integer'Value (Text (Dot + 1 .. Text'Last));
+      Valid := True;
+   exception
+      when Constraint_Error =>
+         Valid := False;
+   end Split_Decimal;
 
    function Integer_Image_No_Leading_Space
      (Value : Long_Long_Integer)
@@ -108,7 +165,9 @@ package body I18N.Render is
    is
    begin
       for C of Text loop
-         if C = '#' then
+         if C = Escaped_Number_Sign then
+            Output.Append ("#");
+         elsif C = '#' then
             Output.Append (Number_Text);
          else
             Output.Append ([1 => C]);
@@ -151,6 +210,179 @@ package body I18N.Render is
                   end if;
                end;
 
+            when I18N.AST.Number =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  if Args.Has (Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Number_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        I18N.Number_Format.Format_Into
+                          (Value_Text => Args.Get (Key),
+                           Locale     => "en",
+                           Style      => To_String (Current.Currency_Code),
+                           Target     => Formatted,
+                           Last       => Last,
+                           Ok         => Ok,
+                           Overflow   => Overflow);
+
+                        if Overflow then
+                           Fail (State, I18N.Errors.Buffer_Overflow);
+                        elsif not Ok then
+                           Fail (State, I18N.Errors.Invalid_Selector);
+                        elsif Last > 0 then
+                           Output.Append (Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Fail (State, I18N.Errors.Missing_Variable);
+                  end if;
+               end;
+
+            when I18N.AST.Date_Format | I18N.AST.Time_Format
+               | I18N.AST.Date_Time_Format =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  if Args.Has (Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Date_Time_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        if Current.Kind = I18N.AST.Date_Format then
+                           I18N.Date_Time_Format.Format_Date_Into
+                             (Value_Text => Args.Get (Key),
+                              Locale     => "en",
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Overflow);
+                        elsif Current.Kind = I18N.AST.Time_Format then
+                           I18N.Date_Time_Format.Format_Time_Into
+                             (Value_Text => Args.Get (Key),
+                              Locale     => "en",
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Overflow);
+                        else
+                           I18N.Date_Time_Format.Format_Date_Time_Into
+                             (Value_Text => Args.Get (Key),
+                              Locale     => "en",
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Overflow);
+                        end if;
+
+                        if Overflow then
+                           Fail (State, I18N.Errors.Buffer_Overflow);
+                        elsif not Ok then
+                           Fail (State, I18N.Errors.Invalid_Selector);
+                        elsif Last > 0 then
+                           Output.Append (Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Fail (State, I18N.Errors.Missing_Variable);
+                  end if;
+               end;
+
+            when I18N.AST.Currency =>
+               declare
+                  Key  : constant String := To_String (Current.Name);
+                  Code : constant String := To_String (Current.Currency_Code);
+               begin
+                  if Args.Has (Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Currency.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        I18N.Currency.Format_Into
+                          (Amount_Text   => Args.Get (Key),
+                           Currency_Code => Code,
+                           Locale        => "en",
+                           Target        => Formatted,
+                           Last          => Last,
+                           Ok            => Ok,
+                           Overflow      => Overflow);
+
+                        if Overflow then
+                           Fail (State, I18N.Errors.Buffer_Overflow);
+                        elsif not Ok then
+                           Fail (State, I18N.Errors.Invalid_Selector);
+                        elsif Last > 0 then
+                           Output.Append (Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Fail (State, I18N.Errors.Missing_Variable);
+                  end if;
+               end;
+
+            when I18N.AST.Duration_Format | I18N.AST.Byte_Size_Format
+               | I18N.AST.Unit_Format | I18N.AST.Relative_Time_Format
+               | I18N.AST.List_Format =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+
+                  function Kind return I18N.Extra_Format.Extra_Kind is
+                  begin
+                     case Current.Kind is
+                        when I18N.AST.Duration_Format =>
+                           return I18N.Extra_Format.Duration;
+                        when I18N.AST.Byte_Size_Format =>
+                           return I18N.Extra_Format.Byte_Size;
+                        when I18N.AST.Unit_Format =>
+                           return I18N.Extra_Format.Unit;
+                        when I18N.AST.Relative_Time_Format =>
+                           return I18N.Extra_Format.Relative_Time;
+                        when others =>
+                           return I18N.Extra_Format.List;
+                     end case;
+                  end Kind;
+               begin
+                  if Args.Has (Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Extra_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        I18N.Extra_Format.Format_Into
+                          (Kind     => Kind,
+                           Value    => Args.Get (Key),
+                           Locale   => "en",
+                           Option   => To_String (Current.Currency_Code),
+                           Target   => Formatted,
+                           Last     => Last,
+                           Ok       => Ok,
+                           Overflow => Overflow);
+
+                        if Overflow then
+                           Fail (State, I18N.Errors.Buffer_Overflow);
+                        elsif not Ok then
+                           Fail (State, I18N.Errors.Invalid_Selector);
+                        elsif Last > 0 then
+                           Output.Append (Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Fail (State, I18N.Errors.Missing_Variable);
+                  end if;
+               end;
+
             when I18N.AST.Plural =>
                declare
                   Key : constant String := To_String (Current.Name);
@@ -160,23 +392,103 @@ package body I18N.Render is
                   else
                      declare
                         Raw_Value : constant String := Args.Get (Key);
-                        Numeric_Value : constant Long_Long_Integer :=
-                          To_Long_Long_Integer_Strict
-                            (Text  => Raw_Value,
-                             State => State,
-                             Kind  => I18N.Errors.Invalid_Selector);
+                        Category : I18N.Plurals.Plural_Category :=
+                          I18N.Plurals.Other;
+                        Rendered_Value : Unbounded_String;
+                        Exact_Value : Unbounded_String;
+                        Valid : Boolean := True;
                      begin
+                        if Current.Plural_Offset /= 0 then
+                           declare
+                              Numeric_Value : constant Long_Long_Integer :=
+                                To_Long_Long_Integer_Strict
+                                  (Text  => Raw_Value,
+                                   State => State,
+                                   Kind  => I18N.Errors.Invalid_Selector);
+                              Adjusted_Value : constant Long_Long_Integer :=
+                                Numeric_Value - Current.Plural_Offset;
+                           begin
+                              if not State.Failed then
+                                 Category :=
+                                   I18N.Plurals.Cardinal ("en", Adjusted_Value);
+                                 Rendered_Value :=
+                                   To_Unbounded_String
+                                     (Integer_Image_No_Leading_Space
+                                        (Adjusted_Value));
+                                 Exact_Value :=
+                                   To_Unbounded_String
+                                     (Integer_Image_No_Leading_Space
+                                        (Numeric_Value));
+                              end if;
+                           end;
+                        elsif Is_Decimal_Integer (Raw_Value) then
+                           declare
+                              Numeric_Value : constant Long_Long_Integer :=
+                                To_Long_Long_Integer_Strict
+                                  (Text  => Raw_Value,
+                                   State => State,
+                                   Kind  => I18N.Errors.Invalid_Selector);
+                           begin
+                              if not State.Failed then
+                                 Category :=
+                                   I18N.Plurals.Cardinal ("en", Numeric_Value);
+                                 Rendered_Value :=
+                                   To_Unbounded_String
+                                     (Integer_Image_No_Leading_Space
+                                        (Numeric_Value));
+                                 Exact_Value := Rendered_Value;
+                              end if;
+                           end;
+                        else
+                           declare
+                              I_Part      : Long_Long_Integer;
+                              Digit_Count : Natural;
+                              F_Val       : Long_Long_Integer;
+                           begin
+                              Split_Decimal
+                                (Raw_Value, I_Part, Digit_Count, F_Val, Valid);
+                              if Valid then
+                                 Category :=
+                                   I18N.Plurals.Cardinal
+                                     ("en", I_Part, Digit_Count, F_Val);
+                                 Rendered_Value := To_Unbounded_String (Raw_Value);
+                              else
+                                 Fail (State, I18N.Errors.Invalid_Selector);
+                              end if;
+                           end;
+                        end if;
+
                         if not State.Failed then
                            declare
-                              Rendered_Value : constant String :=
-                                Integer_Image_No_Leading_Space (Numeric_Value);
-                              --  Only "other" is mandatory; an absent "one"
-                              --  branch falls back to "other".
-                              Selected_AST : constant I18N.AST.Node_Access :=
-                                (if Numeric_Value = 1
-                                    and then Current.One /= null
-                                 then Current.One else Current.Other);
+                              Exact_Text : constant String :=
+                                To_String (Exact_Value);
+                              Selected_AST : I18N.AST.Node_Access :=
+                                (if Exact_Text'Length > 0
+                                 then I18N.AST.Branch_Body
+                                        (Current.Plural_Exact, Exact_Text)
+                                 else null);
                            begin
+                              if Selected_AST = null then
+                                 Selected_AST :=
+                                   (case Category is
+                                      when I18N.Plurals.Zero =>
+                                         Current.Plural_Zero,
+                                      when I18N.Plurals.One =>
+                                         Current.One,
+                                      when I18N.Plurals.Two =>
+                                         Current.Plural_Two,
+                                      when I18N.Plurals.Few =>
+                                         Current.Plural_Few,
+                                      when I18N.Plurals.Many =>
+                                         Current.Plural_Many,
+                                      when I18N.Plurals.Other =>
+                                         Current.Other);
+                              end if;
+
+                              if Selected_AST = null then
+                                 Selected_AST := Current.Other;
+                              end if;
+
                               if Selected_AST = null then
                                  Fail (State, I18N.Errors.Missing_Branch);
                               else
@@ -185,7 +497,7 @@ package body I18N.Render is
                                     Args                   => Args,
                                     Output                 => Output,
                                     State                  => State,
-                                    Number_Text            => Rendered_Value,
+                                    Number_Text => To_String (Rendered_Value),
                                     Substitute_Number_Sign => True);
                               end if;
                            end;
@@ -253,12 +565,18 @@ package body I18N.Render is
                               --  Only "other" is mandatory; an absent category
                               --  branch falls back to "other".
                               Selected_AST : I18N.AST.Node_Access :=
-                                (case Category_For_Ordinal (Numeric_Value) is
-                                    when One   => Current.Ord_One,
-                                    when Two   => Current.Ord_Two,
-                                    when Few   => Current.Ord_Few,
-                                    when Other => Current.Ord_Other);
+                                I18N.AST.Branch_Body
+                                  (Current.Ord_Exact, Rendered_Value);
                            begin
+                              if Selected_AST = null then
+                                 Selected_AST :=
+                                   (case Category_For_Ordinal (Numeric_Value) is
+                                       when One   => Current.Ord_One,
+                                       when Two   => Current.Ord_Two,
+                                       when Few   => Current.Ord_Few,
+                                       when Other => Current.Ord_Other);
+                              end if;
+
                               if Selected_AST = null then
                                  Selected_AST := Current.Ord_Other;
                               end if;

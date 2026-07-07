@@ -4,23 +4,31 @@ This file is the fast-entry guide for AI coding agents and human maintainers wor
 
 ## Project identity
 
-ICU Messages Ada is an Ada 2022 library for deterministic ICU-style message rendering. The v1.0 production path is:
+ICU Messages Ada is an Ada 2022 library for deterministic ICU-style message rendering. The v1.1.0 production path is:
 
 ```text
 text catalog -> deterministic catalog validation -> read-only runtime lookup -> render -> structured result
 ```
 
-This is the v1.0 release branch. Do not add runtime semantics, new ICU grammar, bytecode VMs, CLDR compilers, or code-generation paths while stabilizing the release.
+This is the v1.1.0 release branch.
+
+The completion scope includes eventual expansion of ICU runtime semantics,
+Unicode algorithms, historical calendar data, runtime tzdb ingestion, and CLDR
+RBNF behavior. Until those features are implemented and covered by release-gate
+tests, documentation must describe the current deterministic behavior and mark
+the expansion as planned work rather than as supported behavior.
 
 ## Stable public API
 
 Application code may depend only on these packages:
 
+* `I18N`
 * `I18N.Runtime`
 * `I18N.Result`
 * `I18N.Diagnostics`
 * `I18N.Arguments`
 * `I18N.Locales`
+* `I18N.Plurals`
 
 Everything else under `src/` is implementation detail or compatibility/regression support.
 
@@ -37,13 +45,11 @@ Everything else under `src/` is implementation detail or compatibility/regressio
 ## Build and test commands
 
 ```sh
-gprbuild -P i18n.gpr
-cd tests
-alr exec -- gprbuild -P tests.gpr
-./bin/tests
-cd ..
-gprbuild -P examples/examples.gpr
+alr test
 ```
+
+`alr test` routes through `check_i18n`, the project-tools-based release guard.
+Use the individual `gprbuild`/AUnit/example commands only for focused debugging.
 
 ## Release verification rule
 
@@ -53,7 +59,7 @@ Do not mark the release complete from source/documentation inspection alone. Bef
 
 * Ada 2022.
 * Keep public APIs documented with GNATdoc-compatible comments.
-* Do not expose parser, validator, compiler, IR, cache, AST, buffer, or execution internals through the public v1.0 facade.
+* Do not expose parser, validator, compiler, IR, cache, AST, buffer, formatter implementation packages, generated CLDR data, or execution internals through the public v1.1.0 facade.
 * Do not use Ada reserved words as identifiers. Ada is case-insensitive, so variants such as `OtherS` collide with `others` and are invalid.
 * Do not introduce duplicate argument map or buffer abstractions.
 * Preserve deterministic failures: the same invalid catalog or message must produce the same classification.

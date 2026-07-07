@@ -16,7 +16,7 @@ with I18N.Plurals;
 with I18N.Diagnostics;
 ```
 
-`I18N.Runtime` is the catalog-backed facade (loading, validation, resolution, rendering). `I18N.Arguments` is the stable argument-map facade. `I18N.Result` is the frozen render-status/result model. `I18N.Locales` defines locale identifiers and fallback helpers. `I18N.Plurals` classifies integers into CLDR plural categories. `I18N.Diagnostics` exposes optional non-interfering trace/diagnostic hooks.
+`I18N.Runtime` is the catalog-backed facade (loading, validation, resolution, rendering). `I18N.Arguments` is the stable argument-map facade. `I18N.Result` is the frozen render-status/result model. `I18N.Locales` defines locale identifiers and fallback helpers. `I18N.Plurals` classifies integer and explicit fractional CLDR operands into plural categories. `I18N.Diagnostics` exposes optional non-interfering trace/diagnostic hooks.
 
 ## Stable runtime surface
 
@@ -66,6 +66,8 @@ procedure Finalize (Item : in out Runtime);
 ```
 
 No application-facing runtime declaration exposes parser state, AST nodes, compiler state, IR opcode arrays, cache maps, buffer internals, or internal error enums.
+Formatter implementation packages and generated CLDR data are likewise private
+implementation detail behind the public catalog render path.
 
 ## Ada-level private implementation packages
 
@@ -84,17 +86,22 @@ I18N.Fast_Render
 I18N.Buffer
 I18N.Errors
 I18N.Observability
+I18N.Number_Format
+I18N.Currency
+I18N.Date_Time_Format
+I18N.Extra_Format
+I18N.CLDR_Data
 ```
 
-Downstream application examples, quickstarts, and projects cannot legally import these units as normal public API. Their signatures may change without a v1.0 source-compatibility break.
+Downstream application examples, quickstarts, and projects cannot legally import these units as normal public API. Their signatures may change without a v1.1.0 source-compatibility break.
 
 ## Public example gate
 
-`examples/public_api_sealed.adb` is the compile-only public API boundary example. It intentionally imports only the stable public packages listed above. Attempting to import `I18N.Parser`, `I18N.Compiler`, or `I18N.Runtime.Compatibility` from a non-descendant application unit is an Ada visibility error, not merely a documentation violation.
+`examples/public_api_sealed.adb` is the compile-only public API boundary example. It intentionally imports only the stable public packages listed above. Attempting to import `I18N.Parser`, `I18N.Compiler`, `I18N.Runtime.Compatibility`, `I18N.Number_Format`, or `I18N.CLDR_Data` from a non-descendant application unit is an Ada visibility error, not merely a documentation violation.
 
 ## Documentation rule
 
-If documentation describes behavior requiring a compatibility-only package, it must explicitly say that the package is for tests/regression validation and is outside the v1.0 application contract.
+If documentation describes behavior requiring a compatibility-only package, it must explicitly say that the package is for tests/regression validation and is outside the v1.1.0 application contract.
 
 
 ## Compiler verification

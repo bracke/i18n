@@ -1,5 +1,5 @@
 with "config/tests_config.gpr";
-with "../../project_tools/project_tools.gpr";
+with "project_tools.gpr";
 project Tests is
 
    for Source_Dirs use ("src/", "config/");

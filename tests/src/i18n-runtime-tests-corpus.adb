@@ -11,11 +11,13 @@ with I18N.Errors; use I18N.Errors;
 with I18N.Fast_Render;
 with I18N.Parser;
 with I18N.Render;
+with I18N.Result;
 with I18N.Runtime.Compatibility;
 with I18N.Validation;
 with I18N.Arguments;
 
 package body I18N.Runtime.Tests.Corpus is
+   use type I18N.Result.Render_Status;
 
    type Fuzz_Category is
      (Valid,
@@ -56,6 +58,11 @@ package body I18N.Runtime.Tests.Corpus is
       I18N.Arguments.Set (Args, "rank", "13");
       I18N.Arguments.Set (Args, "gender", "female");
       I18N.Arguments.Set (Args, "kind", "other");
+      I18N.Arguments.Set (Args, "value", "12345.67");
+      I18N.Arguments.Set (Args, "amount", "123.45");
+      I18N.Arguments.Set (Args, "day", "2024-02-29");
+      I18N.Arguments.Set (Args, "clock", "09:05:07");
+      I18N.Arguments.Set (Args, "instant", "2024-02-29T23:30:00Z");
    end Add_Default_Args;
 
    procedure Configure_Args
@@ -448,14 +455,23 @@ package body I18N.Runtime.Tests.Corpus is
                   else
                      return Large_Valid_Message (Seed);
                   end if;
-               when 6 =>
-                  return "Literal text without placeholders";
+         when 6 =>
+                  case Seed mod 4 is
+                     when 0 =>
+                        return "Total {value, number}";
+                     when 1 =>
+                        return "Due {amount, currency, USD}";
+                     when 2 =>
+                        return "When {day, date, long} {clock, time, short}";
+                     when others =>
+                        return "Instant {instant, datetime, short, UTC}";
+                  end case;
                when others =>
                   return "";
             end case;
 
          when Invalid_Syntax =>
-            case Seed mod 8 is
+            case Seed mod 14 is
                when 0 =>
                   return "Hello {";
                when 1 =>
@@ -470,6 +486,20 @@ package body I18N.Runtime.Tests.Corpus is
                   return "{name";
                when 6 =>
                   return "{count, plural, one x other {y}}";
+               when 7 =>
+                  return "{count, number, ::percent'}";
+               when 8 =>
+                  return "{amount, currency, }";
+               when 9 =>
+                  return "{day, date, ::yyyy'-'MM";
+               when 10 =>
+                  return "{count, number, ::precision}";
+               when 11 =>
+                  return "{amount, number, ::currency/}";
+               when 12 =>
+                  return "{day, date, short,}";
+               when 13 =>
+                  return "{clock, time, ::hh-mm, Europe/Berlin, UTC}";
                when others =>
                   return "{gender, select, male {M} female {F} other O}";
             end case;
@@ -579,6 +609,761 @@ package body I18N.Runtime.Tests.Corpus is
       end loop;
    end Fuzz_Run;
 
+   function Parser_Format_Source (Seed : Positive) return String is
+   begin
+      case Seed mod 60 is
+         when 0 =>
+            return "{value, number}";
+         when 1 =>
+            return "{amount, number, ::currency/USD}";
+         when 2 =>
+            return "{amount, currency, USD}";
+         when 3 =>
+            return "{day, date, short}";
+         when 4 =>
+            return "{day, date, medium, UTC}";
+         when 5 =>
+            return "{clock, time, long, Europe/Berlin}";
+         when 6 =>
+            return "{instant, datetime, full, America/New_York}";
+         when 7 =>
+            return "{day, date, ::yMMMd}";
+         when 8 =>
+            return "{clock, time, ::hhmmssa}";
+         when 9 =>
+            return "{instant, datetime, ::yMdHHmmssz, UTC}";
+         when 10 =>
+            return "{amount, currency, USD/accounting}";
+         when 11 =>
+            return "{amount, number, ::currency/CHF/cash}";
+         when 12 =>
+            return "{value, number, ::percent}";
+         when 13 =>
+            return "{value, number, ::scientific}";
+         when 14 =>
+            return "{value, number, ::precision-fraction/2}";
+         when 15 =>
+            return "{value, number, ::currency/usd}";
+         when 16 =>
+            return "{amount, currency, US}";
+         when 17 =>
+            return "{day, date, compact}";
+         when 18 =>
+            return "{clock, time, long, Mars/Base}";
+         when 19 =>
+            return "{instant, datetime, full, +25:00}";
+         when 20 =>
+            return "{value, number, ::currency/USDX}";
+         when 21 =>
+            return "{amount, currency, 12A}";
+         when 22 =>
+            return "{amount, currency, USD/bogus}";
+         when 23 =>
+            return "{day, date, short, UTC, extra}";
+         when 24 =>
+            return "{day, date, ::y%}";
+         when 25 =>
+            return "{day, date, ::short}";
+         when 26 =>
+            return "{clock, time, ::long}";
+         when 27 =>
+            return "{instant, datetime, ::short, UTC}";
+         when 28 =>
+            return "{value, number, ::scale/x}";
+         when 29 =>
+            return "{amount, currency, USD/}";
+         when 30 =>
+            return "{value, number, ::precision-fraction/a}";
+         when 31 =>
+            return "{day, date, ::yyyy'Q'Q}";
+         when 32 =>
+            return "{value, number, ::precision/increment/-1}";
+         when 33 =>
+            return "{amount, currency, XXX}";
+         when 34 =>
+            return "{day, date, ::'";
+         when 35 =>
+            return "{count, plural, one {x} two {y} other {z}";
+         when 36 =>
+            return "{value, number, ::scale/x}";
+         when 37 =>
+            return "{clock, time, ::long, Europe/Berlin, UTC}";
+         when 38 =>
+            return "{instant, datetime, ::short, Not/A_Zone}";
+         when 39 =>
+            return "{clock, time, ::short, UTC, extra}";
+         when 40 =>
+            return "{amount, number, ::currency/USD cash unit-width-narrow}";
+         when 41 =>
+            return "{day, date, ::yyyy-MM}";
+         when 42 =>
+            return "{day, date, ::'yyyy-'}";
+         when 43 =>
+            return "{value, number, ::currency/USD/precision}";
+         when 44 =>
+            return "{value, number, ::currency/USD/abc}";
+         when 45 =>
+            return "{count, number, ::precision-fraction}";
+         when 46 =>
+            return "{value, number, ::scale/1+}";
+         when 47 =>
+            return "{day, date, ::yyyy-MM-#}";
+         when 48 =>
+            return "{clock, time, ::HH-m }";
+         when 49 =>
+            return "{value, number, ::unit-width-full-name}";
+         when 50 =>
+            return "{value, number, ::group-min2 precision-fraction/0-2}";
+         when 51 =>
+            return "{value, number, ::sign/accounting precision-increment/0.05}";
+         when 52 =>
+            return "{amount, number, ::currency/JPY precision-currency/standard}";
+         when 53 =>
+            return "{amount, number, ::currency/CHF precision-currency/cash sign/accounting}";
+         when 54 =>
+            return "{day, date, ::QQQQQ'/'MMMMM'/'ccccc}";
+         when 55 =>
+            return "{clock, time, ::HH':'mm':'ss'.'SSSSSSSSS}";
+         when 56 =>
+            return "{instant, datetime, ::yyyyMMdd'T'HHmmssXXXXX, Europe/Berlin}";
+         when 57 =>
+            return "{value, number, ::precision-significant/3-1}";
+         when 58 =>
+            return "{amount, number, ::currency/USD precision-currency/cash/extra}";
+         when 59 =>
+            return "{instant, datetime, ::yyyy-MM-dd HH:mm, UTC}";
+         when others =>
+            return "{clock, time,}";
+      end case;
+   end Parser_Format_Source;
+
+   procedure Test_Parser_Format_Fuzz
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      for Seed in 1 .. 256 loop
+         declare
+            Source : constant String := Parser_Format_Source (Seed);
+            First  : constant Classification := Classify_Source (Source);
+            Second : constant Classification := Classify_Source (Source);
+            First_Catalog : constant I18N.Runtime.Catalog_Validation_Result :=
+              I18N.Runtime.Validate_Catalog_Text
+                ("parser_format_fuzz",
+                 "en.case = """ & Source & """" & ASCII.LF);
+            Second_Catalog : constant I18N.Runtime.Catalog_Validation_Result :=
+              I18N.Runtime.Validate_Catalog_Text
+                ("parser_format_fuzz",
+                 "en.case = """ & Source & """" & ASCII.LF);
+         begin
+            AUnit.Assertions.Assert
+              (Condition => First.Ok = Second.Ok
+                and then First.Error = Second.Error,
+               Message   =>
+                 "formatted parser fuzz classification changed for: " &
+                 Source);
+            AUnit.Assertions.Assert
+              (Condition => First.Ok = First_Catalog.Valid
+                and then First_Catalog.Valid = Second_Catalog.Valid,
+               Message   =>
+                 "catalog validation disagrees with parser fuzz for: " &
+                 Source);
+         end;
+      end loop;
+   end Test_Parser_Format_Fuzz;
+
+   procedure Test_Formatted_Value_Fuzz
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+
+      Runtime : I18N.Runtime.Instance;
+      Args    : I18N.Arguments.Arguments;
+      Load    : I18N.Runtime.Load_Result;
+
+      function Status_Of (Key : String) return I18N.Result.Render_Status is
+         Result : constant I18N.Result.Render_Result :=
+           I18N.Runtime.Render (Runtime, "en", Key, Args);
+      begin
+         return Result.Status;
+      end Status_Of;
+
+      procedure Expect
+        (Key    : String;
+         Name   : String;
+         Value  : String;
+         Status : I18N.Result.Render_Status;
+         Label  : String) is
+      begin
+         I18N.Arguments.Clear (Args);
+         I18N.Arguments.Set (Args, Name, Value);
+         AUnit.Assertions.Assert
+           (Condition => Status_Of (Key) = Status,
+            Message   => Label & " value=" & Value);
+      end Expect;
+   begin
+      I18N.Runtime.Load_Text
+        (Runtime, "formatted-value-fuzz",
+         "en.number = ""{value, number}""" & ASCII.LF
+         & "en.currency = ""{amount, currency, USD}""" & ASCII.LF
+         & "en.date = ""{day, date}""" & ASCII.LF
+         & "en.time = ""{clock, time}""" & ASCII.LF
+         & "en.datetime = ""{instant, datetime, short, UTC}""" & ASCII.LF
+         & "en.date_bad_time_field = ""{day, date, ::yMdH}""" & ASCII.LF
+         & "en.time_bad_date_field = ""{clock, time, ::Hmsd}""" & ASCII.LF
+         & "en.datetime_bad_zone = ""{instant, datetime, short, Not/A_Zone}"""
+         & ASCII.LF
+         & "en.datetime_bad_offset = ""{instant, datetime, short, +24:00}"""
+         & ASCII.LF
+         & "en.datetime_ut_time = ""{instant, time, long, UT}""" & ASCII.LF
+         & "en.datetime_ut_lower_time = ""{instant, time, long, ut}""" & ASCII.LF
+         & ASCII.LF
+         & "en.duration = ""{seconds, duration}""" & ASCII.LF
+         & "en.bytes = ""{size, bytes}""" & ASCII.LF
+         & "en.unit = ""{distance, unit, kilometer}""" & ASCII.LF
+         & "en.unit_rate = ""{distance, unit, meter/unit-width-short/second}"""
+         & ASCII.LF
+         & "en.measure = ""{distance, number, ::measure-unit/length-kilometer "
+         & "unit-width-short per-measure-unit/duration-hour}"""
+         & ASCII.LF
+         & "en.relative = ""{offset, relative, day}""" & ASCII.LF
+         & "en.list = ""{items, list}""" & ASCII.LF,
+         Load);
+      AUnit.Assertions.Assert
+        (Condition => Load.Status = I18N.Runtime.Loaded,
+         Message   => "formatted-value fuzz catalog should load");
+
+      for Seed in 1 .. 1440 loop
+         case Seed mod 144 is
+            when 0 =>
+               Expect ("number", "value", "12345.67", I18N.Result.Success,
+                       "valid decimal should render");
+            when 1 =>
+               Expect ("number", "value", "", I18N.Result.Invalid_Argument,
+                       "empty decimal should fail");
+            when 2 =>
+               Expect ("number", "value", "1e3", I18N.Result.Invalid_Argument,
+                       "exponent decimal should fail");
+            when 3 =>
+               Expect ("number", "value", "12 345", I18N.Result.Invalid_Argument,
+                       "spaced decimal should fail");
+            when 4 =>
+               Expect ("number", "value", ".12", I18N.Result.Invalid_Argument,
+                       "missing leading digit should fail");
+            when 5 =>
+               Expect ("number", "value", "+1", I18N.Result.Success,
+                       "leading plus number should render");
+            when 6 =>
+               Expect ("number", "value", "-1", I18N.Result.Success,
+                       "leading minus number should render");
+            when 7 =>
+               Expect ("number", "value", "++1", I18N.Result.Invalid_Argument,
+                       "double-plus number should fail");
+            when 8 =>
+               Expect ("number", "value", "--1", I18N.Result.Invalid_Argument,
+                       "double-minus number should fail");
+            when 9 =>
+               Expect ("number", "value", " +123", I18N.Result.Invalid_Argument,
+                       "leading-space number should fail");
+            when 10 =>
+               Expect ("currency", "amount", "123.45", I18N.Result.Success,
+                       "valid currency amount should render");
+            when 11 =>
+               Expect ("currency", "amount", "+123.45", I18N.Result.Success,
+                       "leading plus currency amount should render");
+            when 12 =>
+               Expect ("currency", "amount", "1e3", I18N.Result.Invalid_Argument,
+                       "currency exponent amount should fail");
+            when 13 =>
+               Expect ("currency", "amount", "12.", I18N.Result.Invalid_Argument,
+                       "empty currency fraction should fail");
+            when 14 =>
+               Expect ("currency", "amount", ".12", I18N.Result.Invalid_Argument,
+                       "missing currency integer should fail");
+            when 15 =>
+               Expect ("currency", "amount", "12a", I18N.Result.Invalid_Argument,
+                       "currency suffix should fail");
+            when 16 =>
+               Expect ("currency", "amount", "12.34.56",
+                       I18N.Result.Invalid_Argument,
+                       "double-decimal currency should fail");
+            when 17 =>
+               Expect ("currency", "amount", " 12.34", I18N.Result.Invalid_Argument,
+                       "leading-space currency should fail");
+            when 18 =>
+               Expect ("date", "day", "2024-02-29", I18N.Result.Success,
+                       "valid leap-day date should render");
+            when 19 =>
+               Expect ("date", "day", "2024-02-30", I18N.Result.Invalid_Argument,
+                        "invalid calendar day should fail");
+            when 20 =>
+               Expect ("date", "day", "2024-2-29", I18N.Result.Invalid_Argument,
+                        "unpadded date should fail");
+            when 21 =>
+               Expect ("date", "day", "2024/02/29", I18N.Result.Invalid_Argument,
+                        "slash date should fail");
+            when 22 =>
+               Expect ("date", "day", "2024-13-01", I18N.Result.Invalid_Argument,
+                       "invalid calendar month should fail");
+            when 23 =>
+               Expect ("time", "clock", "09:05:07", I18N.Result.Success,
+                        "valid time should render");
+            when 24 =>
+               Expect ("time", "clock", "24:00", I18N.Result.Invalid_Argument,
+                        "invalid hour should fail");
+            when 25 =>
+               Expect ("time", "clock", "09:60", I18N.Result.Invalid_Argument,
+                        "invalid minute should fail");
+            when 26 =>
+               Expect ("time", "clock", "09:00:60", I18N.Result.Invalid_Argument,
+                       "invalid second should fail");
+            when 27 =>
+               Expect ("time", "clock", "09:05:07.123456789", I18N.Result.Success,
+                       "max nanosecond precision should render");
+            when 28 =>
+               Expect ("time", "clock", "09:05:07.1234567890",
+                       I18N.Result.Invalid_Argument,
+                       "excessive time fraction should fail");
+            when 29 =>
+               Expect ("time", "clock", "9:05", I18N.Result.Invalid_Argument,
+                        "unpadded time should fail");
+            when 30 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00Z",
+                        I18N.Result.Success,
+                        "valid instant should render");
+            when 31 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00",
+                        I18N.Result.Invalid_Argument,
+                        "offset-free instant should fail");
+            when 32 =>
+               Expect ("datetime", "instant", "2024-02-30T23:30:00Z",
+                        I18N.Result.Invalid_Argument,
+                        "invalid instant date should fail");
+            when 33 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+2:00",
+                        I18N.Result.Invalid_Argument,
+                        "single-hour colon instant offset should fail");
+            when 34 =>
+               Expect ("datetime", "instant", "2024-02-29 23:30:00Z",
+                       I18N.Result.Success,
+                       "space separator instant should render");
+            when 35 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+01:00:00",
+                       I18N.Result.Success,
+                       "instant accepts second-precision offsets");
+            when 36 =>
+               Expect ("duration", "seconds", "3661", I18N.Result.Success,
+                        "valid duration seconds should render");
+            when 37 =>
+               Expect ("duration", "seconds", "1.5",
+                        I18N.Result.Invalid_Argument,
+                        "fractional duration seconds should fail");
+            when 38 =>
+               Expect ("duration", "seconds", "abc",
+                        I18N.Result.Invalid_Argument,
+                        "non-numeric duration seconds should fail");
+            when 39 =>
+               Expect ("duration", "seconds", "9223372036854775808",
+                        I18N.Result.Invalid_Argument,
+                        "overflowing duration seconds should fail");
+            when 40 =>
+               Expect ("bytes", "size", "2048", I18N.Result.Success,
+                        "valid byte size should render");
+            when 41 =>
+               Expect ("bytes", "size", "12.5",
+                        I18N.Result.Invalid_Argument,
+                        "fractional byte size should fail");
+            when 42 =>
+               Expect ("bytes", "size", "-1",
+                        I18N.Result.Invalid_Argument,
+                        "negative byte size should fail");
+            when 43 =>
+               Expect ("bytes", "size", "2 KiB",
+                        I18N.Result.Invalid_Argument,
+                        "byte size with unit text should fail");
+            when 44 =>
+               Expect ("unit", "distance", "1.5", I18N.Result.Success,
+                        "valid unit decimal should render");
+            when 45 =>
+               Expect ("unit", "distance", "1.2.3",
+                        I18N.Result.Invalid_Argument,
+                        "malformed unit decimal should fail");
+            when 46 =>
+               Expect ("unit", "distance", "",
+                        I18N.Result.Invalid_Argument,
+                        "empty unit decimal should fail");
+            when 47 =>
+               Expect ("unit", "distance", "1e3",
+                        I18N.Result.Invalid_Argument,
+                        "unit decimal exponent notation should fail");
+            when 48 =>
+               Expect ("relative", "offset", "-2", I18N.Result.Success,
+                        "valid relative offset should render");
+            when 49 =>
+               Expect ("relative", "offset", "1.5",
+                        I18N.Result.Invalid_Argument,
+                        "fractional relative offset should fail");
+            when 50 =>
+               Expect ("relative", "offset", "+",
+                        I18N.Result.Invalid_Argument,
+                        "sign-only relative offset should fail");
+            when 51 =>
+               Expect ("relative", "offset", "tomorrow",
+                        I18N.Result.Invalid_Argument,
+                        "word relative offset should fail");
+            when 52 =>
+               Expect ("list", "items", "red|green|blue",
+                        I18N.Result.Success,
+                        "valid pipe-delimited list should render");
+            when 53 =>
+               Expect ("list", "items", "",
+                        I18N.Result.Invalid_Argument,
+                        "empty list should fail");
+            when 54 =>
+               Expect ("list", "items", "red||blue",
+                        I18N.Result.Invalid_Argument,
+                        "empty list item should fail");
+            when 55 =>
+               Expect ("list", "items", "|red",
+                        I18N.Result.Invalid_Argument,
+                        "leading empty list item should fail");
+            when 56 =>
+               Expect ("date_bad_time_field", "day", "2024-02-29",
+                        I18N.Result.Invalid_Argument,
+                        "date skeleton with time fields should fail");
+            when 57 =>
+               Expect ("time_bad_date_field", "clock", "09:05:07",
+                        I18N.Result.Invalid_Argument,
+                        "time skeleton with date fields should fail");
+            when 58 =>
+               Expect ("datetime_bad_zone", "instant",
+                        "2024-02-29T23:30:00Z",
+                        I18N.Result.Invalid_Argument,
+                        "unknown datetime target zone should fail");
+            when 59 =>
+               Expect ("datetime_bad_offset", "instant",
+                        "2024-02-29T23:30:00Z",
+                        I18N.Result.Invalid_Argument,
+                        "out-of-range datetime target offset should fail");
+            when 60 =>
+               Expect ("duration", "seconds", "",
+                       I18N.Result.Invalid_Argument,
+                       "empty duration seconds should fail");
+            when 61 =>
+               Expect ("bytes", "size", "",
+                       I18N.Result.Invalid_Argument,
+                       "empty byte size should fail");
+            when 62 =>
+               Expect ("relative", "offset", "",
+                       I18N.Result.Invalid_Argument,
+                       "empty relative offset should fail");
+            when 63 =>
+               Expect ("number", "value", "+0", I18N.Result.Success,
+                       "positive zero should render");
+            when 64 =>
+               Expect ("number", "value", "-0.00", I18N.Result.Success,
+                       "negative zero with fraction should render");
+            when 65 =>
+               Expect ("number", "value", "0.",
+                       I18N.Result.Invalid_Argument,
+                       "empty number fraction should fail");
+            when 66 =>
+               Expect ("currency", "amount", "000", I18N.Result.Success,
+                       "leading-zero currency amount should render");
+            when 67 =>
+               Expect ("currency", "amount", "1,00",
+                       I18N.Result.Invalid_Argument,
+                       "currency grouping punctuation should fail");
+            when 68 =>
+               Expect ("currency", "amount", "1e2", I18N.Result.Invalid_Argument,
+                       "currency exponent notation should fail");
+            when 69 =>
+               Expect ("date", "day", "2000-02-29", I18N.Result.Success,
+                       "valid leap date from non-century year should render");
+            when 70 =>
+               Expect ("date", "day", "2019-02-29", I18N.Result.Invalid_Argument,
+                       "invalid leap date should fail");
+            when 71 =>
+               Expect ("date", "day", "2024-04-31", I18N.Result.Invalid_Argument,
+                       "invalid month day should fail");
+               Expect ("datetime_ut_time", "instant",
+                       "2024-02-29T23:30:00Z",
+                       I18N.Result.Success,
+                       "UT target-zone alias should render");
+            when 72 =>
+               Expect ("time", "clock", "23:59:59.999999999",
+                       I18N.Result.Success,
+                       "max precision time fraction should render");
+               Expect ("datetime_ut_lower_time", "instant",
+                       "2024-02-29T23:30:00Z",
+                       I18N.Result.Success,
+                       "lowercase ut target-zone alias should render");
+            when 73 =>
+               Expect ("time", "clock", "23:59:59.000000000",
+                       I18N.Result.Success,
+                       "zeroed max precision time fraction should render");
+            when 74 =>
+               Expect ("time", "clock", "23:59:60.000",
+                       I18N.Result.Invalid_Argument,
+                       "overflow instant second should fail");
+            when 75 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+01:00",
+                       I18N.Result.Success,
+                       "offset instant with colons should render");
+            when 76 =>
+               Expect ("datetime", "instant", "2024-02-29 23:30:00+0100",
+                       I18N.Result.Success,
+                       "offset instant with hhmm should render");
+            when 77 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+01",
+                       I18N.Result.Success,
+                       "offset instant with hour-only should render");
+            when 78 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00-0",
+                       I18N.Result.Invalid_Argument,
+                       "malformed instant offset should fail");
+            when 79 =>
+               Expect ("datetime", "instant", "2024-02-29T23:60:00Z",
+                       I18N.Result.Invalid_Argument,
+                       "invalid instant minute should fail");
+            when 80 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+01:00:00",
+                       I18N.Result.Success,
+                       "instant accepts second-precision offsets");
+            when 81 =>
+               Expect ("datetime", "instant", "2024-02-29 23:30:00+01:00",
+                       I18N.Result.Success,
+                       "space-separator instant with colons should render");
+            when 82 =>
+               Expect ("datetime", "instant", "2024-02-29t23:30:00Z",
+                       I18N.Result.Invalid_Argument,
+                       "lowercase separator instant should fail");
+            when 83 =>
+               Expect ("duration", "seconds", "0", I18N.Result.Success,
+                       "zero duration should render");
+            when 84 =>
+               Expect ("number", "value", "000123", I18N.Result.Success,
+                       "leading-zero number should render");
+            when 85 =>
+               Expect ("number", "value", "+0.00", I18N.Result.Success,
+                       "positive zero fraction should render");
+            when 86 =>
+               Expect ("number", "value", "-.5", I18N.Result.Invalid_Argument,
+                       "missing integer negative decimal should fail");
+            when 87 =>
+               Expect ("number", "value", "1_000", I18N.Result.Invalid_Argument,
+                       "underscore grouped number should fail");
+            when 88 =>
+               Expect ("currency", "amount", "-0.01", I18N.Result.Success,
+                       "negative fractional currency amount should render");
+            when 89 =>
+               Expect ("currency", "amount", "+0.00", I18N.Result.Success,
+                       "positive zero currency amount should render");
+            when 90 =>
+               Expect ("currency", "amount", "NaN", I18N.Result.Invalid_Argument,
+                       "NaN currency amount should fail");
+            when 91 =>
+               Expect ("currency", "amount", "Infinity",
+                       I18N.Result.Invalid_Argument,
+                       "infinite currency amount should fail");
+            when 92 =>
+               Expect ("date", "day", "1900-02-29",
+                       I18N.Result.Invalid_Argument,
+                       "non-leap century date should fail");
+            when 93 =>
+               Expect ("date", "day", "2400-02-29", I18N.Result.Success,
+                       "leap century date should render");
+            when 94 =>
+               Expect ("date", "day", "2024-00-01",
+                       I18N.Result.Invalid_Argument,
+                       "zero month should fail");
+            when 95 =>
+               Expect ("date", "day", "2024-01-00",
+                       I18N.Result.Invalid_Argument,
+                       "zero day should fail");
+            when 96 =>
+               Expect ("time", "clock", "00:00", I18N.Result.Success,
+                       "midnight minute precision should render");
+            when 97 =>
+               Expect ("time", "clock", "00:00:00.1", I18N.Result.Success,
+                       "single fractional second digit should render");
+            when 98 =>
+               Expect ("time", "clock", "00:00:00.",
+                       I18N.Result.Invalid_Argument,
+                       "empty time fraction should fail");
+            when 99 =>
+               Expect ("time", "clock", "09:05:",
+                       I18N.Result.Invalid_Argument,
+                       "missing second should fail");
+            when 100 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00.123Z",
+                       I18N.Result.Success,
+                       "fractional UTC instant should render");
+            when 101 =>
+               Expect ("datetime", "instant",
+                       "2024-02-29T23:30:00.123456789+0130",
+                       I18N.Result.Success,
+                       "fractional hhmm offset instant should render");
+            when 102 =>
+               Expect ("datetime", "instant",
+                       "2024-02-29T23:30:00.1234567890Z",
+                       I18N.Result.Invalid_Argument,
+                       "overprecise fractional instant should fail");
+            when 103 =>
+               Expect ("relative", "offset", "+2", I18N.Result.Success,
+                       "positive signed relative offset should render");
+            when 104 =>
+               Expect ("list", "items", "single", I18N.Result.Success,
+                       "single list item should render");
+            when 105 =>
+               Expect ("unit", "distance", "+1.25", I18N.Result.Success,
+                       "positive signed unit decimal should render");
+            when 106 =>
+               Expect ("unit", "distance", "-1.25", I18N.Result.Success,
+                       "negative signed unit decimal should render");
+            when 107 =>
+               Expect ("unit", "distance", "+", I18N.Result.Invalid_Argument,
+                       "sign-only unit decimal should fail");
+            when 108 =>
+               Expect ("unit", "distance", "-.25", I18N.Result.Invalid_Argument,
+                       "missing integer unit decimal should fail");
+            when 109 =>
+               Expect ("unit_rate", "distance", "3.5", I18N.Result.Success,
+                       "per-unit decimal should render");
+            when 110 =>
+               Expect ("unit_rate", "distance", "3.", I18N.Result.Invalid_Argument,
+                       "per-unit empty fraction should fail");
+            when 111 =>
+               Expect ("unit_rate", "distance", "3,5",
+                       I18N.Result.Invalid_Argument,
+                       "per-unit localized decimal input should fail");
+            when 112 =>
+               Expect ("measure", "distance", "12.5", I18N.Result.Success,
+                       "measure-unit number skeleton should render");
+            when 113 =>
+               Expect ("measure", "distance", "+12.5", I18N.Result.Success,
+                       "signed measure-unit number should render");
+            when 114 =>
+               Expect ("measure", "distance", "12.5.1",
+                       I18N.Result.Invalid_Argument,
+                       "malformed measure-unit number should fail");
+            when 115 =>
+               Expect ("measure", "distance", "12 km",
+                       I18N.Result.Invalid_Argument,
+                       "measure-unit value with unit suffix should fail");
+            when 116 =>
+               Expect ("relative", "offset", "-0", I18N.Result.Success,
+                       "negative zero relative offset should render");
+            when 117 =>
+               Expect ("relative", "offset", "0002", I18N.Result.Success,
+                       "leading-zero relative offset should render");
+            when 118 =>
+               Expect ("relative", "offset", "--2",
+                       I18N.Result.Invalid_Argument,
+                       "double-signed relative offset should fail");
+            when 119 =>
+               Expect ("relative", "offset", "2 days",
+                       I18N.Result.Invalid_Argument,
+                       "relative offset with unit suffix should fail");
+            when 120 =>
+               Expect ("list", "items", "red|green", I18N.Result.Success,
+                       "two-item list should render");
+            when 121 =>
+               Expect ("list", "items", "red |green", I18N.Result.Success,
+                       "list item spaces are literal content");
+            when 122 =>
+               Expect ("list", "items", "red| green", I18N.Result.Success,
+                       "leading item space is literal content");
+            when 123 =>
+               Expect ("list", "items", "red| |blue", I18N.Result.Success,
+                       "space-only list item is literal content");
+            when 124 =>
+               Expect ("bytes", "size", "+2048", I18N.Result.Invalid_Argument,
+                       "positive signed byte size should fail");
+            when 125 =>
+               Expect ("duration", "seconds", "+3661",
+                       I18N.Result.Invalid_Argument,
+                       "positive signed duration should fail");
+            when 126 =>
+               Expect ("number", "value", "-+1",
+                       I18N.Result.Invalid_Argument,
+                       "double-signed number should fail");
+            when 127 =>
+               Expect ("number", "value", "0..1",
+                       I18N.Result.Invalid_Argument,
+                       "multiple decimal points should fail");
+            when 128 =>
+               Expect ("currency", "amount", "-+1.00",
+                       I18N.Result.Invalid_Argument,
+                       "double-signed currency amount should fail");
+            when 129 =>
+               Expect ("currency", "amount", "+1.",
+                       I18N.Result.Invalid_Argument,
+                       "trailing decimal point currency should fail");
+            when 130 =>
+               Expect ("date", "day", "24-02-29",
+                       I18N.Result.Invalid_Argument,
+                       "short year date should fail");
+            when 131 =>
+               Expect ("datetime", "instant", "2024-02-29 23:30:00+24:00",
+                       I18N.Result.Invalid_Argument,
+                       "out-of-range instant hour offset should fail");
+            when 132 =>
+               Expect ("number", "value", "+.5",
+                       I18N.Result.Invalid_Argument,
+                       "number with missing integer and leading dot should fail");
+            when 133 =>
+               Expect ("number", "value", "1e+2",
+                       I18N.Result.Invalid_Argument,
+                       "number exponent notation should fail");
+            when 134 =>
+               Expect ("number", "value", "1,234",
+                       I18N.Result.Invalid_Argument,
+                       "number grouping punctuation should fail");
+            when 135 =>
+               Expect ("currency", "amount", "1,234.56",
+                       I18N.Result.Invalid_Argument,
+                       "currency grouping punctuation should fail");
+            when 136 =>
+               Expect ("currency", "amount", "-",
+                       I18N.Result.Invalid_Argument,
+                       "sign-only currency amount should fail");
+            when 137 =>
+               Expect ("date", "day", "2024-02-29",
+                       I18N.Result.Success,
+                       "valid date baseline in fuzz remains");
+            when 138 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30",
+                       I18N.Result.Invalid_Argument,
+                       "instant missing seconds should fail");
+            when 139 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+01:60",
+                       I18N.Result.Invalid_Argument,
+                       "instant with out-of-range offset minutes should fail");
+            when 140 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+2400",
+                       I18N.Result.Invalid_Argument,
+                       "instant with out-of-range offset hour should fail");
+            when 141 =>
+               Expect ("datetime", "instant", "2024-02-29T23:30:00+01:00:0",
+                       I18N.Result.Invalid_Argument,
+                       "instant with malformed offset seconds should fail");
+            when 142 =>
+               Expect ("time", "clock", "09:05:07.",
+                       I18N.Result.Invalid_Argument,
+                       "clock with dangling decimal point should fail");
+            when 143 =>
+               Expect ("time", "clock", "09:05:07.  ",
+                       I18N.Result.Invalid_Argument,
+                       "clock fraction with trailing spaces should fail");
+            when others =>
+               Expect ("list", "items", "red|green|",
+                       I18N.Result.Invalid_Argument,
+                       "trailing empty list item should fail");
+         end case;
+      end loop;
+   end Test_Formatted_Value_Fuzz;
+
    procedure Test_Corpus_Golden_Outputs
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -641,6 +1426,11 @@ package body I18N.Runtime.Tests.Corpus is
       Assert_AST_IR_Equivalent ("Hello {name}", Args);
       Assert_AST_IR_Equivalent
         ("{count, plural, one {# file} other {# files}}", Args);
+      I18N.Arguments.Set (Args, "count", "1.5");
+      Assert_AST_IR_Equivalent
+        ("{count, plural, =1 {exact #} one {one #} other {other #}}",
+         Args);
+      I18N.Arguments.Set (Args, "count", "2");
       Assert_AST_IR_Equivalent
         ("{gender, select, male {He} female {She} other {They}}", Args);
       Assert_AST_IR_Equivalent
@@ -766,7 +1556,7 @@ package body I18N.Runtime.Tests.Corpus is
         ("{rank, selectordinal, one {1} two {2} few {3} few {4} other {o}}",
          I18N.Errors.Parse_Error);
       Assert_Invalid_Source
-        ("{count, plural, zero {0} other {n}}",
+        ("{count, plural, zero {0} zero {z} other {n}}",
          I18N.Errors.Parse_Error);
       --  Generalized select accepts arbitrary identifier branch names, so a
       --  duplicate generalized branch (not an unknown one) is the malformed
@@ -775,7 +1565,25 @@ package body I18N.Runtime.Tests.Corpus is
         ("{gender, select, unknown {U} unknown {V} other {O}}",
          I18N.Errors.Parse_Error);
       Assert_Invalid_Source
-        ("{rank, selectordinal, many {M} other {O}}",
+        ("{rank, selectordinal, many {M} many {N} other {O}}",
+         I18N.Errors.Parse_Error);
+      Assert_Invalid_Source
+        ("{rank, selectordinal, zero {Z} zero {N} other {O}}",
+         I18N.Errors.Parse_Error);
+      Assert_Invalid_Source
+        ("{day, date, ::yyyy{MM}}",
+         I18N.Errors.Parse_Error);
+      Assert_Invalid_Source
+        ("{clock, time, ::HH' oclock}",
+         I18N.Errors.Unbalanced_Braces);
+      Assert_Invalid_Source
+        ("{instant, datetime, ::yyyy','MM, }",
+         I18N.Errors.Parse_Error);
+      Assert_Invalid_Source
+        ("{value, number, ::scale/0}",
+         I18N.Errors.Parse_Error);
+      Assert_Invalid_Source
+        ("{amount, number, ::currency/US}",
          I18N.Errors.Parse_Error);
    end Test_Additional_Invalid_Grammar_Corpus;
 
@@ -817,6 +1625,12 @@ package body I18N.Runtime.Tests.Corpus is
       AUnit.Test_Cases.Registration.Register_Routine
         (T, Test_Fuzz_Run_Is_Robust'Access,
          "deterministic fuzz harness does not crash and preserves equivalence");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T, Test_Parser_Format_Fuzz'Access,
+         "parser fuzz covers formatted argument syntax deterministically");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T, Test_Formatted_Value_Fuzz'Access,
+         "formatted-value fuzz validates malformed formatted arguments");
       AUnit.Test_Cases.Registration.Register_Routine
         (T, Test_Error_Classification_Is_Stable'Access,
          "invalid corpus classification remains stable");

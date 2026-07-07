@@ -7,28 +7,71 @@ on:
 
 jobs:
   linux-release-check:
-    name: Linux release checklist
+    name: Linux release and packaging checks
     runs-on: ubuntu-latest
+    env:
+      ALIRE_NONINTERACTIVE: "true"
     steps:
       - name: Check out i18n
         uses: actions/checkout@v4
         with:
           path: i18n
+
       - name: Check out project_tools sibling
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/project_tools
           path: project_tools
+
       - name: Set up Alire
         uses: alire-project/setup-alire@v5
+
       - name: Install Ada toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y gnat gprbuild gnatprove gnatdoc || sudo apt-get install -y gnat gprbuild gnatdoc
           sudo apt-get install -y libaunit-dev || sudo apt-get install -y libaunit22-dev || sudo apt-get install -y libaunit24-dev
+
+      - name: Build library package
+        working-directory: i18n
+        run: alr build
+
+      - name: Build AUnit tests
+        working-directory: i18n/tests
+        run: alr exec -- gprbuild -P tests.gpr
+
+      - name: Run AUnit tests
+        working-directory: i18n/tests
+        run: alr exec -- ./bin/tests
+
+      - name: Build public examples
+        working-directory: i18n
+        run: alr exec -- gprbuild -P examples/examples.gpr
+
       - name: Build release checker
         working-directory: i18n/check_i18n
         run: alr build
-      - name: Run release checker
+
+      - name: Run public example output checks
         working-directory: i18n/check_i18n
-        run: ./bin/check_i18n
+        run: ./bin/check_i18n --examples-only
+
+      - name: Build render benchmarks
+        working-directory: i18n
+        run: alr exec -- gprbuild -P benchmarks/benchmarks.gpr
+
+      - name: Run render benchmark smoke
+        working-directory: i18n
+        run: ./benchmarks/bin/render_benchmarks --smoke
+
+      - name: Generate GNATdoc
+        working-directory: i18n
+        run: alr exec -- gnatdoc -P i18n.gpr
+
+      - name: Run project_tools release checker
+        working-directory: i18n/check_i18n
+        run: ./bin/check_i18n --skip-alr-test
+
+      - name: Run Alire packaging test action
+        working-directory: i18n
+        run: alr test

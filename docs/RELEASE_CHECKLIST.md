@@ -1,24 +1,36 @@
 # Release Checklist
 
-A v1.0 release candidate is acceptable only when the mandatory items below are true for the candidate being published.
+A v1.1.0 release candidate is acceptable only when the mandatory items below are true for the candidate being published.
 
 ## Build and tests
 
 ```text
-[verified] alr build succeeds
-[verified] tests/alr build succeeds
-[verified] tests/alr run passes
 [verified] alr test succeeds
-[verified] alr exec -- gprbuild -P examples/examples.gpr succeeds
-[verified] alr exec -- gnatprove -P i18n.gpr --level=0 --mode=check succeeds
 ```
+
+`alr test` must route through the `check_i18n` guard, which uses the sibling
+`project_tools` crate for release checks and runs the library build, test build,
+AUnit runner, examples build and output checks, CLDR data-boundary checks,
+Alire build/test checks, benchmark smoke checks for render hot paths and
+bounded `Render_Into`, GNATdoc, and GNATprove.
+
+## Alire publication readiness audit
+
+```text
+[verified] check_i18n Alire publication readiness audit succeeds
+```
+
+The audit must confirm that the root `alire.toml` is pin-free, named `i18n`,
+declares publication metadata, publishes only `i18n.gpr` as the primary project
+file, declares the supported GNAT dependency, and routes the Alire test action
+through the project-tools-based guard.
 
 ## Public API
 
 * Public examples import only public packages.
 * Public result statuses match `docs/ERROR_MODEL.md`.
 * Public catalog behavior matches `docs/CATALOG_FORMAT.md`.
-* No public example imports parser, AST, validation, compiler, compiled IR, cache, buffer, fast-render, or lower-level renderer packages.
+* No public example imports parser, AST, validation, compiler, compiled IR, cache, buffer, fast-render, lower-level renderer, formatter implementation, or generated CLDR data packages.
 
 ## Documentation
 
@@ -28,7 +40,7 @@ A v1.0 release candidate is acceptable only when the mandatory items below are t
 * `docs/CATALOG_FORMAT.md` matches catalog tests.
 * `docs/THREADING.md` distinguishes public render from the no-allocation compatibility `Render_Into` path.
 * `docs/COMPATIBILITY.md` states the source/runtime compatibility boundary.
-* `docs/RELEASE_VERIFICATION.md` states the GNAT/GPRbuild verification commands and private-package acceptance rules.
+* `docs/RELEASE_VERIFICATION.md` states the project-tools-based verification guard and private-package acceptance rules.
 * `docs/SPARK.md` states the SPARK-enabled units and GNATprove release command.
 
 ## Cleanup
@@ -38,7 +50,7 @@ A v1.0 release candidate is acceptable only when the mandatory items below are t
 
 ## Release blocker
 
-Do not tag v1.0 from documentation review alone. Before public publication, verify the library build, test project build, AUnit runner, example project, and selected packaging/documentation tooling such as Alire and GNATdoc for the candidate being published.
+Do not tag v1.1.0 from documentation review alone. Before public publication, run `alr test` and require the project-tools-based `check_i18n` guard, including example output checks, CLDR data-boundary checks, benchmark smoke checks, GNATdoc, and GNATprove, to pass for the candidate being published.
 
 ## Ada discriminant-safety audit
 

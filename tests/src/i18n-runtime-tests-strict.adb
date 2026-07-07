@@ -200,7 +200,7 @@ package body I18N.Runtime.Tests.Strict is
       pragma Unreferenced (T);
    begin
       Assert_Render_Error
-        (Source  => "{count, plural, few {x}}",
+        (Source  => "{count, plural, invalid {x}}",
          Error   => I18N.Errors.Parse_Error,
          Key_1   => "count",
          Value_1 => "3");
@@ -320,6 +320,101 @@ package body I18N.Runtime.Tests.Strict is
          Value_1 => "1");
    end Test_Duplicate_Plural_Branch_Returns_Parse_Error;
 
+   procedure Test_Quoted_Text_Close_Branch_Boundary
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Runtime : I18N.Runtime.Runtime;
+      Args    : I18N.Arguments.Arguments;
+   begin
+      I18N.Arguments.Set (Args, "count", "1");
+
+      I18N.Runtime.Compatibility.Initialize_Message
+        (Runtime,
+         Source => "{count, plural, one {'# item} other {# items}}");
+
+      declare
+         Result : constant I18N.Errors.Result :=
+           I18N.Runtime.Compatibility.Render (Runtime, Args);
+      begin
+         AUnit.Assertions.Assert
+           (Condition => Result.Ok,
+            Message => "unterminated quote inside plural branch closes at branch end");
+         AUnit.Assertions.Assert
+           (Condition => I18N.Errors.Value_Text (Result) = "# item",
+            Message =>
+              "branch quote content should be preserved and rendered literally");
+      end;
+
+      I18N.Runtime.Finalize (Runtime);
+   end Test_Quoted_Text_Close_Branch_Boundary;
+
+   procedure Test_Unclosed_Format_Quote_Error
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert_Render_Error
+        (Source => "{amount, number, ::percent'}",
+         Error  => I18N.Errors.Unbalanced_Braces,
+         Key_1  => "amount",
+         Value_1 => "1");
+   end Test_Unclosed_Format_Quote_Error;
+
+   procedure Test_Apostrophe_Before_Normal_Text_Is_Literal
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert_Render_OK
+        (Source   => "I don't parse {name}",
+         Key_1    => "name",
+         Value_1  => "X",
+         Expected => "I don't parse X");
+   end Test_Apostrophe_Before_Normal_Text_Is_Literal;
+
+   procedure Test_Message_With_Only_Unterminated_Quote_Renders_To_End
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert_Render_OK
+        (Source   => "This is '{literal",
+         Expected => "This is {literal");
+   end Test_Message_With_Only_Unterminated_Quote_Renders_To_End;
+
+   procedure Test_Quoted_Text_Braces_Render_Literally
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert_Render_OK
+        (Source   => "prefix '{' and '}' suffix",
+         Expected => "prefix { and } suffix");
+   end Test_Quoted_Text_Braces_Render_Literally;
+
+   procedure Test_Quoted_Text_Contains_Variable_Name_Literals
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert_Render_OK
+        (Source   => "'{name}'",
+         Expected => "{name}");
+   end Test_Quoted_Text_Contains_Variable_Name_Literals;
+
+   procedure Test_Number_Sign_Is_Literal_In_Quoted_Apostrophe_Block
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert_Render_OK
+        (Source   => "{count, plural, one {'#'} other {#}}",
+         Key_1    => "count",
+         Value_1  => "1",
+         Expected => "#");
+   end Test_Number_Sign_Is_Literal_In_Quoted_Apostrophe_Block;
+
    procedure Test_Invalid_Variable_Identifier_Returns_Parse_Error
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -422,6 +517,34 @@ package body I18N.Runtime.Tests.Strict is
         (T,
          Test_Duplicate_Plural_Branch_Returns_Parse_Error'Access,
          "duplicate plural branches return Parse_Error");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Quoted_Text_Close_Branch_Boundary'Access,
+         "unterminated quoted text closes at branch end");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Unclosed_Format_Quote_Error'Access,
+         "unclosed quoted format option is rejected");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Apostrophe_Before_Normal_Text_Is_Literal'Access,
+         "apostrophe before normal text is literal");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Message_With_Only_Unterminated_Quote_Renders_To_End'Access,
+         "unterminated quoted text in message closes at end");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Quoted_Text_Braces_Render_Literally'Access,
+         "quoted braces in message text render literally");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Quoted_Text_Contains_Variable_Name_Literals'Access,
+         "quoted variable markers inside text render literally");
+      AUnit.Test_Cases.Registration.Register_Routine
+        (T,
+         Test_Number_Sign_Is_Literal_In_Quoted_Apostrophe_Block'Access,
+         "quoted number-sign remains literal in text");
       AUnit.Test_Cases.Registration.Register_Routine
         (T,
          Test_Invalid_Variable_Identifier_Returns_Parse_Error'Access,

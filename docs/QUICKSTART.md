@@ -1,6 +1,6 @@
 # Quickstart
 
-This guide shows the smallest complete v1.0 workflow: create a catalog, initialize the runtime, pass arguments, render a message, and inspect the structured result.
+This guide shows the smallest complete v1.1.0 workflow: create a catalog, initialize the runtime, pass arguments, render a message, and inspect the structured result.
 
 ## 1. Create a catalog
 
@@ -14,7 +14,7 @@ en.items = "{count, plural, one {One item} other {# items}}"
 de.items = "{count, plural, one {Ein Artikel} other {# Artikel}}"
 ```
 
-The v1.0 catalog format is line-oriented:
+The v1.1.0 catalog format is line-oriented:
 
 ```text
 locale.key = ICU message string
@@ -123,9 +123,90 @@ begin
 end;
 ```
 
-If `count` is missing, the result status is `Missing_Argument`. If `count` is not a strict integer, the result status is `Invalid_Argument`.
+If `count` is missing, the result status is `Missing_Argument`. Non-offset plurals accept strict integer or decimal text; malformed numeric text returns `Invalid_Argument`.
 
-## 5. Build the library and examples
+## 5. Render date, time, number, and currency values
+
+Date and time values are strict text inputs:
+
+```text
+en.when = "On {day, date} at {clock, time}"
+de.when = "Am {day, date} um {clock, time}"
+```
+
+`day = "2024-02-29"` and `clock = "09:05:07"` render as
+`2024-02-29` / `09:05:07` for `en` and `29.02.2024` / `09:05:07` for
+`de`. Invalid calendar dates and out-of-range times return `Invalid_Argument`.
+
+ISO instants with offsets can be formatted as date, time, or combined
+date-time values with a fixed target zone:
+
+```text
+en.meeting = "{instant, datetime, short, America/New_York}"
+```
+
+`instant = "2024-03-01T02:30:00Z"` renders as `2/29/24 21:30`.
+Supported target zones include deterministic offsets such as `UTC`, `+02:00`,
+`Europe/Berlin`, `Europe/Paris`, `Europe/Zurich`, `Europe/Vienna`,
+`Europe/Brussels`, `Europe/Copenhagen`, `Europe/Stockholm`, `Europe/Oslo`,
+`Europe/Warsaw`, `Europe/Prague`, `Europe/Budapest`, `Europe/London`,
+`Z`, `GMT`, `Etc/UTC`, `Etc/GMT`, alias names such as `Zulu`,
+`US/Eastern`, `US/Pacific`, and `Canada/Eastern`, `Europe/Bratislava`,
+`Europe/Luxembourg`, `Europe/Monaco`, `Europe/Andorra`,
+`Europe/Malta`, `Europe/San_Marino`, `Europe/Vatican`, `Europe/Belgrade`,
+`Europe/Zagreb`, `Europe/Ljubljana`, `Europe/Sarajevo`, `Europe/Skopje`,
+`Europe/Podgorica`, `Europe/Tirane`, `Europe/Dublin`, `Europe/Lisbon`,
+`Atlantic/Canary`, `Europe/Athens`,
+`Europe/Helsinki`, `Europe/Bucharest`, `Europe/Sofia`, `Europe/Vilnius`,
+`Europe/Riga`, `Europe/Tallinn`, `Europe/Kyiv`, `Europe/Chisinau`,
+`Asia/Nicosia`, `Europe/Moscow`, `Europe/Istanbul`, `America/New_York`,
+`America/Toronto`, `America/Montreal`, `America/Detroit`,
+`America/Indiana/Indianapolis`, `America/Kentucky/Louisville`,
+`America/Nassau`, `America/Chicago`,
+`America/Winnipeg`, `America/Denver`, `America/Edmonton`, `America/Boise`,
+`America/Los_Angeles`, `America/Vancouver`, `America/Tijuana`,
+`America/Phoenix`, `America/Mexico_City`, `America/Bogota`,
+`America/Lima`, `America/Sao_Paulo`,
+`America/Argentina/Buenos_Aires`, `Africa/Johannesburg`,
+`Africa/Nairobi`, `Africa/Lagos`, `Asia/Dubai`, `Asia/Riyadh`,
+`Asia/Shanghai`, `Asia/Singapore`, `Asia/Hong_Kong`, `Asia/Taipei`,
+`Asia/Kuala_Lumpur`, `Asia/Tokyo`, `Asia/Kolkata`,
+`Asia/Ho_Chi_Minh`, `Asia/Karachi`, `Asia/Kathmandu`,
+`Pacific/Honolulu`, `Pacific/Auckland`,
+`Australia/Sydney`, `Australia/Melbourne`, `Australia/Hobart`,
+`Australia/Adelaide`, `Australia/Brisbane`, `Australia/Perth`, and
+`Australia/Darwin`; the listed European DST-rule zones, DST-aware America and
+Canada, New Zealand, Sydney, Melbourne, Hobart, and Adelaide named zones keep
+their deterministic display-name families. Instant conversion uses checked
+IANA tzdb 2026a transition tables generated into the library for 1900 through
+2050, plus deterministic runtime-data/tzdb override rows for application-loaded
+offset data. See `docs/ICU_SUBSET.md` for the
+complete deterministic target-zone list.
+
+Number values are supplied as strict decimal strings. Catalog messages can
+format grouped output:
+
+```text
+en.total = "Total {value, number}"
+de.total = "Summe {value, number}"
+```
+
+`"12345.67"` renders as `12,345.67` for `en` and `12.345,67` for `de`.
+Grouping separators are output-only; grouped input returns `Invalid_Argument`.
+
+Currency values are supplied as strict decimal strings. Catalog messages choose
+the ISO code:
+
+```text
+en.price = "Total {amount, currency, USD}"
+de.price = "Summe {amount, currency, EUR}"
+```
+
+`"12.3"` renders as `USD 12.30` for `en` and `12,30 EUR` for `de`.
+Currency codes must be three uppercase ASCII letters. Too many fraction digits
+return `Invalid_Argument`.
+
+## 6. Build the library and examples
 
 From the project root:
 
@@ -133,7 +214,7 @@ From the project root:
 gprbuild -P i18n.gpr
 ```
 
-To build the maintained v1.0 example series:
+To build the maintained v1.1.0 example series:
 
 ```sh
 gprbuild -P examples/examples.gpr
@@ -145,13 +226,14 @@ The example suite includes `hello_world.adb` as the shortest start-here program 
 with I18N.Arguments;
 with I18N.Diagnostics;
 with I18N.Locales;
+with I18N.Plurals;
 with I18N.Result;
 with I18N.Runtime;
 ```
 
 Application code should not `with` parser, validator, compiler, IR, cache, AST, or execution packages.
 
-## 6. Run the release test suite
+## 7. Run the release test suite
 
 ```sh
 cd tests
@@ -160,9 +242,9 @@ alr exec -- gprbuild -P tests.gpr
 cd ..
 ```
 
-The tests are the release gate. See `docs/TEST_MATRIX.md` for the mapping between v1.0 requirements and concrete test groups.
+The tests are the release gate. See `docs/TEST_MATRIX.md` for the mapping between v1.1.0 requirements and concrete test groups.
 
-## 7. What to read next
+## 8. What to read next
 
 * `docs/API.md` for the frozen public API contract.
 * `docs/CATALOG_FORMAT.md` for exact catalog syntax and rejection rules.
@@ -172,4 +254,4 @@ The tests are the release gate. See `docs/TEST_MATRIX.md` for the mapping betwee
 
 ## More examples
 
-See `docs/EXAMPLES.md`, `examples/README.md`, `examples/EXAMPLES_INDEX.md`, and `examples/EXPECTED_OUTPUT.md` for the full v1.0 example series covering hello-world rendering, plural, select, selectordinal, nesting, full fallback chains, diagnostics, invalid catalogs, invalid catalog fields, stable failure statuses, empty messages, default-locale keys, and argument-map lifecycle operations.
+See `docs/EXAMPLES.md`, `examples/README.md`, `examples/EXAMPLES_INDEX.md`, and `examples/EXPECTED_OUTPUT.md` for the full v1.1.0 example series covering hello-world rendering, plural, select, selectordinal, nesting, number/currency/date/time/domain formatting, full fallback chains, diagnostics, invalid catalogs, invalid catalog fields, stable failure statuses, empty messages, default-locale keys, and argument-map lifecycle operations.

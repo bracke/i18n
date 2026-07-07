@@ -1,21 +1,23 @@
 with I18N.Locales;
 
---  Stable v1.0 public plural-category foundation.
+--  Stable v1.1.0 public plural-category foundation.
 --
 --  Purpose:
---  This package classifies an integer value into a CLDR plural category for a
---  given locale. It provides the generic plural/selectordinal mechanics the
---  message engine and downstream libraries build on. It does NOT implement any
---  application-domain wording, number formatting, or unit-humanization policy.
+--  This package classifies whole values and explicit CLDR fractional operands
+--  into plural categories for a given locale. It provides the generic
+--  plural/selectordinal mechanics the message engine and downstream libraries
+--  build on. It does NOT implement any application-domain wording, number
+--  formatting, or unit-humanization policy.
 --
 --  Coverage:
---  Cardinal rules cover en, de, nl, da, es, it, fr, pt, ru, pl, cs, and ar -- the
---  Slavic (ru, pl, cs) and Arabic (ar) rules cover all six categories. Ordinal
---  rules are modelled for en, fr, and it. The integer Cardinal/Ordinal take a
---  whole value; an overloaded Cardinal also accepts CLDR fractional operands
---  (i, v, f) for decimal quantities. Locales resolve through their two-letter
---  language subtag; any locale outside these sets (including the CJK languages
---  ja, zh, ko) uses the root rule, which returns Other.
+--  Cardinal and ordinal rule-family mappings are generated from the checked
+--  CLDR 46.1 source subset and evaluated by built-in deterministic families.
+--  The checked-in tables cover all 219 CLDR cardinal locale IDs and all 104
+--  CLDR ordinal locale IDs from that source, with exact locale matching before
+--  parent fallback. The integer Cardinal/Ordinal take a whole value; an
+--  overloaded Cardinal also accepts CLDR fractional operands (i, v, f) for
+--  decimal quantities. Locales outside the generated CLDR set use the root
+--  rule, which returns Other.
 --
 --  Value model:
 --  The absolute value of the argument is used, matching the CLDR operand n. The
@@ -24,7 +26,10 @@ with I18N.Locales;
 --  French "1,5" -> One).
 --
 --  Error behavior:
---  These are pure total functions. They never raise and never allocate.
+--  These are total functions. They never raise. If runtime plural-category
+--  overrides have been loaded through I18N.Runtime, exact integer cardinal and
+--  ordinal classifications consult those overrides before bounded runtime
+--  plural-rule expressions and generated fallback rules.
 --
 --  Example:
 --     Cardinal ("en", 1) = One
@@ -32,8 +37,6 @@ with I18N.Locales;
 --     Ordinal  ("en", 2) = Two     --  "2nd"
 --     Ordinal  ("en", 3) = Few     --  "3rd"
 package I18N.Plurals is
-   pragma Preelaborate;
-   pragma SPARK_Mode (On);
 
    --  CLDR plural categories.
    type Plural_Category is
@@ -52,9 +55,7 @@ package I18N.Plurals is
    function Cardinal
      (Locale : I18N.Locales.Locale_Id;
       Value  : Long_Long_Integer)
-      return Plural_Category
-   with
-     Global => null;
+      return Plural_Category;
 
    --  Cardinal category from CLDR fractional operands.
    --
@@ -69,9 +70,7 @@ package I18N.Plurals is
       Integer_Part    : Long_Long_Integer;
       Fraction_Digits : Natural;
       Fraction_Value  : Long_Long_Integer)
-      return Plural_Category
-   with
-     Global => null;
+      return Plural_Category;
 
    --  Ordinal plural category (1st / 2nd / 3rd / 4th ...).
    --
@@ -81,8 +80,6 @@ package I18N.Plurals is
    function Ordinal
      (Locale : I18N.Locales.Locale_Id;
       Value  : Long_Long_Integer)
-      return Plural_Category
-   with
-     Global => null;
+      return Plural_Category;
 
 end I18N.Plurals;

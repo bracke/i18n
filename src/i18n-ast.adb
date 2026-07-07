@@ -54,13 +54,23 @@ package body I18N.AST is
              (Kind  => I18N.AST.Text,
               Text  => To_Unbounded_String (Text),
               Name  => Null_Unbounded_String,
+              Currency_Code => Null_Unbounded_String,
+              Plural_Offset => 0,
+              Plural_Zero => null,
               One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
               Other  => null,
+              Plural_Exact => null,
               Branches => null,
+              Ord_Zero  => null,
               Ord_One   => null,
               Ord_Two   => null,
               Ord_Few   => null,
+              Ord_Many  => null,
               Ord_Other => null,
+              Ord_Exact => null,
               Next   => null));
    end Append_Text;
 
@@ -139,22 +149,292 @@ package body I18N.AST is
              (Kind  => I18N.AST.Variable,
               Text  => Null_Unbounded_String,
               Name  => To_Unbounded_String (Name),
+              Currency_Code => Null_Unbounded_String,
+              Plural_Offset => 0,
+              Plural_Zero => null,
               One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
               Other  => null,
+              Plural_Exact => null,
               Branches => null,
+              Ord_Zero  => null,
               Ord_One   => null,
               Ord_Two   => null,
               Ord_Few   => null,
+              Ord_Many  => null,
               Ord_Other => null,
+              Ord_Exact => null,
               Next   => null));
    end Append_Variable;
+
+   procedure Append_Number
+     (Head : in out Node_Access;
+      Tail : in out Node_Access;
+      Name : String;
+      Style : String := "")
+   is
+   begin
+      pragma Assert (Name'Length > 0, "Number argument name must not be empty");
+
+      if Name'Length = 0 then
+         raise Constraint_Error with "Number argument name must not be empty";
+      end if;
+
+      Append_Node
+        (Head => Head,
+         Tail => Tail,
+         Item =>
+           new Node'
+             (Kind  => I18N.AST.Number,
+              Text  => Null_Unbounded_String,
+              Name  => To_Unbounded_String (Name),
+              Currency_Code => To_Unbounded_String (Style),
+              Plural_Offset => 0,
+              Plural_Zero => null,
+              One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
+              Other  => null,
+              Plural_Exact => null,
+              Branches => null,
+              Ord_Zero  => null,
+              Ord_One   => null,
+              Ord_Two   => null,
+              Ord_Few   => null,
+              Ord_Many  => null,
+              Ord_Other => null,
+              Ord_Exact => null,
+              Next   => null));
+   end Append_Number;
+
+   procedure Append_Date
+     (Head : in out Node_Access;
+      Tail : in out Node_Access;
+      Name : String;
+      Style : String := "")
+   is
+   begin
+      pragma Assert (Name'Length > 0, "Date argument name must not be empty");
+
+      if Name'Length = 0 then
+         raise Constraint_Error with "Date argument name must not be empty";
+      end if;
+
+      Append_Node
+        (Head => Head,
+         Tail => Tail,
+         Item =>
+           new Node'
+             (Kind  => I18N.AST.Date_Format,
+              Text  => Null_Unbounded_String,
+              Name  => To_Unbounded_String (Name),
+              Currency_Code => To_Unbounded_String (Style),
+              Plural_Offset => 0,
+              Plural_Zero => null,
+              One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
+              Other  => null,
+              Plural_Exact => null,
+              Branches => null,
+              Ord_Zero  => null,
+              Ord_One   => null,
+              Ord_Two   => null,
+              Ord_Few   => null,
+              Ord_Many  => null,
+              Ord_Other => null,
+              Ord_Exact => null,
+              Next   => null));
+   end Append_Date;
+
+   procedure Append_Time
+     (Head : in out Node_Access;
+      Tail : in out Node_Access;
+      Name : String;
+      Style : String := "")
+   is
+   begin
+      pragma Assert (Name'Length > 0, "Time argument name must not be empty");
+
+      if Name'Length = 0 then
+         raise Constraint_Error with "Time argument name must not be empty";
+      end if;
+
+      Append_Node
+        (Head => Head,
+         Tail => Tail,
+         Item =>
+           new Node'
+             (Kind  => I18N.AST.Time_Format,
+              Text  => Null_Unbounded_String,
+              Name  => To_Unbounded_String (Name),
+              Currency_Code => To_Unbounded_String (Style),
+              Plural_Offset => 0,
+              Plural_Zero => null,
+              One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
+              Other  => null,
+              Plural_Exact => null,
+              Branches => null,
+              Ord_Zero  => null,
+              Ord_One   => null,
+              Ord_Two   => null,
+              Ord_Few   => null,
+              Ord_Many  => null,
+              Ord_Other => null,
+              Ord_Exact => null,
+              Next   => null));
+   end Append_Time;
+
+   procedure Append_Date_Time
+     (Head : in out Node_Access;
+      Tail : in out Node_Access;
+      Name : String;
+      Style : String := "")
+   is
+   begin
+      pragma Assert
+        (Name'Length > 0, "Date-time argument name must not be empty");
+
+      if Name'Length = 0 then
+         raise Constraint_Error with "Date-time argument name must not be empty";
+      end if;
+
+      Append_Node
+        (Head => Head,
+         Tail => Tail,
+         Item =>
+           new Node'
+             (Kind  => I18N.AST.Date_Time_Format,
+              Text  => Null_Unbounded_String,
+              Name  => To_Unbounded_String (Name),
+              Currency_Code => To_Unbounded_String (Style),
+              Plural_Offset => 0,
+              Plural_Zero => null,
+              One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
+              Other  => null,
+              Plural_Exact => null,
+              Branches => null,
+              Ord_Zero  => null,
+              Ord_One   => null,
+              Ord_Two   => null,
+              Ord_Few   => null,
+              Ord_Many  => null,
+              Ord_Other => null,
+              Ord_Exact => null,
+              Next   => null));
+   end Append_Date_Time;
+
+   procedure Append_Currency
+     (Head          : in out Node_Access;
+      Tail          : in out Node_Access;
+      Name          : String;
+      Currency_Code : String)
+   is
+   begin
+      pragma Assert (Name'Length > 0, "Currency amount name must not be empty");
+      pragma Assert
+        (Currency_Code'Length > 0, "Currency code must not be empty");
+
+      if Name'Length = 0 or else Currency_Code'Length = 0 then
+         raise Constraint_Error with "Currency node fields must not be empty";
+      end if;
+
+      Append_Node
+        (Head => Head,
+         Tail => Tail,
+         Item =>
+           new Node'
+             (Kind  => I18N.AST.Currency,
+              Text  => Null_Unbounded_String,
+              Name  => To_Unbounded_String (Name),
+              Currency_Code => To_Unbounded_String (Currency_Code),
+              Plural_Offset => 0,
+              Plural_Zero => null,
+              One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
+              Other  => null,
+              Plural_Exact => null,
+              Branches => null,
+              Ord_Zero  => null,
+              Ord_One   => null,
+              Ord_Two   => null,
+              Ord_Few   => null,
+              Ord_Many  => null,
+              Ord_Other => null,
+              Ord_Exact => null,
+              Next   => null));
+   end Append_Currency;
+
+   procedure Append_Extra_Format
+     (Head   : in out Node_Access;
+      Tail   : in out Node_Access;
+      Kind   : Node_Kind;
+      Name   : String;
+      Option : String := "")
+   is
+   begin
+      pragma Assert (Name'Length > 0, "Formatted argument name must not be empty");
+
+      if Name'Length = 0 then
+         raise Constraint_Error with "Formatted argument name must not be empty";
+      elsif Kind not in Duration_Format | Byte_Size_Format | Unit_Format
+        | Relative_Time_Format | List_Format
+      then
+         raise Constraint_Error with "Invalid extra formatter node kind";
+      end if;
+
+      Append_Node
+        (Head => Head,
+         Tail => Tail,
+         Item =>
+           new Node'
+             (Kind  => Kind,
+              Text  => Null_Unbounded_String,
+              Name  => To_Unbounded_String (Name),
+              Currency_Code => To_Unbounded_String (Option),
+              Plural_Offset => 0,
+              Plural_Zero => null,
+              One    => null,
+              Plural_Two  => null,
+              Plural_Few  => null,
+              Plural_Many => null,
+              Other  => null,
+              Plural_Exact => null,
+              Branches => null,
+              Ord_Zero  => null,
+              Ord_One   => null,
+              Ord_Two   => null,
+              Ord_Few   => null,
+              Ord_Many  => null,
+              Ord_Other => null,
+              Ord_Exact => null,
+              Next   => null));
+   end Append_Extra_Format;
 
    procedure Append_Plural
      (Head  : in out Node_Access;
       Tail  : in out Node_Access;
       Name  : String;
+      Offset : Long_Long_Integer;
+      Zero  : in out Node_Access;
       One   : in out Node_Access;
-      Other : in out Node_Access)
+      Two   : in out Node_Access;
+      Few   : in out Node_Access;
+      Many  : in out Node_Access;
+      Other : in out Node_Access;
+      Exact : in out Branch_Access)
    is
       Item : Node_Access;
    begin
@@ -162,6 +442,8 @@ package body I18N.AST is
 
       if Name'Length = 0 then
          raise Constraint_Error with "Plural selector name must not be empty";
+      elsif Offset < 0 then
+         raise Constraint_Error with "Plural offset must not be negative";
       end if;
 
       Item :=
@@ -169,17 +451,32 @@ package body I18N.AST is
           (Kind  => I18N.AST.Plural,
            Text  => Null_Unbounded_String,
            Name  => To_Unbounded_String (Name),
+           Currency_Code => Null_Unbounded_String,
+           Plural_Offset => Offset,
+           Plural_Zero => Zero,
            One    => One,
+           Plural_Two  => Two,
+           Plural_Few  => Few,
+           Plural_Many => Many,
            Other  => Other,
+           Plural_Exact => Exact,
            Branches => null,
+           Ord_Zero  => null,
            Ord_One   => null,
            Ord_Two   => null,
            Ord_Few   => null,
+           Ord_Many  => null,
            Ord_Other => null,
+           Ord_Exact => null,
            Next   => null);
 
+      Zero := null;
       One := null;
+      Two := null;
+      Few := null;
+      Many := null;
       Other := null;
+      Exact := null;
 
       Append_Node
         (Head => Head,
@@ -206,13 +503,23 @@ package body I18N.AST is
           (Kind   => I18N.AST.Select_Node,
            Text   => Null_Unbounded_String,
            Name   => To_Unbounded_String (Name),
+           Currency_Code => Null_Unbounded_String,
+           Plural_Offset => 0,
+           Plural_Zero => null,
            One    => null,
+           Plural_Two  => null,
+           Plural_Few  => null,
+           Plural_Many => null,
            Other  => null,
+           Plural_Exact => null,
            Branches => Branches,
+           Ord_Zero  => null,
            Ord_One   => null,
            Ord_Two   => null,
            Ord_Few   => null,
+           Ord_Many  => null,
            Ord_Other => null,
+           Ord_Exact => null,
            Next   => null);
 
       Branches := null;
@@ -227,10 +534,13 @@ package body I18N.AST is
      (Head  : in out Node_Access;
       Tail  : in out Node_Access;
       Name  : String;
+      Zero  : in out Node_Access;
       One   : in out Node_Access;
       Two   : in out Node_Access;
       Few   : in out Node_Access;
-      Other : in out Node_Access)
+      Many  : in out Node_Access;
+      Other : in out Node_Access;
+      Exact : in out Branch_Access)
    is
       Item : Node_Access;
    begin
@@ -245,19 +555,32 @@ package body I18N.AST is
           (Kind      => I18N.AST.SelectOrdinal,
            Text      => Null_Unbounded_String,
            Name      => To_Unbounded_String (Name),
+           Currency_Code => Null_Unbounded_String,
+           Plural_Offset => 0,
+           Plural_Zero => null,
            One       => null,
+           Plural_Two  => null,
+           Plural_Few  => null,
+           Plural_Many => null,
            Other     => null,
+           Plural_Exact => null,
            Branches  => null,
+           Ord_Zero  => Zero,
            Ord_One   => One,
            Ord_Two   => Two,
            Ord_Few   => Few,
+           Ord_Many  => Many,
            Ord_Other => Other,
+           Ord_Exact => Exact,
            Next      => null);
 
+      Zero := null;
       One := null;
       Two := null;
       Few := null;
+      Many := null;
       Other := null;
+      Exact := null;
 
       Append_Node
         (Head => Head,
@@ -291,15 +614,23 @@ package body I18N.AST is
          Current.Next := null;
 
          if Current.Kind = I18N.AST.Plural then
+            Free (Current.Plural_Zero);
             Free (Current.One);
+            Free (Current.Plural_Two);
+            Free (Current.Plural_Few);
+            Free (Current.Plural_Many);
             Free (Current.Other);
+            Free_Branches (Current.Plural_Exact);
          elsif Current.Kind = I18N.AST.Select_Node then
             Free_Branches (Current.Branches);
          elsif Current.Kind = I18N.AST.SelectOrdinal then
+            Free (Current.Ord_Zero);
             Free (Current.Ord_One);
             Free (Current.Ord_Two);
             Free (Current.Ord_Few);
+            Free (Current.Ord_Many);
             Free (Current.Ord_Other);
+            Free_Branches (Current.Ord_Exact);
          end if;
 
          Free_Node (Current);

@@ -1,4 +1,4 @@
---  Stable v1.0 public diagnostics API.
+--  Stable v1.1.0 public diagnostics API.
 --
 --  Purpose:
 --  Diagnostics provide optional, fixed-storage detail about rendering and

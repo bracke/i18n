@@ -17,11 +17,13 @@ private with I18N.AST;
 --  Purpose:
 --  This package owns runtime initialization, catalog/shard loading, catalog
 --  validation, locale fallback, key resolution, and the stable public render
---  facades. Applications use Instance, Initialize, Load_File/Load_Text,
---  Validate_Catalog_File/Text, Resolve, Render, Render_Into, Is_Valid, and
---  Finalize. Parser, validator, compiler, IR, cache, execution, internal error,
---  buffer, and observability packages are implementation details and are not
---  part of the public contract.
+--  facades. Applications use Instance, Initialize, Initialize_Binary_File,
+--  Load_File/Load_Binary_File/Load_Text, Validate_Catalog_File/Text,
+--  Validate_Binary_Catalog_File/Text, Resolve, Render, Render_Into, Is_Valid,
+--  and Finalize. Parser, validator, compiler, IR, cache, execution, formatter
+--  implementation, generated CLDR data, internal error, buffer, and
+--  observability packages are implementation details and are not part of the
+--  public contract.
 --
 --  Error behavior:
 --  Initialize records deterministic validity state. Public catalog Render returns
@@ -43,6 +45,24 @@ private with I18N.AST;
 --  is the public allocation-free path: it renders directly into caller-owned
 --  fixed storage without building an intermediate dynamic buffer.
 --
+--  Message behavior:
+--  Catalog messages support variables, plural/select/selectordinal with
+--  locale-aware CLDR category selection, ICU-style apostrophe escaping, and the
+--  deterministic formatting set: number skeletons such as {value, number},
+--  {value, number, ::percent}, and {value, number, ::compact-short}; currency
+--  formats such as {amount, currency, USD/standard},
+--  {amount, currency, USD/unit-width-long}, and
+--  {amount, number, ::currency/CHF precision-currency-cash}; date/time style
+--  and skeleton formats such as {day, date, full}, {day, date, ::date-short},
+--  {clock, time, ::time-short}, and {instant, datetime, ::yMdHHmmssz, UTC}; and
+--  deterministic domain formatters for duration, byte size, unit,
+--  measure-unit, relative-time, and list output. Number, currency, date/time,
+--  and domain formatter output honors the supported locale digits and
+--  deterministic CLDR-derived data boundary. Missing arguments report
+--  Missing_Argument; malformed numeric, number, currency, date, time,
+--  datetime, duration, byte-size, unit, relative-time, or list arguments report
+--  Invalid_Argument.
+--
 --  Example:
 --     I18N.Runtime.Initialize (Runtime, "messages.catalog");
 --     Result := I18N.Runtime.Render (Runtime, "de-AT", "welcome", Args);
@@ -51,7 +71,7 @@ package I18N.Runtime is
    type Runtime is tagged limited private;
    subtype Instance is Runtime;
 
-   --  Initialize a v1.0 runtime from the canonical catalog file format.
+   --  Initialize a v1.1.0 runtime from the canonical catalog file format.
    --
    --  Catalog format is UTF-8-compatible ASCII text with one message per line:
    --
@@ -72,6 +92,27 @@ package I18N.Runtime is
      (Item         : in out Runtime;
       Catalog_Path : String);
 
+   --  Initialize a runtime from a versioned binary catalog file.
+   --
+   --  The v1.1.0 binary catalog envelope is deterministic and versioned:
+   --
+   --     I18N-CATALOG-BINARY
+   --     format_version=1
+   --     ir_version=1
+   --     payload=text
+   --
+   --  The blank line after the header is followed by canonical text catalog
+   --  payload. The payload may also be encoded as payload=hex-text, where the
+   --  body is ASCII hex bytes for the same canonical text catalog payload.
+   --  Unsupported magic, format versions, IR versions, or payload kinds fail
+   --  deterministically and leave the runtime invalid.
+   --
+   --  @param Item Runtime instance to initialize.
+   --  @param Catalog_Path Path to a binary catalog file.
+   procedure Initialize_Binary_File
+     (Item         : in out Runtime;
+      Catalog_Path : String);
+
    --  Append catalog entries from another canonical catalog file.
    --
    --  This preserves entries already loaded by Initialize or prior Load calls,
@@ -86,18 +127,19 @@ package I18N.Runtime is
      (Item         : in out Runtime;
       Catalog_Path : String);
 
-   --  Stable v1.0 catalog render API.
+   --  Stable v1.1.0 catalog render API.
    --
-   --  Rendering does not mutate Runtime. It resolves Locale using deterministic
-   --  fallback (for example de-AT -> de -> default locale), selects Key, and
-   --  renders the selected ICU message. Normal ICU/render
+   --  Rendering does not mutate Runtime. It canonicalizes Locale casing and
+   --  known CLDR language aliases, resolves it using deterministic fallback
+   --  (for example de-AT -> de -> default locale), selects Key, and renders
+   --  the selected ICU message. Normal ICU/render
    --  failures are returned as structured statuses and do not raise exceptions.
    --
    --  @param Item Initialized runtime instance.
    --  @param Locale Requested locale.
    --  @param Key Message key.
    --  @param Arguments Public argument map.
-   --  @return Stable v1.0 public render result.
+   --  @return Stable v1.1.0 public render result.
    function Render
      (Item      : Instance;
       Locale    : I18N.Locales.Locale_Id;
@@ -178,6 +220,22 @@ package I18N.Runtime is
       Result : out Load_Result;
       Policy : Duplicate_Policy := Reject_Duplicates);
 
+   --  Load a versioned binary catalog shard from a file.
+   --
+   --  The decoded payload is ingested with the same transactional semantics as
+   --  Load_File. Unsupported binary versions are rejected deterministically as
+   --  Invalid_Catalog and do not mutate the runtime.
+   --
+   --  @param Item Runtime instance to load into.
+   --  @param Path Path to a binary catalog file.
+   --  @param Result Outcome, entry count, and diagnostics.
+   --  @param Policy Duplicate-handling policy. Default rejects duplicates.
+   procedure Load_Binary_File
+     (Item   : in out Instance;
+      Path   : String;
+      Result : out Load_Result;
+      Policy : Duplicate_Policy := Reject_Duplicates);
+
    --  Load catalog shards from an in-memory catalog string into a runtime.
    --
    --  Behaves exactly like Load_File but reads the catalog from Text. Source_Name
@@ -220,6 +278,14 @@ package I18N.Runtime is
      (Path : String)
       return Catalog_Validation_Result;
 
+   --  Validate a versioned binary catalog file without mutating any runtime.
+   --
+   --  @param Path Path to a binary catalog file.
+   --  @return Validation outcome and diagnostics.
+   function Validate_Binary_Catalog_File
+     (Path : String)
+      return Catalog_Validation_Result;
+
    --  Validate catalog text without mutating any runtime.
    --
    --  @param Source_Name Logical name used in diagnostics.
@@ -229,6 +295,147 @@ package I18N.Runtime is
      (Source_Name : String;
       Text        : String)
       return Catalog_Validation_Result;
+
+   --  Validate versioned binary catalog text without mutating any runtime.
+   --
+   --  This is intended for tooling/tests that already hold the binary envelope
+   --  in memory. It follows the same header and payload rules as
+   --  Validate_Binary_Catalog_File.
+   --
+   --  @param Source_Name Logical name used in diagnostics.
+   --  @param Text Binary catalog envelope text.
+   --  @return Validation outcome and diagnostics.
+   function Validate_Binary_Catalog_Text
+     (Source_Name : String;
+      Text        : String)
+      return Catalog_Validation_Result;
+
+   ---------------------------------------------------------------------------
+   --  Runtime locale/tzdb data overrides.
+   ---------------------------------------------------------------------------
+
+   --  Outcome class for loading external deterministic runtime data.
+   type Data_Load_Status is
+     (Data_Loaded,
+      Data_Source_Not_Found,
+      Invalid_Data);
+
+   --  Result of loading external deterministic runtime data.
+   type Data_Load_Result is record
+      Status      : Data_Load_Status := Invalid_Data;
+      Diagnostics : I18N.Diagnostics.Diagnostic_List;
+   end record;
+
+   --  Load process-wide locale/tzdb overrides from text.
+   --
+   --  The v1.1.0 override format is line-oriented:
+   --
+   --     locale.xx.decimal_separator = ,
+   --     locale.xx.group_separator = .
+   --     locale.xx.uses_indian_grouping = true
+   --     locale.xx.uses_day_month_year = true
+   --     locale.xx.digit.0 = 0
+   --     locale.xx.month.1 = January
+   --     locale.xx.weekday.0 = Sunday
+   --     locale.xx.date_style.short = d/M/yy
+   --     locale.xx.available_format.yMMMd = d MMM y
+   --     locale.xx.date_time_field_separator = " at "
+   --     locale.xx.date_time_style_separator = " at "
+   --     locale.xx.day_period_rule.morning1 = 04:00-10:00
+   --     locale.xx.timezone_exemplar.Example/Zone = Example
+   --     locale.xx.timezone_location_pattern = {0} Time
+   --     locale.xx.timezone_location_pattern_standard = {0} Standard Time
+   --     locale.xx.timezone_location_pattern_daylight = {0} Daylight Time
+   --     locale.xx.timezone_short.Example/Zone = EXT
+   --     locale.xx.list_final_separator = and
+   --     locale.xx.unit.meter.unit-width-full-name.few = meters
+   --     locale.xx.relative_exact.day.unit-width-full-name.-1 = yesterday
+   --     locale.xx.relative_unit.day.many = days
+   --     locale.xx.currency_symbol_first = true
+   --     rbnf.xx.cardinal.2 = two
+   --     rbnf.xx.cardinal.-2 = minus two
+   --     rbnf.xx.ordinal.2 = second
+   --     rbnf.xx.decimal_separator = point
+   --     plural.rule.cardinal.xx.one = n is 1
+   --     plural.rule.cardinal.xx.few = n mod 10 in 2..4
+   --     timezone.Example/Zone.base_offset_minutes = 90
+   --
+   --  Loaded values are process-wide formatter data overrides. They are used
+   --  before generated CLDR/tzdb fallback data and are transactional: malformed
+   --  input installs no partial override set. LDML relativePattern and
+   --  relativeTimePattern rows may use strict one-placeholder element text for
+   --  relative affixes. LDML listPattern rows may use
+   --  raw separators or strict {0}<separator>{1} pattern text, and CLDR
+   --  listPattern type standard, or/disjunction, and unit containers provide
+   --  context for child listPatternPart rows. Flexible
+   --  day-period rules use half-open HH:MM-HH:MM ranges and may wrap midnight.
+   --  LDML dayPeriodRuleSet and dayPeriodRules containers provide inherited
+   --  locale lists for child dayPeriodRule rows. Exact LDML at rows are
+   --  accepted for midnight at 00:00 and noon at 12:00.
+   --  LDML unitDisplayName rows and unitName rows without count feed the
+   --  other unit display slot. Unit and relative-unit count suffixes may use
+   --  CLDR zero/one/two/few/many/other category names. LDML fields/field
+   --  containers provide inherited relative unit and width for child relative
+   --  and relativeTimePattern rows. LDML
+   --  plurals and pluralRules containers provide inherited kind and
+   --  space-separated locale lists for child pluralRule rows. LDML
+   --  currency containers provide inherited ISO codes for child symbol and
+   --  displayName rows. CLDR currencyFormats/currencyFormatLength containers
+   --  provide context for bounded child currencyFormat pattern rows. LDML
+   --  currencySpacing beforeCurrency/afterCurrency containers provide
+   --  placement context for child insertBetween rows and accept
+   --  currencyMatch/surroundingMatch metadata rows in that context. LDML
+   --  defaultNumberingSystem rows and symbols numberSystem containers feed
+   --  selected number-system decimal/group/sign/percent/exponent symbols. LDML
+   --  monthContext/dayContext/quarterContext containers with type stand-alone
+   --  feed stand-alone L/c/q skeleton names, including narrow width 5 rows, and
+   --  monthWidth/dayWidth/quarterWidth and dayPeriodWidth containers provide
+   --  inherited abbreviated/wide/narrow width context for child
+   --  month/day/quarter/dayPeriod rows. LDML
+   --  weekData containers with firstDay and minDays child rows feed locale
+   --  week-data preferences. LDML
+   --  date/time/dateTime format length containers provide style context for
+   --  child pattern rows. LDML
+   --  compoundUnitPattern rows with type per feed long or short per-unit
+   --  separators from strict {0}<separator>{1} pattern text.
+   --  RBNF spellout rows provide exact signed cardinal/ordinal spellout text,
+   --  exact cardinal decimal spellout text, signed integer-part text for
+   --  negative decimal spellout, and the decimal separator word used by number
+   --  spellout skeletons. Literal numeric RBNF rule rows without substitutions
+   --  are accepted as exact spellout rows; substitution-bearing rule rows feed
+   --  bounded quotient/remainder composition.
+   --  LDML timeZone rows and fixed-offset tzdb Zone/Link rows accept
+   --  case-insensitive Z/UTC/GMT zero offsets plus +H, +HH, +HMM, +HHMM,
+   --  +H:MM, and +HH:MM offsets, with matching negative numeric forms.
+   --  Bounded fixed-offset tzdb Zone continuation rows use numeric or
+   --  Jan-Dec until dates and optional HH[:MM[:SS]][u|g|z|s|w] times to
+   --  feed runtime transition offsets; month/weekday tokens and Rule
+   --  only/minimum/maximum year keywords are accepted case-insensitively.
+   --  Full-line and trailing # comments are ignored in tzdb Zone,
+   --  continuation, Rule, and Link rows.
+   --  Checked normalized CLDR rows such as raw|day_month_year|xx and
+   --  raw|symbol_first|xx feed the same date-style order and currency
+   --  placement fields as key/value overrides; rbnf_text rows feed the
+   --  spellout override table.
+   --
+   --  @param Source_Name Logical name used in diagnostics.
+   --  @param Text Runtime data text.
+   --  @return Load status and diagnostics.
+   function Load_Data_Text
+     (Source_Name : String;
+      Text        : String)
+      return Data_Load_Result;
+
+   --  Load process-wide locale/tzdb overrides from a file.
+   --
+   --  @param Path Path to the runtime data file.
+   --  @return Load status and diagnostics.
+   function Load_Data_File
+     (Path : String)
+      return Data_Load_Result;
+
+   --  Clear process-wide locale/tzdb runtime data overrides.
+   procedure Clear_Runtime_Data;
 
    ---------------------------------------------------------------------------
    --  Key resolution through the locale fallback chain (no rendering).
@@ -263,7 +470,7 @@ package I18N.Runtime is
    --  Report whether a key resolves through the locale fallback chain without
    --  rendering it. Resolve does not require arguments and does not execute the
    --  message. It only answers whether the runtime can resolve Key for Locale
-   --  through the runtime's deterministic fallback rules.
+   --  through the runtime's deterministic canonicalization and fallback rules.
    --
    --  @param Item Initialized runtime instance.
    --  @param Locale Requested locale.

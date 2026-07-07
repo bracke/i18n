@@ -5,7 +5,7 @@ pragma Style_Checks (Off);
 package I18n_Config is
    pragma Pure;
 
-   Crate_Version : constant String := "1.0.0";
+   Crate_Version : constant String := "1.1.0";
    Crate_Name : constant String := "i18n";
 
    Alire_Host_OS : constant String := "linux";
@@ -15,6 +15,6 @@ package I18n_Config is
    Alire_Host_Distro : constant String := "ubuntu";
 
    type Build_Profile_Kind is (release, validation, development);
-   Build_Profile : constant Build_Profile_Kind := release;
+   Build_Profile : constant Build_Profile_Kind := development;
 
 end I18n_Config;

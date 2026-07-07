@@ -1,6 +1,6 @@
 # Validation and Release Gate
 
-The v1.0 release freezes the test suite as the release gate. A v1.0 build is valid only if all release-gate groups pass.
+The v1.1.0 release freezes the test suite as the release gate. A v1.1.0 build is valid only if all release-gate groups pass.
 
 Required groups:
 
@@ -10,15 +10,22 @@ Required groups:
 * IR equivalence tests
 * render tests
 * plural/select/selectordinal tests
+* number-format tests
+* currency-format tests
+* date/time-format tests
+* deterministic domain-format tests
 * locale fallback tests
 * diagnostic tests
-* fuzz smoke tests
+* fuzz smoke tests, including formatted-argument parser fuzz and malformed formatted-value validation fuzz
 * corpus regression tests
 * concurrency tests
 * zero-allocation checks
 * public API freeze tests
 * catalog validation tests
-* runtime feature tests (shard loading, duplicate policy, `Load_Text`, non-destructive validation, key resolution, argument helpers, generalized select, plural categories, bounded render)
+* CLDR data-boundary checks
+* public example output checks
+* benchmark smoke checks for render hot paths and bounded `Render_Into`
+* runtime feature tests (shard loading, duplicate policy, `Load_Text`, non-destructive validation, key resolution, argument helpers, generalized select, plural categories, number formatting, currency formatting, date/time formatting, deterministic domain formatting, bounded render)
 
 ## Non-destructive validation API
 
@@ -45,15 +52,19 @@ Examples and public API tests must compile using only:
 * `I18N.Locales`
 * `I18N.Plurals`
 
-Any example requiring parser, AST, compiler, compiled IR, cache, buffer, fast-render, or lower-level renderer packages is not a valid public example.
+Any example requiring parser, AST, compiler, compiled IR, cache, buffer,
+fast-render, lower-level renderer, formatter implementation, or generated CLDR
+data packages is not a valid public example.
 
 ## Documentation validation
 
 Documentation must describe implemented behavior only. A release is invalid if documentation promises:
 
 * a TOML catalog parser;
-* a binary catalog format;
-* CLDR plural-data generation;
+* binary catalog behavior beyond the versioned `I18N-CATALOG-BINARY`
+  envelope with `format_version=1`, `ir_version=1`, and `payload=text` or
+  `payload=hex-text`;
+* broad external CLDR plural-data generation outside the private checked-in `I18N.CLDR_Data` boundary;
 * public parser/compiler access;
 * public `Render` itself is zero-allocation;
 * diagnostics that affect correctness;
@@ -62,4 +73,4 @@ Documentation must describe implemented behavior only. A release is invalid if d
 
 ## Toolchain verification
 
-The validation boundary is release-ready only when the build, test, example, Alire, and documentation checks in `docs/RELEASE_VERIFICATION.md` pass for the intended release channel.
+The validation boundary is release-ready only when the project-tools-based `check_i18n` guard launched by `alr test` passes for the intended release channel.

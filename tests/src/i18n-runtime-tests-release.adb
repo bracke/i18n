@@ -107,7 +107,7 @@ package body I18N.Runtime.Tests.Release is
       AUnit.Test_Cases.Registration.Register_Routine
         (T,
          Test_Public_Catalog_Render_Uses_Only_Frozen_API'Access,
-         "catalog render compiles using only v1.0 public packages");
+         "catalog render compiles using only v1.1.0 public packages");
       AUnit.Test_Cases.Registration.Register_Routine
         (T,
          Test_Locale_Fallback_Is_Deterministic'Access,

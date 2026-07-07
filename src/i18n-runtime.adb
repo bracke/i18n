@@ -4,13 +4,20 @@ with Ada.Strings.Fixed;
 with Ada.Text_IO;
 
 with I18N.AST; use I18N.AST;
+with I18N.Currency;
+with I18N.Date_Time_Format;
+with I18N.Extra_Format;
+with I18N.Number_Format;
 with I18N.Result; use I18N.Result;
 with I18N.Parser;
 with I18N.Observability;
 with I18N.Plurals;
+with I18N.Runtime_Data;
 with I18N.Validation;
 
 package body I18N.Runtime is
+
+   Escaped_Number_Sign : constant Character := Character'Val (1);
 
    use type I18N.Plurals.Plural_Category;
 
@@ -35,6 +42,11 @@ package body I18N.Runtime is
 
       return T;
    end Unquote;
+
+   function Canonical_Locale (Text : String) return String is
+   begin
+      return I18N.Locales.Canonicalize (Text);
+   end Canonical_Locale;
 
    function Dot_Index (Text : String) return Natural is
    begin
@@ -150,6 +162,152 @@ package body I18N.Runtime is
       return Lines;
    end Split_Text_Lines;
 
+   procedure Add_Load_Diagnostic
+     (Diagnostics : in out I18N.Diagnostics.Diagnostic_List;
+      Kind        : I18N.Diagnostics.Diagnostic_Kind;
+      Message     : String := "";
+      Key         : String := "");
+
+   function Decode_Binary_Catalog
+     (Lines       : Line_Vectors.Vector;
+      Source_Name : String;
+      Payload     : out Line_Vectors.Vector;
+      Diagnostics : in out I18N.Diagnostics.Diagnostic_List)
+      return Boolean
+   is
+      Header_Count : constant Natural := 5;
+
+      function Hex_Value (Item : Character) return Integer is
+      begin
+         if Item in '0' .. '9' then
+            return Character'Pos (Item) - Character'Pos ('0');
+         elsif Item in 'A' .. 'F' then
+            return 10 + Character'Pos (Item) - Character'Pos ('A');
+         elsif Item in 'a' .. 'f' then
+            return 10 + Character'Pos (Item) - Character'Pos ('a');
+         else
+            return -1;
+         end if;
+      end Hex_Value;
+
+      function Decode_Hex_Payload (Text : String) return String is
+         Result : String (1 .. Text'Length / 2);
+         Out_Pos : Natural := 0;
+      begin
+         if Text'Length = 0 or else Text'Length mod 2 /= 0 then
+            return "";
+         end if;
+
+         for Index in 0 .. (Text'Length / 2) - 1 loop
+            declare
+               High : constant Integer :=
+                 Hex_Value (Text (Text'First + Index * 2));
+               Low  : constant Integer :=
+                 Hex_Value (Text (Text'First + Index * 2 + 1));
+            begin
+               if High < 0 or else Low < 0 then
+                  return "";
+               end if;
+
+               Out_Pos := Out_Pos + 1;
+               Result (Out_Pos) :=
+                 Character'Val (High * 16 + Low);
+            end;
+         end loop;
+
+         return Result;
+      end Decode_Hex_Payload;
+   begin
+      Payload.Clear;
+
+      if Natural (Lines.Length) < Header_Count then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Parse_Error,
+            "binary catalog header is incomplete in " & Source_Name, "");
+         return False;
+      end if;
+
+      if To_String (Lines.Element (0)) /= "I18N-CATALOG-BINARY" then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Parse_Error,
+            "invalid binary catalog magic in " & Source_Name, "");
+         return False;
+      elsif Trimmed (To_String (Lines.Element (1))) /= "format_version=1" then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Validation_Error,
+            "unsupported binary catalog format version in " & Source_Name,
+            To_String (Lines.Element (1)));
+         return False;
+      elsif Trimmed (To_String (Lines.Element (2))) /= "ir_version=1" then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Validation_Error,
+            "unsupported binary catalog IR version in " & Source_Name,
+            To_String (Lines.Element (2)));
+         return False;
+      elsif Trimmed (To_String (Lines.Element (3))) /= "payload=text"
+        and then Trimmed (To_String (Lines.Element (3))) /= "payload=hex-text"
+      then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Validation_Error,
+            "unsupported binary catalog payload kind in " & Source_Name,
+            To_String (Lines.Element (3)));
+         return False;
+      elsif Trimmed (To_String (Lines.Element (4))) /= "" then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Parse_Error,
+            "binary catalog header must end with a blank line in "
+            & Source_Name,
+            To_String (Lines.Element (4)));
+         return False;
+      end if;
+
+      if Natural (Lines.Length) = Header_Count then
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Validation_Error,
+            "binary catalog payload is empty in " & Source_Name, "");
+         return False;
+      end if;
+
+      if Trimmed (To_String (Lines.Element (3))) = "payload=hex-text" then
+         declare
+            Hex_Text : Unbounded_String;
+         begin
+            for Index in 5 .. Lines.Last_Index loop
+               Append (Hex_Text, Trimmed (To_String (Lines.Element (Index))));
+            end loop;
+
+            declare
+               Decoded : constant String :=
+                 Decode_Hex_Payload (To_String (Hex_Text));
+            begin
+               if Decoded'Length = 0 then
+                  Add_Load_Diagnostic
+                    (Diagnostics, I18N.Diagnostics.Validation_Error,
+                     "invalid hex-text binary catalog payload in "
+                     & Source_Name,
+                     "");
+                  return False;
+               end if;
+
+               Payload := Split_Text_Lines (Decoded);
+            end;
+         end;
+      else
+         for Index in 5 .. Lines.Last_Index loop
+            Payload.Append (Lines.Element (Index));
+         end loop;
+      end if;
+
+      return True;
+   exception
+      when others =>
+         Payload.Clear;
+         Add_Load_Diagnostic
+           (Diagnostics, I18N.Diagnostics.Parse_Error,
+            "invalid binary catalog envelope in " & Source_Name, "");
+         return False;
+   end Decode_Binary_Catalog;
+
    ---------------------------------------------------------------------------
    --  Message compilation (parse + validate once at load time).
    ---------------------------------------------------------------------------
@@ -260,6 +418,111 @@ package body I18N.Runtime is
       return not After_Hyphen;  --  reject a trailing hyphen
    end Is_Valid_Locale;
 
+   --  Locale-like values accepted for `default_locale` directives. This form
+   --  accepts underscores as separators while preserving the same empty-subtag
+   --  rule as `Is_Valid_Locale`; canonicalization handles case normalization.
+   function Is_Valid_Default_Locale (Text : String) return Boolean is
+      After_Separator : Boolean := True;  --  start state rejects a leading sep
+   begin
+      if Text'Length = 0 then
+         return False;
+      end if;
+
+      for C of Text loop
+         if C = '-' or else C = '_' then
+            if After_Separator then
+               return False;  --  leading separator or empty subtag
+            end if;
+            After_Separator := True;
+         elsif C in 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' then
+            After_Separator := False;
+         else
+            return False;
+         end if;
+      end loop;
+
+      return not After_Separator;  --  reject a trailing separator
+   end Is_Valid_Default_Locale;
+
+   --  Extract and validate a default-locale directive from catalog lines.
+   procedure Analyze_Default_Locale
+     (Lines         : Line_Vectors.Vector;
+      Has_Default   : out Boolean;
+      Value         : out Unbounded_String;
+      Duplicate     : out Boolean;
+      Invalid       : out Boolean;
+      Invalid_Tag   : out Unbounded_String;
+      Invalid_Line  : out Natural;
+      Duplicate_Line : out Natural)
+   is
+      First_Default : Boolean := True;
+   begin
+      Has_Default := False;
+      Duplicate := False;
+      Invalid := False;
+      Value := Null_Unbounded_String;
+      Invalid_Tag := Null_Unbounded_String;
+      Invalid_Line := 0;
+      Duplicate_Line := 0;
+
+      for Index in Lines.First_Index .. Lines.Last_Index loop
+         declare
+            Raw      : constant Unbounded_String := Lines.Element (Index);
+            Clean    : constant String := Trimmed (To_String (Raw));
+            Line_No  : constant Natural := Index + 1;
+         begin
+            if Clean'Length > 0 and then Clean (Clean'First) /= '#' then
+               declare
+                  Eq : constant Natural := Equals_Index (Clean);
+               begin
+                  if Eq /= 0 and then Eq /= Clean'First then
+                     declare
+                        Name : constant String :=
+                          Trimmed (Clean (Clean'First .. Eq - 1));
+                        Value_Text : constant String :=
+                          (if Eq = Clean'Last
+                           then ""
+                           else Unquote (Clean (Eq + 1 .. Clean'Last)));
+                     begin
+                        if Name = "default_locale" then
+                           if First_Default then
+                              First_Default := False;
+                              Has_Default := True;
+
+                              if not Is_Valid_Default_Locale (Value_Text) then
+                                 Invalid := True;
+                                 Invalid_Tag := To_Unbounded_String (Value_Text);
+                                 Invalid_Line := Line_No;
+                              else
+                                 declare
+                                    Canonical : constant String :=
+                                      Canonical_Locale (Value_Text);
+                                 begin
+                                    if not Is_Valid_Locale (Canonical) then
+                                       Invalid := True;
+                                       Invalid_Tag :=
+                                         To_Unbounded_String (Value_Text);
+                                       Invalid_Line := Line_No;
+                                    else
+                                       Value := To_Unbounded_String (Canonical);
+                                    end if;
+                                 end;
+                              end if;
+                           else
+                              Duplicate := True;
+                              if Duplicate_Line = 0 then
+                                 Duplicate_Line := Line_No;
+                              end if;
+                           end if;
+                        end if;
+                     end;
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+   end Analyze_Default_Locale;
+
    --  A valid key is a non-empty run of identifier characters and dots, with no
    --  leading or trailing dot. Dots are allowed so dotted keys such as
    --  "cart.items" remain valid (the locale/key split uses only the first dot).
@@ -341,7 +604,9 @@ package body I18N.Runtime is
                            Valid_Split : Boolean := True;
                         begin
                            if Dot = 0 then
-                              Locale := To_Unbounded_String (Default_Locale);
+                              Locale :=
+                                To_Unbounded_String
+                                  (Canonical_Locale (Default_Locale));
                               Key := To_Unbounded_String (Name);
                            elsif Dot = Name'First or else Dot = Name'Last then
                               Valid_Split := False;
@@ -371,6 +636,10 @@ package body I18N.Runtime is
                               Error := I18N.Errors.Validation_Error;
                               return;
                            end if;
+
+                           Locale :=
+                             To_Unbounded_String
+                               (Canonical_Locale (To_String (Locale)));
 
                            declare
                               Root      : I18N.AST.Node_Access := null;
@@ -548,13 +817,22 @@ package body I18N.Runtime is
          declare
             Value : constant String := Unquote (Clean (Eq + 1 .. Clean'Last));
          begin
-            if Item.Default_Locale_Seen or else Value'Length = 0 then
+            if Item.Default_Locale_Seen
+              or else not Is_Valid_Default_Locale (Value)
+            then
                Item.Valid := False;
                Item.Error := I18N.Errors.Validation_Error;
                return;
             end if;
 
-            Item.Default_Locale := To_Unbounded_String (Value);
+            if not Is_Valid_Locale (Canonical_Locale (Value)) then
+               Item.Valid := False;
+               Item.Error := I18N.Errors.Validation_Error;
+               return;
+            end if;
+
+            Item.Default_Locale :=
+              To_Unbounded_String (Canonical_Locale (Value));
             Item.Default_Locale_Seen := True;
          end;
       end if;
@@ -564,38 +842,31 @@ package body I18N.Runtime is
    function Detect_Default_Locale
      (Lines : Line_Vectors.Vector)
       return String
-   is
+    is
+      Unused_Invalid_Tag : Unbounded_String;
+      Unused_Invalid_Line : Natural;
+      Unused_Duplicate_Line : Natural;
+      Has_Default : Boolean;
+      Value       : Unbounded_String;
+      Duplicate   : Boolean;
+      Invalid     : Boolean;
    begin
-      for Raw of Lines loop
-         declare
-            Clean : constant String := Trimmed (To_String (Raw));
-         begin
-            if Clean'Length > 0 and then Clean (Clean'First) /= '#' then
-               declare
-                  Eq : constant Natural := Equals_Index (Clean);
-               begin
-                  if Eq /= 0 and then Eq /= Clean'First then
-                     declare
-                        Name : constant String :=
-                          Trimmed (Clean (Clean'First .. Eq - 1));
-                     begin
-                        if Name = "default_locale" and then Eq /= Clean'Last
-                        then
-                           declare
-                              Value : constant String :=
-                                Unquote (Clean (Eq + 1 .. Clean'Last));
-                           begin
-                              if Value'Length > 0 then
-                                 return Value;
-                              end if;
-                           end;
-                        end if;
-                     end;
-                  end if;
-               end;
-            end if;
-         end;
-      end loop;
+      Analyze_Default_Locale
+        (Lines       => Lines,
+         Has_Default => Has_Default,
+         Value       => Value,
+         Duplicate   => Duplicate,
+         Invalid     => Invalid,
+         Invalid_Tag => Unused_Invalid_Tag,
+         Invalid_Line => Unused_Invalid_Line,
+         Duplicate_Line => Unused_Duplicate_Line);
+
+      if Has_Default then
+         if not Invalid and then not Duplicate then
+            return To_String (Value);
+         end if;
+         return I18N.Locales.Default_Locale_Name;
+      end if;
 
       return I18N.Locales.Default_Locale_Name;
    end Detect_Default_Locale;
@@ -694,7 +965,9 @@ package body I18N.Runtime is
       Result : Unbounded_String;
    begin
       for C of Text loop
-         if C = '#' and then Active then
+         if C = Escaped_Number_Sign then
+            Append (Result, '#');
+         elsif C = '#' and then Active then
             Append (Result, Number_Text);
          else
             Append (Result, C);
@@ -764,6 +1037,7 @@ package body I18N.Runtime is
    procedure Classify_Plural_Argument
      (Raw      : String;
       Locale   : String;
+      Offset   : Long_Long_Integer;
       Category : out I18N.Plurals.Plural_Category;
       Rendered : out Unbounded_String;
       Valid    : out Boolean)
@@ -773,7 +1047,21 @@ package body I18N.Runtime is
       Rendered := Null_Unbounded_String;
       Valid    := True;
 
-      if Is_Decimal_Integer (Raw) then
+      if Offset /= 0 then
+         if not Is_Decimal_Integer (Raw) then
+            Valid := False;
+            return;
+         end if;
+
+         declare
+            Value : constant Long_Long_Integer := Long_Long_Integer'Value (Raw);
+            Adjusted : constant Long_Long_Integer := Value - Offset;
+         begin
+            Category := I18N.Plurals.Cardinal (Locale, Adjusted);
+            Rendered :=
+              To_Unbounded_String (Integer_Image_No_Leading_Space (Adjusted));
+         end;
+      elsif Is_Decimal_Integer (Raw) then
          declare
             Value : constant Long_Long_Integer := Long_Long_Integer'Value (Raw);
          begin
@@ -842,6 +1130,199 @@ package body I18N.Runtime is
                   end if;
                end;
 
+            when I18N.AST.Number        =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Number_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        I18N.Number_Format.Format_Into
+                          (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                           Locale     => Locale,
+                           Style      => To_String (Current.Currency_Code),
+                           Target     => Formatted,
+                           Last       => Last,
+                           Ok         => Ok,
+                           Overflow   => Overflow);
+
+                        if Overflow then
+                           Status := I18N.Result.Buffer_Overflow;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append (Output, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Date_Format | I18N.AST.Time_Format
+               | I18N.AST.Date_Time_Format =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Date_Time_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        if Current.Kind = I18N.AST.Date_Format then
+                           I18N.Date_Time_Format.Format_Date_Into
+                             (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                              Locale     => Locale,
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Overflow);
+                        elsif Current.Kind = I18N.AST.Time_Format then
+                           I18N.Date_Time_Format.Format_Time_Into
+                             (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                              Locale     => Locale,
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Overflow);
+                        else
+                           I18N.Date_Time_Format.Format_Date_Time_Into
+                             (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                              Locale     => Locale,
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Overflow);
+                        end if;
+
+                        if Overflow then
+                           Status := I18N.Result.Buffer_Overflow;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append (Output, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Currency      =>
+               declare
+                  Key  : constant String := To_String (Current.Name);
+                  Code : constant String := To_String (Current.Currency_Code);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Currency.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        I18N.Currency.Format_Into
+                          (Amount_Text   => I18N.Arguments.Get (Arguments, Key),
+                           Currency_Code => Code,
+                           Locale        => Locale,
+                           Target        => Formatted,
+                           Last          => Last,
+                           Ok            => Ok,
+                           Overflow      => Overflow);
+
+                        if Overflow then
+                           Status := I18N.Result.Buffer_Overflow;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append (Output, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Duration_Format | I18N.AST.Byte_Size_Format
+               | I18N.AST.Unit_Format | I18N.AST.Relative_Time_Format
+               | I18N.AST.List_Format =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+
+                  function Kind return I18N.Extra_Format.Extra_Kind is
+                  begin
+                     case Current.Kind is
+                        when I18N.AST.Duration_Format =>
+                           return I18N.Extra_Format.Duration;
+                        when I18N.AST.Byte_Size_Format =>
+                           return I18N.Extra_Format.Byte_Size;
+                        when I18N.AST.Unit_Format =>
+                           return I18N.Extra_Format.Unit;
+                        when I18N.AST.Relative_Time_Format =>
+                           return I18N.Extra_Format.Relative_Time;
+                        when others =>
+                           return I18N.Extra_Format.List;
+                     end case;
+                  end Kind;
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Extra_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
+                     begin
+                        I18N.Extra_Format.Format_Into
+                          (Kind     => Kind,
+                           Value    => I18N.Arguments.Get (Arguments, Key),
+                           Locale   => Locale,
+                           Option   => To_String (Current.Currency_Code),
+                           Target   => Formatted,
+                           Last     => Last,
+                           Ok       => Ok,
+                           Overflow => Overflow);
+
+                        if Overflow then
+                           Status := I18N.Result.Buffer_Overflow;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append (Output, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
             when I18N.AST.Plural        =>
                declare
                   Key : constant String := To_String (Current.Name);
@@ -861,6 +1342,7 @@ package body I18N.Runtime is
                         Classify_Plural_Argument
                           (Raw      => I18N.Arguments.Get (Arguments, Key),
                            Locale   => Locale,
+                           Offset   => Current.Plural_Offset,
                            Category => Category,
                            Rendered => Rendered,
                            Valid    => Valid);
@@ -869,14 +1351,40 @@ package body I18N.Runtime is
                            Add_Runtime_Diagnostic (Diagnostics, Status, Key);
                         else
                            declare
-                              --  Only "other" is guaranteed present; an absent
-                              --  "one" branch falls back to "other".
-                              Branch : constant I18N.AST.Node_Access :=
-                                (if Category = I18N.Plurals.One
-                                   and then Current.One /= null
-                                 then Current.One
-                                 else Current.Other);
+                              Raw_Value : constant String :=
+                                I18N.Arguments.Get (Arguments, Key);
+                              Exact_Key : constant String :=
+                                (if Is_Decimal_Integer (Raw_Value)
+                                 then Integer_Image_No_Leading_Space
+                                        (Long_Long_Integer'Value (Raw_Value))
+                                 else "");
+                              Branch : I18N.AST.Node_Access :=
+                                (if Exact_Key'Length > 0
+                                 then I18N.AST.Branch_Body
+                                        (Current.Plural_Exact, Exact_Key)
+                                 else null);
                            begin
+                              if Branch = null then
+                                 Branch :=
+                                   (case Category is
+                                      when I18N.Plurals.Zero =>
+                                         Current.Plural_Zero,
+                                      when I18N.Plurals.One =>
+                                         Current.One,
+                                      when I18N.Plurals.Two =>
+                                         Current.Plural_Two,
+                                      when I18N.Plurals.Few =>
+                                         Current.Plural_Few,
+                                      when I18N.Plurals.Many =>
+                                         Current.Plural_Many,
+                                      when I18N.Plurals.Other =>
+                                         Current.Other);
+                              end if;
+
+                              if Branch = null then
+                                 Branch := Current.Other;
+                              end if;
+
                               if Branch = null then
                                  Status := I18N.Result.Formatting_Error;
                                  Add_Runtime_Diagnostic
@@ -966,18 +1474,26 @@ package body I18N.Runtime is
                               --  Select the ordinal branch by the locale's CLDR
                               --  ordinal category. Categories without a matching
                               --  branch fall back to other.
-                              Branch   : I18N.AST.Node_Access;
+                              Branch   : I18N.AST.Node_Access :=
+                                I18N.AST.Branch_Body
+                                  (Current.Ord_Exact, Rendered);
                            begin
-                              case I18N.Plurals.Ordinal (Locale, Value) is
-                                 when I18N.Plurals.One =>
-                                    Branch := Current.Ord_One;
-                                 when I18N.Plurals.Two =>
-                                    Branch := Current.Ord_Two;
-                                 when I18N.Plurals.Few =>
-                                    Branch := Current.Ord_Few;
-                                 when others =>
-                                    Branch := Current.Ord_Other;
-                              end case;
+                              if Branch = null then
+                                 case I18N.Plurals.Ordinal (Locale, Value) is
+                                    when I18N.Plurals.Zero =>
+                                       Branch := Current.Ord_Zero;
+                                    when I18N.Plurals.One =>
+                                       Branch := Current.Ord_One;
+                                    when I18N.Plurals.Two =>
+                                       Branch := Current.Ord_Two;
+                                    when I18N.Plurals.Few =>
+                                       Branch := Current.Ord_Few;
+                                    when I18N.Plurals.Many =>
+                                       Branch := Current.Ord_Many;
+                                    when others =>
+                                       Branch := Current.Ord_Other;
+                                 end case;
+                              end if;
 
                               --  An absent category branch falls back to "other".
                               if Branch = null then
@@ -1088,7 +1604,9 @@ package body I18N.Runtime is
    is
    begin
       for C of Text loop
-         if C = '#' and then Number_Active then
+         if C = Escaped_Number_Sign then
+            Append_Bounded (Target, Count, Overflow, "#");
+         elsif C = '#' and then Number_Active then
             Append_Bounded (Target, Count, Overflow, Number_Text);
          else
             Append_Bounded (Target, Count, Overflow, [1 => C]);
@@ -1141,6 +1659,199 @@ package body I18N.Runtime is
                   end if;
                end;
 
+            when I18N.AST.Number        =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Number_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Format_Overflow : Boolean;
+                     begin
+                        I18N.Number_Format.Format_Into
+                          (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                           Locale     => Locale,
+                           Style      => To_String (Current.Currency_Code),
+                           Target     => Formatted,
+                           Last       => Last,
+                           Ok         => Ok,
+                           Overflow   => Format_Overflow);
+
+                        if Format_Overflow then
+                           Overflow := True;
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append_Bounded
+                             (Target, Count, Overflow, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Date_Format | I18N.AST.Time_Format
+               | I18N.AST.Date_Time_Format =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Date_Time_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Format_Overflow : Boolean;
+                     begin
+                        if Current.Kind = I18N.AST.Date_Format then
+                           I18N.Date_Time_Format.Format_Date_Into
+                             (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                              Locale     => Locale,
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Format_Overflow);
+                        elsif Current.Kind = I18N.AST.Time_Format then
+                           I18N.Date_Time_Format.Format_Time_Into
+                             (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                              Locale     => Locale,
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Format_Overflow);
+                        else
+                           I18N.Date_Time_Format.Format_Date_Time_Into
+                             (Value_Text => I18N.Arguments.Get (Arguments, Key),
+                              Locale     => Locale,
+                              Style      => To_String (Current.Currency_Code),
+                              Target     => Formatted,
+                              Last       => Last,
+                              Ok         => Ok,
+                              Overflow   => Format_Overflow);
+                        end if;
+
+                        if Format_Overflow then
+                           Overflow := True;
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append_Bounded
+                             (Target, Count, Overflow, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Currency      =>
+               declare
+                  Key  : constant String := To_String (Current.Name);
+                  Code : constant String := To_String (Current.Currency_Code);
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Currency.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Format_Overflow : Boolean;
+                     begin
+                        I18N.Currency.Format_Into
+                          (Amount_Text   => I18N.Arguments.Get (Arguments, Key),
+                           Currency_Code => Code,
+                           Locale        => Locale,
+                           Target        => Formatted,
+                           Last          => Last,
+                           Ok            => Ok,
+                           Overflow      => Format_Overflow);
+
+                        if Format_Overflow then
+                           Overflow := True;
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append_Bounded
+                             (Target, Count, Overflow, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
+            when I18N.AST.Duration_Format | I18N.AST.Byte_Size_Format
+               | I18N.AST.Unit_Format | I18N.AST.Relative_Time_Format
+               | I18N.AST.List_Format =>
+               declare
+                  Key : constant String := To_String (Current.Name);
+
+                  function Kind return I18N.Extra_Format.Extra_Kind is
+                  begin
+                     case Current.Kind is
+                        when I18N.AST.Duration_Format =>
+                           return I18N.Extra_Format.Duration;
+                        when I18N.AST.Byte_Size_Format =>
+                           return I18N.Extra_Format.Byte_Size;
+                        when I18N.AST.Unit_Format =>
+                           return I18N.Extra_Format.Unit;
+                        when I18N.AST.Relative_Time_Format =>
+                           return I18N.Extra_Format.Relative_Time;
+                        when others =>
+                           return I18N.Extra_Format.List;
+                     end case;
+                  end Kind;
+               begin
+                  I18N.Observability.Emit
+                    (I18N.Observability.Op_Variable, Key);
+                  if I18N.Arguments.Has (Arguments, Key) then
+                     declare
+                        Formatted : String (1 .. I18N.Extra_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Format_Overflow : Boolean;
+                     begin
+                        I18N.Extra_Format.Format_Into
+                          (Kind     => Kind,
+                           Value    => I18N.Arguments.Get (Arguments, Key),
+                           Locale   => Locale,
+                           Option   => To_String (Current.Currency_Code),
+                           Target   => Formatted,
+                           Last     => Last,
+                           Ok       => Ok,
+                           Overflow => Format_Overflow);
+
+                        if Format_Overflow then
+                           Overflow := True;
+                        elsif not Ok then
+                           Status := I18N.Result.Invalid_Argument;
+                           Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                        elsif Last > 0 then
+                           Append_Bounded
+                             (Target, Count, Overflow, Formatted (1 .. Last));
+                        end if;
+                     end;
+                  else
+                     Status := I18N.Result.Missing_Argument;
+                     Add_Runtime_Diagnostic (Diagnostics, Status, Key);
+                  end if;
+               end;
+
             when I18N.AST.Plural        =>
                declare
                   Key : constant String := To_String (Current.Name);
@@ -1158,6 +1869,7 @@ package body I18N.Runtime is
                         Classify_Plural_Argument
                           (Raw      => I18N.Arguments.Get (Arguments, Key),
                            Locale   => Locale,
+                           Offset   => Current.Plural_Offset,
                            Category => Category,
                            Rendered => Rendered,
                            Valid    => Valid);
@@ -1166,12 +1878,40 @@ package body I18N.Runtime is
                            Add_Runtime_Diagnostic (Diagnostics, Status, Key);
                         else
                            declare
-                              Branch : constant I18N.AST.Node_Access :=
-                                (if Category = I18N.Plurals.One
-                                   and then Current.One /= null
-                                 then Current.One
-                                 else Current.Other);
+                              Raw_Value : constant String :=
+                                I18N.Arguments.Get (Arguments, Key);
+                              Exact_Key : constant String :=
+                                (if Is_Decimal_Integer (Raw_Value)
+                                 then Integer_Image_No_Leading_Space
+                                        (Long_Long_Integer'Value (Raw_Value))
+                                 else "");
+                              Branch : I18N.AST.Node_Access :=
+                                (if Exact_Key'Length > 0
+                                 then I18N.AST.Branch_Body
+                                        (Current.Plural_Exact, Exact_Key)
+                                 else null);
                            begin
+                              if Branch = null then
+                                 Branch :=
+                                   (case Category is
+                                      when I18N.Plurals.Zero =>
+                                         Current.Plural_Zero,
+                                      when I18N.Plurals.One =>
+                                         Current.One,
+                                      when I18N.Plurals.Two =>
+                                         Current.Plural_Two,
+                                      when I18N.Plurals.Few =>
+                                         Current.Plural_Few,
+                                      when I18N.Plurals.Many =>
+                                         Current.Plural_Many,
+                                      when I18N.Plurals.Other =>
+                                         Current.Other);
+                              end if;
+
+                              if Branch = null then
+                                 Branch := Current.Other;
+                              end if;
+
                               if Branch = null then
                                  Status := I18N.Result.Formatting_Error;
                                  Add_Runtime_Diagnostic
@@ -1244,18 +1984,25 @@ package body I18N.Runtime is
                             (I18N.Arguments.Get (Arguments, Key));
                         Rendered : constant String :=
                           Integer_Image_No_Leading_Space (Value);
-                        Branch   : I18N.AST.Node_Access;
+                        Branch   : I18N.AST.Node_Access :=
+                          I18N.AST.Branch_Body (Current.Ord_Exact, Rendered);
                      begin
-                        case I18N.Plurals.Ordinal (Locale, Value) is
-                           when I18N.Plurals.One =>
-                              Branch := Current.Ord_One;
-                           when I18N.Plurals.Two =>
-                              Branch := Current.Ord_Two;
-                           when I18N.Plurals.Few =>
-                              Branch := Current.Ord_Few;
-                           when others =>
-                              Branch := Current.Ord_Other;
-                        end case;
+                        if Branch = null then
+                           case I18N.Plurals.Ordinal (Locale, Value) is
+                              when I18N.Plurals.Zero =>
+                                 Branch := Current.Ord_Zero;
+                              when I18N.Plurals.One =>
+                                 Branch := Current.Ord_One;
+                              when I18N.Plurals.Two =>
+                                 Branch := Current.Ord_Two;
+                              when I18N.Plurals.Few =>
+                                 Branch := Current.Ord_Few;
+                              when I18N.Plurals.Many =>
+                                 Branch := Current.Ord_Many;
+                              when others =>
+                                 Branch := Current.Ord_Other;
+                           end case;
+                        end if;
 
                         --  An absent category branch falls back to "other".
                         if Branch = null then
@@ -1315,7 +2062,8 @@ package body I18N.Runtime is
       Resolved_Locale : out Unbounded_String;
       Idx             : out Natural)
    is
-      Current : Unbounded_String := To_Unbounded_String (Locale);
+      Requested : constant String := Canonical_Locale (Locale);
+      Current   : Unbounded_String := To_Unbounded_String (Requested);
    begin
       Resolved_Locale := Null_Unbounded_String;
       Idx := 0;
@@ -1336,7 +2084,7 @@ package body I18N.Runtime is
          end;
       end loop;
 
-      if To_String (Item.Default_Locale) /= Locale then
+      if To_String (Item.Default_Locale) /= Requested then
          Index_Lookup
            (Item, To_String (Item.Default_Locale), Key, Hit, Idx);
          if Hit then
@@ -1446,6 +2194,52 @@ package body I18N.Runtime is
       end if;
    end Initialize;
 
+   procedure Initialize_Binary_File
+     (Item         : in out Runtime;
+      Catalog_Path : String)
+   is
+      Found       : Boolean;
+      Lines       : Line_Vectors.Vector;
+      Payload     : Line_Vectors.Vector;
+      Succeeded   : Boolean;
+      Diagnostics : I18N.Diagnostics.Diagnostic_List;
+   begin
+      Finalize (Item);
+      Reset_Defaults (Item);
+
+      Read_File_Lines (Catalog_Path, Found, Lines);
+      if not Found then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Parse_Error;
+         return;
+      elsif not Decode_Binary_Catalog
+                  (Lines, Catalog_Path, Payload, Diagnostics)
+      then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Validation_Error;
+         return;
+      end if;
+
+      for Raw of Payload loop
+         Parse_Default_Locale_Line (Item, To_String (Raw));
+         exit when not Item.Valid;
+      end loop;
+
+      if not Item.Valid then
+         return;
+      end if;
+
+      Ingest_Strict (Item, Payload, Catalog_Path, Succeeded);
+      if not Succeeded then
+         return;
+      end if;
+
+      if Item.Catalog.Is_Empty then
+         Item.Valid := False;
+         Item.Error := I18N.Errors.Validation_Error;
+      end if;
+   end Initialize_Binary_File;
+
    procedure Load (Item : in out Runtime; Catalog_Path : String) is
       Found     : Boolean;
       Lines     : Line_Vectors.Vector;
@@ -1493,17 +2287,41 @@ package body I18N.Runtime is
       --  shard default_locale directives are ignored.
       if not Item.Default_Locale_Seen then
          declare
-            Detected : constant String := Detect_Default_Locale (Lines);
+            Has_Default : Boolean;
+            Duplicate   : Boolean;
+            Invalid     : Boolean;
+            Default     : Unbounded_String;
+            Invalid_Tag : Unbounded_String;
+            Invalid_Line  : Natural;
+            Duplicate_Line : Natural;
          begin
-            if Detected /= I18N.Locales.Default_Locale_Name then
-               if not Is_Valid_Locale (Detected) then
-                  Add_Load_Diagnostic
-                    (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
-                     "invalid default_locale in " & Source_Name, Detected);
-                  Result.Status := Invalid_Catalog;
-                  return;
-               end if;
-               Effective_Default := To_Unbounded_String (Detected);
+            Analyze_Default_Locale
+              (Lines       => Lines,
+               Has_Default => Has_Default,
+               Value       => Default,
+               Duplicate   => Duplicate,
+               Invalid     => Invalid,
+               Invalid_Tag => Invalid_Tag,
+               Invalid_Line => Invalid_Line,
+               Duplicate_Line => Duplicate_Line);
+
+            if Duplicate then
+               Add_Load_Diagnostic
+                 (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
+                  "duplicate default_locale in " & Source_Name
+                  & Line_Suffix (Duplicate_Line));
+               Result.Status := Invalid_Catalog;
+               return;
+            elsif Has_Default and then Invalid then
+               Add_Load_Diagnostic
+                 (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
+                  "invalid default_locale in " & Source_Name
+                  & Line_Suffix (Invalid_Line),
+                  To_String (Invalid_Tag));
+               Result.Status := Invalid_Catalog;
+               return;
+            elsif Has_Default then
+               Effective_Default := Default;
                Set_Default := True;
             end if;
          end;
@@ -1569,6 +2387,43 @@ package body I18N.Runtime is
          Result.Status := Invalid_Catalog;
    end Load_File;
 
+   procedure Load_Binary_File
+     (Item   : in out Instance;
+      Path   : String;
+      Result : out Load_Result;
+      Policy : Duplicate_Policy := Reject_Duplicates)
+   is
+      Found   : Boolean;
+      Lines   : Line_Vectors.Vector;
+      Payload : Line_Vectors.Vector;
+   begin
+      Result := (Status => Invalid_Catalog, Entries_Added => 0, others => <>);
+
+      if not Item.Valid then
+         Result.Status := Runtime_Invalid;
+         return;
+      end if;
+
+      Read_File_Lines (Path, Found, Lines);
+      if not Found then
+         Add_Load_Diagnostic
+           (Result.Diagnostics, I18N.Diagnostics.Parse_Error,
+            "binary catalog file not found", Path);
+         Result.Status := Source_Not_Found;
+         return;
+      elsif not Decode_Binary_Catalog
+                  (Lines, Path, Payload, Result.Diagnostics)
+      then
+         Result.Status := Invalid_Catalog;
+         return;
+      end if;
+
+      Ingest_Lines (Item, Payload, Path, Policy, Result);
+   exception
+      when others =>
+         Result.Status := Invalid_Catalog;
+   end Load_Binary_File;
+
    procedure Load_Text
      (Item        : in out Instance;
       Source_Name : String;
@@ -1604,11 +2459,46 @@ package body I18N.Runtime is
       Staged      : Staged_Vectors.Vector;
       Stage_Ok    : Boolean;
       Stage_Error : I18N.Errors.Error_Kind;
-      Default     : constant String := Detect_Default_Locale (Lines);
+      Has_Default : Boolean;
+      Duplicate   : Boolean;
+      Invalid     : Boolean;
+      Invalid_Tag : Unbounded_String;
+      Default     : Unbounded_String;
+      Invalid_Line : Natural;
+      Duplicate_Line : Natural;
    begin
+      Analyze_Default_Locale
+        (Lines       => Lines,
+         Has_Default => Has_Default,
+         Value       => Default,
+         Duplicate   => Duplicate,
+         Invalid     => Invalid,
+         Invalid_Tag => Invalid_Tag,
+         Invalid_Line => Invalid_Line,
+         Duplicate_Line => Duplicate_Line);
+
+      if Duplicate then
+         Add_Load_Diagnostic
+           (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
+            "duplicate default_locale in " & Source_Name
+            & Line_Suffix (Duplicate_Line),
+            "default_locale");
+         Result.Valid := False;
+         return Result;
+      elsif Has_Default and then Invalid then
+         Add_Load_Diagnostic
+           (Result.Diagnostics, I18N.Diagnostics.Validation_Error,
+            "invalid default_locale in " & Source_Name
+            & Line_Suffix (Invalid_Line),
+            To_String (Invalid_Tag));
+         Result.Valid := False;
+         return Result;
+      end if;
+
       Stage_Lines
         (Lines          => Lines,
-         Default_Locale => Default,
+         Default_Locale => (if Has_Default then To_String (Default)
+                           else I18N.Locales.Default_Locale_Name),
          Source_Name    => Source_Name,
          Staged         => Staged,
          Ok             => Stage_Ok,
@@ -1683,6 +2573,36 @@ package body I18N.Runtime is
          return Result;
    end Validate_Catalog_File;
 
+   function Validate_Binary_Catalog_File
+     (Path : String)
+      return Catalog_Validation_Result
+   is
+      Result  : Catalog_Validation_Result;
+      Found   : Boolean;
+      Lines   : Line_Vectors.Vector;
+      Payload : Line_Vectors.Vector;
+   begin
+      Read_File_Lines (Path, Found, Lines);
+      if not Found then
+         Add_Load_Diagnostic
+           (Result.Diagnostics, I18N.Diagnostics.Parse_Error,
+            "binary catalog file not found", Path);
+         Result.Valid := False;
+         return Result;
+      elsif not Decode_Binary_Catalog
+                  (Lines, Path, Payload, Result.Diagnostics)
+      then
+         Result.Valid := False;
+         return Result;
+      end if;
+
+      return Validate_Lines (Payload, Path);
+   exception
+      when others =>
+         Result.Valid := False;
+         return Result;
+   end Validate_Binary_Catalog_File;
+
    function Validate_Catalog_Text
      (Source_Name : String;
       Text        : String)
@@ -1699,6 +2619,88 @@ package body I18N.Runtime is
             return Result;
          end;
    end Validate_Catalog_Text;
+
+   function Validate_Binary_Catalog_Text
+     (Source_Name : String;
+      Text        : String)
+      return Catalog_Validation_Result
+   is
+      Result  : Catalog_Validation_Result;
+      Payload : Line_Vectors.Vector;
+   begin
+      if not Decode_Binary_Catalog
+                (Split_Text_Lines (Text), Source_Name, Payload,
+                 Result.Diagnostics)
+      then
+         Result.Valid := False;
+         return Result;
+      end if;
+
+      return Validate_Lines (Payload, Source_Name);
+   exception
+      when others =>
+      Result.Valid := False;
+      return Result;
+   end Validate_Binary_Catalog_Text;
+
+   function Load_Data_Text
+     (Source_Name : String;
+      Text        : String)
+      return Data_Load_Result
+   is
+      Result : Data_Load_Result;
+   begin
+      if I18N.Runtime_Data.Load_Text
+           (Source_Name => Source_Name,
+            Text        => Text,
+            Diagnostics => Result.Diagnostics)
+      then
+         Result.Status := Data_Loaded;
+      else
+         Result.Status := Invalid_Data;
+      end if;
+
+      return Result;
+   exception
+      when others =>
+         Result.Status := Invalid_Data;
+         return Result;
+   end Load_Data_Text;
+
+   function Load_Data_File
+     (Path : String)
+      return Data_Load_Result
+   is
+      Found  : Boolean;
+      Lines  : Line_Vectors.Vector;
+      Buffer : Unbounded_String;
+      Result : Data_Load_Result;
+   begin
+      Read_File_Lines (Path, Found, Lines);
+      if not Found then
+         Result.Status := Data_Source_Not_Found;
+         I18N.Diagnostics.Add
+           (Result.Diagnostics, I18N.Diagnostics.Parse_Error,
+            "runtime data file not found", Path);
+         return Result;
+      end if;
+
+      for Line of Lines loop
+         Append (Buffer, To_String (Line));
+         Append (Buffer, ASCII.LF);
+      end loop;
+
+      return Load_Data_Text (Path, To_String (Buffer));
+   exception
+      when others =>
+         Result.Status := Invalid_Data;
+         return Result;
+   end Load_Data_File;
+
+   procedure Clear_Runtime_Data is
+   begin
+      I18N.Runtime_Data.Clear;
+   end Clear_Runtime_Data;
 
    ---------------------------------------------------------------------------
    --  Rendering, resolution, and bounded rendering.

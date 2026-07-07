@@ -1,6 +1,6 @@
 {
   "project": "ICU Messages Ada",
-  "version_contract": "v1.0",
+  "version_contract": "v1.1.0",
   "files": [
     {
       "file": "AGENTS.md",
@@ -45,6 +45,66 @@
     {
       "file": "alire.toml",
       "role": "package_metadata"
+    },
+    {
+      "file": "cldr/CLDR_DATA.md",
+      "role": "internal_data_manifest"
+    },
+    {
+      "file": "cldr/cldr_tools.gpr",
+      "role": "internal_tool_project"
+    },
+    {
+      "file": "cldr/upstream/source_manifest.txt",
+      "role": "internal_upstream_source_manifest"
+    },
+    {
+      "file": "cldr/upstream/source_files.txt",
+      "role": "internal_upstream_source_inventory"
+    },
+    {
+      "file": "cldr/upstream/cldr_export.jsonl",
+      "role": "internal_upstream_data_source"
+    },
+    {
+      "file": "cldr/raw/cldr_records.txt",
+      "role": "internal_raw_data_source"
+    },
+    {
+      "file": "cldr/raw/coverage.txt",
+      "role": "internal_raw_data_coverage"
+    },
+    {
+      "file": "cldr/import/normalized_cldr.txt",
+      "role": "internal_normalized_data_source"
+    },
+    {
+      "file": "cldr/src/extract_cldr_normalized.adb",
+      "role": "internal_tool"
+    },
+    {
+      "file": "cldr/src/check_cldr_sources.adb",
+      "role": "internal_tool"
+    },
+    {
+      "file": "cldr/src/generate_cldr_export.adb",
+      "role": "internal_tool"
+    },
+    {
+      "file": "cldr/src/import_cldr_raw.adb",
+      "role": "internal_tool"
+    },
+    {
+      "file": "cldr/data/cldr_subset.txt",
+      "role": "internal_data_source"
+    },
+    {
+      "file": "cldr/src/import_cldr_subset.adb",
+      "role": "internal_tool"
+    },
+    {
+      "file": "cldr/src/generate_cldr_data.adb",
+      "role": "internal_tool"
     },
     {
       "file": "docs/AI_CONSUMPTION_GUIDE.md",
@@ -172,6 +232,10 @@
       "role": "example_source"
     },
     {
+      "file": "examples/domain_formatting.adb",
+      "role": "example_source"
+    },
+    {
       "file": "examples/empty_message.adb",
       "role": "example_source"
     },
@@ -236,6 +300,10 @@
       "role": "example_source"
     },
     {
+      "file": "examples/number_formatting.adb",
+      "role": "formatter_example_source"
+    },
+    {
       "file": "examples/plural_render.adb",
       "role": "example_source"
     },
@@ -262,6 +330,18 @@
     {
       "file": "examples/status_handling.adb",
       "role": "example_source"
+    },
+    {
+      "file": "examples/currency_formatting.adb",
+      "role": "formatter_example_source"
+    },
+    {
+      "file": "examples/date_formatting.adb",
+      "role": "formatter_example_source"
+    },
+    {
+      "file": "examples/time_formatting.adb",
+      "role": "formatter_example_source"
     },
     {
       "file": "i18n.gpr",
@@ -316,6 +396,38 @@
       "role": "internal_implementation"
     },
     {
+      "file": "src/i18n-cldr_data.adb",
+      "role": "internal_generated_data"
+    },
+    {
+      "file": "src/i18n-cldr_data.ads",
+      "role": "internal_generated_data"
+    },
+    {
+      "file": "src/i18n-currency.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-currency.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-date_time_format.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-date_time_format.ads",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-extra_format.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-extra_format.ads",
+      "role": "internal_implementation"
+    },
+    {
       "file": "src/i18n-diagnostics.adb",
       "role": "internal_implementation"
     },
@@ -346,6 +458,14 @@
     {
       "file": "src/i18n-locales.ads",
       "role": "stable_public_api"
+    },
+    {
+      "file": "src/i18n-number_format.adb",
+      "role": "internal_implementation"
+    },
+    {
+      "file": "src/i18n-number_format.ads",
+      "role": "internal_implementation"
     },
     {
       "file": "src/i18n-plurals.adb",
@@ -484,6 +604,6 @@
       "role": "release_or_regression_tests"
     }
   ],
-  "ada_visibility_note": "src/i18n-parser.ads, validation/compiler/cache/compiled/buffer/errors/observability/render/fast_render, runtime-compatibility specs are Ada private child packages.",
-  "release_verification_note": "Release candidates require the library build, test project build, AUnit test runner, example project, Alire build, and selected documentation tooling to pass for the candidate being published."
+  "ada_visibility_note": "src/i18n-parser.ads, validation/compiler/cache/compiled/buffer/errors/observability/render/fast_render, formatter implementation packages, generated CLDR data, and runtime-compatibility specs are Ada private child packages.",
+  "release_verification_note": "Release candidates require alr test to pass; the manifest test action routes through the project_tools-based check_i18n guard, which runs the library build, test project build, AUnit runner, example project build and output checks, CLDR data-boundary checks, benchmark smoke checks, Alire build/test checks, GNATdoc, and GNATprove for the candidate being published."
 }

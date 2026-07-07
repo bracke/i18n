@@ -9,11 +9,11 @@ private package I18N.Fast_Render is
 
    --  Regression-only legacy renderer. This executes the compiled IR for the
    --  in-tree compatibility/differential tests. It is locale-agnostic and
-   --  supports only male/female/other select branches and a hardcoded
-   --  plural/ordinal category mapping (one iff n = 1; ordinal by 1/2/3). The
-   --  stable public render path is I18N.Runtime (generalized select plus
-   --  locale-aware I18N.Plurals selection). Both share the "only other is
-   --  mandatory; absent category branches fall back to other" policy.
+   --  supports generalized select branches plus a hardcoded plural/ordinal
+   --  category mapping (one iff n = 1; ordinal by 1/2/3). The stable public
+   --  render path is I18N.Runtime with locale-aware I18N.Plurals selection.
+   --  Both share the "only other is mandatory; absent category branches fall
+   --  back to other" policy.
 
    --  Render a compiled message into caller-owned fixed output storage and
    --  return only status metadata. This is the strict no-result-

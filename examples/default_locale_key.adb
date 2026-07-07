@@ -12,7 +12,7 @@ begin
 
    declare
       Result : constant I18N.Result.Render_Result :=
-        I18N.Runtime.Render (Runtime, "fr-CA", "plain.default", Args);
+        I18N.Runtime.Render (Runtime, "fr-CA", "plain", Args);
    begin
       Example_Support.Print_Result ("unqualified catalog key uses default locale", Result);
    end;

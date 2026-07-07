@@ -24,4 +24,12 @@ begin
    begin
       Example_Support.Print_Result ("ordinal other", Other_Result);
    end;
+
+   I18N.Arguments.Set (Args, "rank", "8");
+   declare
+      Many_Result : constant I18N.Result.Render_Result :=
+        I18N.Runtime.Render (Runtime, "it", "rank.label", Args);
+   begin
+      Example_Support.Print_Result ("ordinal many", Many_Result);
+   end;
 end Selectordinal_Render;

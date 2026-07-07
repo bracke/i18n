@@ -26,7 +26,7 @@ Parser -> Validator -> Compiler -> Compiled Message / Cache
                                I18N.Result.Render_Result
 ```
 
-The source tree contains private compatibility entry points and white-box test packages. They exist to preserve regression coverage and semantic continuity. They are not part of the application-facing v1.0 compatibility contract.
+The source tree contains private compatibility entry points and white-box test packages. They exist to preserve regression coverage and semantic continuity. They are not part of the application-facing v1.1.0 compatibility contract.
 
 ## Public/internal boundary
 
@@ -62,9 +62,22 @@ Diagnostics are optional and observational. Enabling callbacks or storing diagno
 
 ## Release cleanup rule
 
-No application-facing release feature may require parser cursors, cache maps, IR arrays, VM/codegen experiments, prototype packages, or non-public AST execution paths. Those may remain only when needed as implementation details or regression-test support, and they must stay out of public examples and v1.0 documentation examples.
+No application-facing release feature may require parser cursors, cache maps, IR arrays, VM/codegen experiments, prototype packages, or non-public AST execution paths. Those may remain only when needed as implementation details or regression-test support, and they must stay out of public examples and v1.1.0 documentation examples.
 
 
 ## Release verification boundary
 
-The release boundary is verified by the commands in `docs/RELEASE_VERIFICATION.md`: the core library build, test project build, AUnit runner, example project, Alire build, and selected documentation tooling must pass for the intended release channel.
+The release boundary is verified by the project-tools-based `check_i18n` guard launched by `alr test`: the core library build, test project build, AUnit runner, example project build and output checks, CLDR data-boundary checks, Alire build/test checks, render benchmark smoke checks, GNATdoc, and GNATprove must pass for the intended release channel.
+
+## CLDR data boundary
+
+CLDR-derived runtime data is centralized in the private `I18N.CLDR_Data`
+generated-data boundary. Number, currency, and date/time formatters consume
+that internal package for locale symbols, numbering digits, grouping policy,
+date ordering, style patterns and separators, localized date/time names, zone
+display data, number/currency affixes, unit/list separators, unit labels,
+currency metadata, and plural rule-family mappings. Runtime data loaded through
+`I18N.Runtime` may override selected locale, currency, fixed-zone, and exact
+plural-category values before generated fallback data is used. The checked-in
+body is the deterministic curated data image for this release; the staged CLDR
+import tooling regenerates that package without changing the public API.

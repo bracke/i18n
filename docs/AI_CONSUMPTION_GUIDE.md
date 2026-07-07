@@ -4,7 +4,7 @@ This guide is written for code assistants, static-analysis tools, and maintainer
 
 ## Canonical project summary
 
-ICU Messages Ada v1.0 is a catalog-backed Ada 2022 message-rendering library. It accepts a line-oriented catalog, validates catalog structure during initialization, and renders messages through a small stable public API.
+ICU Messages Ada v1.1.0 is a catalog-backed Ada 2022 message-rendering library. It accepts a line-oriented catalog, validates catalog structure during initialization, and renders messages through a small stable public API.
 
 The production path is exactly:
 
@@ -24,6 +24,7 @@ with I18N.Runtime;
 with I18N.Result;
 with I18N.Arguments;
 with I18N.Locales;
+with I18N.Plurals;
 with I18N.Diagnostics;
 ```
 
@@ -40,9 +41,16 @@ with I18N.AST;
 with I18N.Validation;
 with I18N.Runtime.Compatibility; -- private regression child; in-tree tests only
 with I18N.Fast_Render;
+with I18N.Number_Format;
+with I18N.Currency;
+with I18N.Date_Time_Format;
+with I18N.Extra_Format;
+with I18N.CLDR_Data;
 ```
 
 Those are implementation/regression surfaces, not the stable application API.
+Formatter implementation packages and generated CLDR data must stay behind the
+public catalog render path.
 
 ## High-confidence answer sources
 
@@ -73,13 +81,16 @@ When answering questions about the crate, prefer sources in this order:
 3. For public API changes, update `ai/API_MANIFEST.json` and `ai/CONTRACT_SUMMARY.yaml` in the same patch.
 4. Add or update release-gate tests in `tests/src/i18n-runtime-tests-release.adb`.
 5. Update docs and `MANIFEST.txt`.
-6. Build with `gprbuild -P i18n.gpr` and run `cd tests && alr exec -- gprbuild -P tests.gpr && ./bin/tests`.
+6. Run `alr test`; the manifest test action routes through the `project_tools`-based `check_i18n` guard.
 
 ## Common mistakes to avoid
 
 * Treating `I18N.Parser`, `I18N.Compiler`, `I18N.Cache`, `I18N.Errors`, `I18N.Runtime.Compatibility`, as public API. These are Ada private child packages.
-* Assuming TOML catalogs are accepted; v1.0 uses a line-oriented format.
-* Assuming binary compiled catalogs are part of v1.0; they are not.
+* Assuming TOML catalogs are accepted; v1.1.0 uses a line-oriented format.
+* Assuming compiled bytecode or IR catalogs are part of v1.1.0; they are not.
+  The supported binary catalog path is only the deterministic
+  `I18N-CATALOG-BINARY` envelope with canonical text payload, either directly
+  as `payload=text` or hex-encoded as `payload=hex-text`.
 * Adding new ICU features during release-stabilization work.
 * Introducing duplicate buffer or argument abstractions.
 * Forgetting that Ada identifiers are case-insensitive.

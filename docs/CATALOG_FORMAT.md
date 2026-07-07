@@ -1,12 +1,15 @@
 # Catalog Format
 
-The v1.0 canonical catalog format is line-oriented text.
+The v1.1.0 canonical catalog format is line-oriented text.
 
 ```text
 default_locale = en
 en.welcome = "Welcome, {name}!"
 de.welcome = "Willkommen, {name}!"
 en.items = "{count, plural, one {One item} other {# items}}"
+en.total = "Total {value, number}"
+en.price = "Total {amount, currency, USD}"
+en.when = "On {day, date} at {clock, time}"
 ```
 
 ## Lexical rules
@@ -18,7 +21,7 @@ en.items = "{count, plural, one {One item} other {# items}}"
 * Additional `=` characters belong to the value.
 * Leading/trailing spaces around the name and value are trimmed.
 * If the trimmed value starts and ends with `"`, the surrounding quotes are removed.
-* No TOML parser is part of v1.0; this text format is the canonical authoring format.
+* No TOML parser is part of v1.1.0; this text format is the canonical authoring format.
 
 ## Default locale
 
@@ -48,6 +51,7 @@ Rules:
 * unqualified entries use the configured default locale;
 * duplicate `locale.key` entries are invalid;
 * catalog structure and brace balance are validated during initialization;
+* ICU messages may use variables, plural, select, selectordinal, deterministic number/date/time formats, and deterministic currency formats documented in `docs/ICU_SUBSET.md`;
 * an explicitly present empty value is a valid empty message and renders as successful empty text;
 * any invalid entry makes initialization fail deterministically.
 
@@ -58,6 +62,12 @@ For requested locale `de-AT`, fallback order is:
 ```text
 de-AT -> de -> default locale
 ```
+
+Catalog locale prefixes, `default_locale`, and public render/resolve requests
+are canonicalized before lookup: language subtags are lower-case, script
+subtags title-case, region subtags upper-case, extension subtags lower-case,
+and deterministic CLDR language aliases such as `iw -> he`, `in -> id`,
+`ji -> yi`, and `sh -> sr-Latn` are applied.
 
 A missing key after fallback returns `Missing_Key`.
 
@@ -88,4 +98,23 @@ en.welcome = "Hello"
 
 ## Binary catalogs
 
-v1.0 does not define or ship a persistent binary compiled catalog format. The only frozen input format is this line-oriented text authoring format. Future binary catalogs must be explicitly versioned and must reject unsupported versions deterministically.
+v1.1.0 defines a deterministic versioned binary catalog envelope:
+
+```text
+I18N-CATALOG-BINARY
+format_version=1
+ir_version=1
+payload=text
+
+default_locale = en
+en.welcome = "Welcome, {name}!"
+```
+
+The blank line after `payload=text` separates the header from the canonical text
+catalog payload. The alternate `payload=hex-text` kind uses the same envelope
+but encodes the canonical text catalog payload as ASCII hex bytes after the
+blank line. Unsupported magic, format versions, IR versions, malformed
+hex-text payloads, and unsupported payload kinds are rejected
+deterministically. The v1.1 payload kinds are `text` and `hex-text`; the
+runtime still validates and compiles entries into its private indexed runtime
+representation during initialization or load.

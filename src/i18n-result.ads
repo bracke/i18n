@@ -1,11 +1,12 @@
 with I18N.Diagnostics;
 
---  Stable v1.0 public render result model.
+--  Stable v1.1.0 public render result model.
 --
 --  Purpose:
---  This package defines the only result type returned by the v1.0 public
---  catalog render API. It intentionally hides parser, compiler, cache, IR, and
---  internal error details behind a small frozen status enumeration.
+--  This package defines the only result type returned by the v1.1.0 public
+--  catalog render API. It intentionally hides parser, compiler, cache, IR,
+--  formatter implementation, generated CLDR data, and internal error details
+--  behind a small frozen status enumeration.
 --
 --  Error behavior:
 --  Normal ICU/render failures are represented by Render_Status values. Future

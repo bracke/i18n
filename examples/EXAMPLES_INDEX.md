@@ -1,6 +1,6 @@
 # Examples Index
 
-All examples in this directory use the stable public v1.0 API only, unless a
+All examples in this directory use the stable public v1.1.0 API only, unless a
 file is explicitly identified as support code.
 
 Build the example project with:
@@ -34,8 +34,13 @@ Run examples from the repository root, for example:
 | `basic_render.adb` | Basic catalog initialization and variable rendering. |
 | `plural_render.adb` | ICU plural branch selection and `#` replacement. |
 | `select_render.adb` | ICU select branch selection. |
-| `selectordinal_render.adb` | ICU selectordinal branch selection. |
+| `selectordinal_render.adb` | ICU selectordinal branch selection, including locale-aware ordinal categories. |
 | `nested_message_render.adb` | Nested supported constructs. |
+| `number_formatting.adb` | Public number formatting with locale grouping, Arabic digits, Indian grouping, percent, permille, compact, scientific, engineering, sign-accounting, trailing-zero-display, scale, and spellout skeletons. |
+| `currency_formatting.adb` | Public currency formatting with symbols, narrow symbols, ISO-code output, display names, cash rounding, accounting output, and zero-minor-unit metadata. |
+| `date_formatting.adb` | Public date formatting with long/full styles, named, numeric, and locale week skeletons, plus Japanese, Buddhist, and Persian calendar output. |
+| `time_formatting.adb` | Public time formatting with styles, day-period and fractional-second skeletons, zoned instant formatting, zone width skeletons, UTC widths, and datetime style aliases. |
+| `domain_formatting.adb` | Public deterministic duration, byte-size, unit, measure-unit rates, localized relative-time, and localized list formatting. |
 | `locale_fallback.adb` | Region, parent-language, and default-locale fallback. |
 | `fallback_chain.adb` | Explicit `de-AT -> de -> en` fallback chain in one program. |
 | `missing_key.adb` | Stable `Missing_Key` status. |

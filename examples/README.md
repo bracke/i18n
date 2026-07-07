@@ -1,7 +1,7 @@
 # Examples
 
 This directory contains small, standalone programs that demonstrate the sealed
-v1.0 public API.
+v1.1.0 public API.
 
 ## Start here
 
