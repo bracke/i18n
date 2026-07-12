@@ -24,3 +24,7 @@ cldr/obj/
 check_i18n/bin/
 check_i18n/obj/
 check_i18n/config/
+
+# Alire regenerates config/ on every build, including builds of crates that pin
+# i18n as a path dependency — tracking it means their builds dirty this repo.
+/config/
