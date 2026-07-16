@@ -18,6 +18,18 @@ procedure Generate_CLDR_Data is
    Target_Path : constant String := "../src/i18n-cldr_data.adb";
    Generated_Path : constant String := "/tmp/i18n_cldr_data.generated.adb";
 
+   --  The two largest lookup functions are emitted as subunits: inline they made the
+   --  single body file exceed GitHub's 100 MB per-file limit, so each goes in its own
+   --  source file (each well under the limit).
+   Currency_Sub_Target    : constant String :=
+     "../src/i18n-cldr_data-currency_display_name.adb";
+   Currency_Sub_Generated : constant String :=
+     "/tmp/i18n_cldr_data-currency_display_name.generated.adb";
+   Unit_Sub_Target        : constant String :=
+     "../src/i18n-cldr_data-unit_display_name.adb";
+   Unit_Sub_Generated     : constant String :=
+     "/tmp/i18n_cldr_data-unit_display_name.generated.adb";
+
    Max_Rules : constant := 2_000_000;
    Max_TZDB_Zones : constant := 600;
    Max_TZDB_Links : constant := 1000;
@@ -1667,12 +1679,25 @@ procedure Generate_CLDR_Data is
    end Validate_Rules;
 
    function Generate return String is
-      Output : Ada.Text_IO.File_Type;
+      Output       : aliased Ada.Text_IO.File_Type;
+      Currency_Sub : aliased Ada.Text_IO.File_Type;
+      Unit_Sub     : aliased Ada.Text_IO.File_Type;
+      --  L writes to whichever file is current: the main body, or a subunit while one is
+      --  being emitted.
+      Current_File : Ada.Text_IO.File_Access;
 
       procedure L (Text : String := "") is
       begin
-         Ada.Text_IO.Put_Line (Output, Text);
+         Ada.Text_IO.Put_Line (Current_File.all, Text);
       end L;
+
+      --  Write the standard subunit header (L must already point at the subunit file).
+      procedure Subunit_Header is
+      begin
+         L ("pragma Style_Checks (Off);");
+         L ("pragma Warnings (Off);");
+         L ("separate (I18N.CLDR_Data)");
+      end Subunit_Header;
 
       procedure Emit_Static_Prelude is
       begin
@@ -9674,6 +9699,7 @@ procedure Generate_CLDR_Data is
 
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
+      Current_File := Output'Unchecked_Access;
       Emit_Static_Prelude;
       Emit_Locale_Return_Function ("Decimal_Separator", "decimal", """.""");
       Emit_Locale_Return_Function ("Group_Separator", "group", """,""");
@@ -9700,7 +9726,21 @@ procedure Generate_CLDR_Data is
       Emit_Currency_Field ("Currency_Symbol", 4, "String", "Code");
       Emit_Currency_Field ("Currency_Narrow_Symbol", 5, "String", "Currency_Symbol (Code)");
       Emit_Currency_Field ("Currency_Display_Name", 6, "String", "Code");
+      --  Emit Currency_Display_Name as a subunit (see the subunit paths above).
+      L;
+      L ("   function Currency_Display_Name");
+      L ("     (Locale   : String;");
+      L ("      Code     : String;");
+      L ("      Category : String := ""other"")");
+      L ("      return String");
+      L ("   is separate;");
+      Ada.Text_IO.Create
+        (Currency_Sub, Ada.Text_IO.Out_File, Currency_Sub_Generated);
+      Current_File := Currency_Sub'Unchecked_Access;
+      Subunit_Header;
       Emit_Localized_Currency_Display_Name;
+      Current_File := Output'Unchecked_Access;
+      Ada.Text_IO.Close (Currency_Sub);
       Emit_Symbol_First;
       Emit_Currency_Format_Patterns;
       Emit_List_Final_Separator;
@@ -9708,7 +9748,21 @@ procedure Generate_CLDR_Data is
       Emit_List_Pattern_Separators;
       Emit_Per_Unit_Separator;
       Emit_Unit_Separators;
+      --  Emit Unit_Display_Name as a subunit (see the subunit paths above).
+      L;
+      L ("   function Unit_Display_Name");
+      L ("     (Locale   : String;");
+      L ("      Base     : String;");
+      L ("      Width    : String;");
+      L ("      Singular : Boolean)");
+      L ("      return String");
+      L ("   is separate;");
+      Ada.Text_IO.Create (Unit_Sub, Ada.Text_IO.Out_File, Unit_Sub_Generated);
+      Current_File := Unit_Sub'Unchecked_Access;
+      Subunit_Header;
       Emit_Unit_Display_Name;
+      Current_File := Output'Unchecked_Access;
+      Ada.Text_IO.Close (Unit_Sub);
       Emit_Byte_Size_Unit_Label;
       Emit_Number_Spellout_Words;
       Emit_Relative_Current_Name;
@@ -9755,7 +9809,10 @@ begin
       Generated : constant String := Generate;
    begin
       if Has_Argument ("--check") then
-         if File_Equals_File (Generated_Path, Target_Path) then
+         if File_Equals_File (Generated_Path, Target_Path)
+           and then File_Equals_File (Currency_Sub_Generated, Currency_Sub_Target)
+           and then File_Equals_File (Unit_Sub_Generated, Unit_Sub_Target)
+         then
             Ada.Text_IO.Put_Line ("CLDR generated data is current");
          else
             Ada.Text_IO.Put_Line
@@ -9765,6 +9822,8 @@ begin
          end if;
       else
          Ada.Directories.Copy_File (Generated_Path, Target_Path);
+         Ada.Directories.Copy_File (Currency_Sub_Generated, Currency_Sub_Target);
+         Ada.Directories.Copy_File (Unit_Sub_Generated, Unit_Sub_Target);
          Ada.Text_IO.Put_Line ("generated src/i18n-cldr_data.adb");
       end if;
    end;
