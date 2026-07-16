@@ -1,6 +1,3 @@
-with Ada.Exceptions;
-with Ada.Strings.Fixed;
-
 with AUnit.Assertions;
 
 with I18N.AST;
@@ -111,23 +108,6 @@ package body I18N.Runtime.Tests.Corpus is
       end case;
    end Configure_Args;
 
-   function Parse_Failure_Kind
-     (Occurrence : Ada.Exceptions.Exception_Occurrence)
-      return I18N.Errors.Error_Kind
-   is
-      Message : constant String := Ada.Exceptions.Exception_Message (Occurrence);
-      use Ada.Strings.Fixed;
-   begin
-      if Index (Message, "Unmatched") /= 0
-        or else Index (Message, "Unclosed") /= 0
-        or else Index (Message, "brace") /= 0
-      then
-         return I18N.Errors.Unbalanced_Braces;
-      end if;
-
-      return I18N.Errors.Parse_Error;
-   end Parse_Failure_Kind;
-
    function Same_Result
      (Left  : I18N.Errors.Result;
       Right : I18N.Errors.Result)
@@ -202,9 +182,12 @@ package body I18N.Runtime.Tests.Corpus is
          return (Ok => False, Error => Validation_Result.Error);
       end;
    exception
-      when Failure : I18N.Parser.Parse_Error =>
+      when I18N.Parser.Unbalanced_Braces =>
          I18N.AST.Free (Root);
-         return (Ok => False, Error => Parse_Failure_Kind (Failure));
+         return (Ok => False, Error => I18N.Errors.Unbalanced_Braces);
+      when I18N.Parser.Parse_Error =>
+         I18N.AST.Free (Root);
+         return (Ok => False, Error => I18N.Errors.Parse_Error);
       when others =>
          I18N.AST.Free (Root);
          return (Ok => False, Error => I18N.Errors.Parse_Error);

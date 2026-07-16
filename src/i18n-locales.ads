@@ -513,7 +513,7 @@ package I18N.Locales is
    --  variation selectors including U+FE00..U+FE0F and U+E0100..U+E01EF,
    --  emoji keycap marks, emoji
    --  skin-tone modifiers, emoji tag sequences, regional indicator flag
-   --  pairs, simple zero-width-joiner sequences, and bounded Hangul Jamo
+   --  pairs, multi-code-point zero-width-joiner sequences, and bounded Hangul Jamo
    --  L/V/T sequences. CRLF is counted as one cluster, while ASCII control
    --  characters and bounded Unicode C1 controls remain standalone clusters. Malformed bytes
    --  are counted as single byte clusters. This is not a full UAX #29

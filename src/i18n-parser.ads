@@ -5,6 +5,9 @@ private package I18N.Parser is
    --  Raised internally when the strict grammar is violated.
    Parse_Error : exception;
 
+   --  Raised for deterministic unmatched brace/formatted-quote conditions.
+   Unbalanced_Braces : exception;
+
    --  Parse a message source into a linked-list AST.
    --
    --  Valid variables have the form {identifier}. Plurals have the form

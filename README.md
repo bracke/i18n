@@ -451,6 +451,7 @@ The release includes explicit orientation files for code assistants and automate
 * `AGENTS.md` — contributor instructions and maintenance guardrails.
 * `PROJECT_INDEX.md` — repository map by task, package, and file role.
 * `docs/AI_CONSUMPTION_GUIDE.md` — guidance for interpreting the public contract.
+* `docs/ICU_CLDR_COMPLETION_CHECKLIST.md` — hard checklist for the full Unicode/CLDR/ICU completion target.
 * `ai/API_MANIFEST.json` — machine-readable public API summary.
 * `ai/CONTRACT_SUMMARY.yaml` — compact behavior contract.
 * `ai/EXAMPLE_CATALOG.json` — example and catalog inventory.
@@ -461,7 +462,14 @@ These files are non-runtime metadata. They do not define behavior independently 
 
 ## Verification status
 
-Before publishing or tagging v1.1.0, run `alr test`. The manifest test action invokes the project-tools-based `check_i18n` guard, which covers the library build, test project build, AUnit runner, example project build and output checks, CLDR data-boundary checks, Alire build/test checks, render benchmark smoke checks, GNATdoc, and GNATprove. Treat any recurrence of the `I18N.Errors.Result` `Storage_Error` warning as a release blocker.
+The project uses `alr test` as the default full verification command. Run it before
+publishing or tagging v1.1.0. The manifest test action invokes the project-tools-based `check_i18n` guard, which covers the library build, test project build, AUnit runner, example project build and output checks, CLDR data-boundary checks, Alire build/test checks, render benchmark smoke checks, GNATdoc, and GNATprove. Treat any recurrence of the `I18N.Errors.Result`
+`Storage_Error` warning as a release blocker.
+
+The full ICU/CLDR target is tracked separately in
+`docs/ICU_CLDR_COMPLETION_CHECKLIST.md`. The Ada conformance harness under
+`conformance/` is run by `check_i18n`, and the repository must not claim full
+Unicode/CLDR/ICU completion while any checklist item remains unchecked.
 
 ## v1.1.0 compatibility boundary
 

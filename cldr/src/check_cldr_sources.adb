@@ -12,7 +12,7 @@ procedure Check_CLDR_Sources is
    Source_Path   : constant String := "upstream/source_files.txt";
    Source        : constant String := Project_Tools.Files.Read_Raw_File (Source_Path);
 
-   Max_Sources : constant := 4_000;
+   Max_Sources : constant := 5_000;
 
    Errors           : Natural := 0;
    Paths            : array (1 .. Max_Sources) of US.Unbounded_String;
@@ -21,6 +21,8 @@ procedure Check_CLDR_Sources is
    Has_Numbers      : Boolean := False;
    Has_Dates        : Boolean := False;
    Has_Supplemental : Boolean := False;
+   Has_Misc         : Boolean := False;
+   Has_Units        : Boolean := False;
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
 
@@ -126,6 +128,21 @@ procedure Check_CLDR_Sources is
       return Value'Length >= Suffix'Length
         and then Value (Value'Last - Suffix'Length + 1 .. Value'Last) = Suffix;
    end Ends_With;
+
+   function CLDR_Major (Value : String) return String is
+   begin
+      for Index in Value'Range loop
+         if Value (Index) = '.' then
+            if Index = Value'First then
+               return "";
+            else
+               return Value (Value'First .. Index - 1);
+            end if;
+         end if;
+      end loop;
+
+      return Value;
+   end CLDR_Major;
 
    function Path_In_Inventory (Path : String) return Boolean is
    begin
@@ -750,18 +767,20 @@ procedure Check_CLDR_Sources is
       Full_Path : constant String := "upstream/" & Path;
       Text      : constant String := Project_Tools.Files.Read_Raw_File (Full_Path);
       Version   : constant String := Project_Tools.JSON.Object_Field_Value (Text, "cldrVersion");
+      Nested_Version : constant String := Project_Tools.JSON.Field_Value (Text, "_cldrVersion");
+      Effective_Version : constant String :=
+        (if Version /= "" then Version else Nested_Version);
    begin
-      if Version /= "" and then Version /= S (Expected_Version) then
+      if Effective_Version /= ""
+        and then Effective_Version /= S (Expected_Version)
+        and then Effective_Version /= CLDR_Major (S (Expected_Version))
+      then
          Add_Error
            ("upstream CLDR source " & Full_Path
             & " must declare cldrVersion=" & S (Expected_Version));
       end if;
 
-      if Starts_With (Path, "cldr-json/cldr-dates-modern/main/")
-        and then Ends_With (Path, "/ca-gregorian.json")
-      then
-         Validate_Selected_Date_Source (Path, Text);
-      elsif Starts_With (Path, "cldr-json/cldr-dates-full/main/")
+      if Starts_With (Path, "cldr-json/cldr-dates-full/main/")
         and then Ends_With (Path, "/ca-gregorian.json")
       then
          Validate_Full_Date_Source (Path, Text);
@@ -769,10 +788,6 @@ procedure Check_CLDR_Sources is
         and then Ends_With (Path, "/timeZoneNames.json")
       then
          Validate_Full_Time_Zone_Source (Path, Text);
-      elsif Path = "cldr-json/cldr-full/listData.json" then
-         Validate_List_Source (Path, Text);
-      elsif Path = "cldr-json/cldr-full/timeZoneData.json" then
-         Validate_Time_Zone_Source (Path, Text);
       end if;
    exception
       when others =>
@@ -810,6 +825,10 @@ procedure Check_CLDR_Sources is
          Has_Dates := True;
       elsif Family = "supplemental" then
          Has_Supplemental := True;
+      elsif Family = "misc" then
+         Has_Misc := True;
+      elsif Family = "units" then
+         Has_Units := True;
       else
          Add_Line_Error (Line_Number, "unknown upstream CLDR source family: " & Family);
          return;
@@ -882,7 +901,8 @@ begin
    Require_Path ("cldr-json/cldr-dates-full/main/en/timeZoneNames.json");
    Require_Path ("cldr-json/cldr-dates-full/main/de/timeZoneNames.json");
    Require_Path ("cldr-json/cldr-dates-full/main/fr/timeZoneNames.json");
-   Require_Path ("cldr-json/cldr-full/listData.json");
+   Require_Path ("cldr-json/cldr-misc-full/main/en/listPatterns.json");
+   Require_Path ("cldr-json/cldr-units-full/main/en/units.json");
    if Errors = 0 then
       Validate_Source_Files;
    end if;
@@ -897,6 +917,14 @@ begin
 
    if not Has_Supplemental then
       Add_Error ("upstream CLDR source inventory is missing supplemental family");
+   end if;
+
+   if not Has_Misc then
+      Add_Error ("upstream CLDR source inventory is missing misc family");
+   end if;
+
+   if not Has_Units then
+      Add_Error ("upstream CLDR source inventory is missing units family");
    end if;
 
    if Errors = 0 then

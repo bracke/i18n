@@ -28,13 +28,14 @@ procedure Extract_CLDR_Normalized is
    Coverage      : constant String := Project_Tools.Files.Read_Raw_File (Coverage_Path);
    Generated_Path : constant String := "/tmp/i18n_normalized_cldr.generated.txt";
 
-   Max_Keys : constant := 250_000;
+   Max_Keys : constant := 2_000_000;
+   Max_Coverage_Keys : constant := 400_000;
 
    Errors             : Natural := 0;
    Keys               : String_Sets.Set;
    Raw_Counts         : String_Natural_Maps.Map;
    Key_Count          : Natural := 0;
-   Coverage_Keys      : array (1 .. Max_Keys) of US.Unbounded_String;
+   Coverage_Keys      : array (1 .. Max_Coverage_Keys) of US.Unbounded_String;
    Coverage_Key_Count : Natural := 0;
    Currency_Count     : Natural := 0;
    Currency_Name_Count : Natural := 0;
@@ -542,7 +543,7 @@ procedure Extract_CLDR_Normalized is
          end if;
       end loop;
 
-      if Coverage_Key_Count = Max_Keys then
+      if Coverage_Key_Count = Max_Coverage_Keys then
          Add_Line_Error (Line_Number, "too many raw CLDR coverage requirements");
          return;
       end if;

@@ -1,0 +1,5 @@
+# Format:
+# case|id|catalog|locale|key|args|expected_status|expected_text
+case|unit-kilometer|default_locale = en\nen.distance = {value, unit, length-kilometer}|en|distance|value=1.5|SUCCESS|1.5 kilometers
+case|relative-days|default_locale = en\nen.when = {value, relative, day}|en|when|value=-3|SUCCESS|3 days ago
+case|list-standard|default_locale = en\nen.colors = {items, list}|en|colors|items=red\|green\|blue|SUCCESS|red, green, and blue

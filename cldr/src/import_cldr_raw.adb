@@ -22,7 +22,7 @@ procedure Import_CLDR_Raw is
    Target_Path   : constant String := "raw/cldr_records.txt";
    Generated_Path : constant String := "/tmp/i18n_cldr_records.generated.txt";
 
-   Max_Keys : constant := 250_000;
+   Max_Keys : constant := 2_000_000;
 
    Errors              : Natural := 0;
    Key_Count           : Natural := 0;

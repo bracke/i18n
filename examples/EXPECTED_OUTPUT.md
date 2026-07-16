@@ -3,7 +3,7 @@
 Build the example suite from the repository root:
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 ```
 
 Run examples from the repository root because they use catalog paths such as

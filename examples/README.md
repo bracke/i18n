@@ -8,7 +8,7 @@ v1.1.0 public API.
 The shortest example is:
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 ./examples/bin/hello_world
 ```
 
@@ -21,7 +21,7 @@ hello world: Hello, Ada!
 ## Build the suite
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 ```
 
 The generated executables are written into this `examples/` directory. Run them

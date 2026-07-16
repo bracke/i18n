@@ -74,6 +74,15 @@ cldr/src/import_cldr_raw.adb
 cldr/src/extract_cldr_normalized.adb
 cldr/src/import_cldr_subset.adb
 cldr/src/generate_cldr_data.adb
+conformance/README.md
+conformance/conformance.gpr
+conformance/fixtures/manifest.txt
+conformance/fixtures/message_format.render
+conformance/fixtures/plurals.render
+conformance/fixtures/number_currency.render
+conformance/fixtures/date_time_calendar_tz.render
+conformance/fixtures/units_lists_names.render
+conformance/src/check_conformance.adb
 config/i18n_config.ads
 config/i18n_config.gpr
 config/i18n_config.h
@@ -85,6 +94,7 @@ docs/COMPATIBILITY.md
 docs/ERROR_MODEL.md
 docs/EXAMPLES.md
 docs/ICU_SUBSET.md
+docs/ICU_CLDR_COMPLETION_CHECKLIST.md
 docs/PACKAGING.md
 docs/PUBLIC_API_BOUNDARY.md
 docs/PUBLIC_IMPORT_RULES.md

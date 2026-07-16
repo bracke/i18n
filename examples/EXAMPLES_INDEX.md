@@ -6,7 +6,7 @@ file is explicitly identified as support code.
 Build the example project with:
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 ```
 
 Run examples from the repository root, for example:

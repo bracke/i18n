@@ -44,20 +44,28 @@ procedure Check_I18N is
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("examples/examples.gpr"));
+      5 => new String'("examples/examples.gpr"),
+      6 => new String'("-j1"));
    No_Args : constant Argument_List (1 .. 0) := (others => null);
    Build_Benchmarks_Args : constant Argument_List :=
      (1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("benchmarks/benchmarks.gpr"));
+      5 => new String'("benchmarks/benchmarks.gpr"),
+      6 => new String'("-j1"));
    Build_CLDR_Tools_Args : constant Argument_List :=
      (1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
       5 => new String'("cldr_tools.gpr"));
+   Build_Conformance_Args : constant Argument_List :=
+     (1 => new String'("exec"),
+      2 => new String'("--"),
+      3 => new String'("gprbuild"),
+      4 => new String'("-P"),
+      5 => new String'("conformance/conformance.gpr"));
    Run_Benchmarks_Args : constant Argument_List :=
      (1 => new String'("--smoke"));
    Check_CLDR_Args : constant Argument_List :=
@@ -98,16 +106,6 @@ procedure Check_I18N is
    begin
       return Project_Tools.Processes.Locate_Command ("alr");
    end Alr_Path;
-
-   function Gprbuild_Path return String is
-   begin
-      return Project_Tools.Processes.Locate_Command ("gprbuild");
-   end Gprbuild_Path;
-
-   function Gnatdoc_Path return String is
-   begin
-      return Project_Tools.Processes.Locate_Command ("gnatdoc");
-   end Gnatdoc_Path;
 
    procedure Run_Check
      (Label   : String;
@@ -455,6 +453,16 @@ procedure Check_I18N is
          Root & "/cldr/bin/generate_cldr_data",
          Check_CLDR_Args);
       Run_Check
+        ("build i18n ICU/CLDR conformance harness",
+         Root,
+         Alr_Path,
+         Build_Conformance_Args);
+      Run_Check
+        ("run i18n ICU/CLDR conformance harness",
+         Root,
+         Root & "/conformance/bin/check_conformance",
+         No_Args);
+      Run_Check
         ("run i18n benchmark smoke",
          Root,
          Root & "/benchmarks/bin/render_benchmarks",
@@ -668,11 +676,50 @@ procedure Check_I18N is
       Errors := Errors + Hygiene_Errors;
    end Check_Generated_Artifacts;
 
+   procedure Check_ICU_CLDR_Completion_Checklist is
+      Path : constant String := Root & "/docs/ICU_CLDR_COMPLETION_CHECKLIST.md";
+      Text : constant String := Project_Tools.Files.Read_Raw_File (Path);
+      Has_Unresolved : constant Boolean :=
+        Project_Tools.Text.Contains (Text, "- [ ]");
+      Claims_Complete : constant Boolean :=
+        Project_Tools.Files.Has_Line (Path, "Overall status: COMPLETE");
+   begin
+      if Claims_Complete and then Has_Unresolved then
+         Error
+           ("ICU/CLDR completion checklist claims COMPLETE while unresolved items remain");
+      end if;
+
+      if not Claims_Complete
+        and then not Project_Tools.Files.Has_Line
+          (Path, "Overall status: INCOMPLETE")
+      then
+         Error
+           ("ICU/CLDR completion checklist must state COMPLETE or INCOMPLETE");
+      end if;
+
+      if not Project_Tools.Text.Contains (Text, "Unicode version: 17.0.0") then
+         Error ("ICU/CLDR completion checklist must pin Unicode 17.0.0");
+      end if;
+
+      if not Project_Tools.Text.Contains (Text, "CLDR version: 48.2") then
+         Error ("ICU/CLDR completion checklist must pin CLDR 48.2");
+      end if;
+
+      if not Project_Tools.Text.Contains (Text, "ICU behavior baseline: ICU 78.3") then
+         Error ("ICU/CLDR completion checklist must pin ICU 78.3");
+      end if;
+
+      if not Project_Tools.Text.Contains (Text, "`alr test`") then
+         Error ("ICU/CLDR completion checklist must include the local alr test gate");
+      end if;
+   exception
+      when others =>
+         Error ("failed to validate ICU/CLDR completion checklist");
+   end Check_ICU_CLDR_Completion_Checklist;
+
 begin
    Project_Tools.Processes.Require_Command
      ("alr", "alr executable not found on PATH");
-   Project_Tools.Processes.Require_Command
-     ("gprbuild", "gprbuild executable not found on PATH");
 
    if Project_Tools.Processes.Has_Argument ("--examples-only") then
       Check_Example_Output;
@@ -695,6 +742,7 @@ begin
    Project_Tools.Release_Checks.Require_File (Checks, "config/i18n_config.ads");
    Project_Tools.Release_Checks.Require_File (Checks, "config/i18n_config.h");
    Project_Tools.Release_Checks.Require_File (Checks, "docs/RELEASE_VERIFICATION.md");
+   Project_Tools.Release_Checks.Require_File (Checks, "docs/ICU_CLDR_COMPLETION_CHECKLIST.md");
    Project_Tools.Release_Checks.Require_File (Checks, "docs/SPARK.md");
    Project_Tools.Release_Checks.Require_File (Checks, "docs/API.md");
    Project_Tools.Release_Checks.Require_File (Checks, "ai/API_MANIFEST.json");
@@ -724,6 +772,14 @@ begin
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/src/extract_cldr_normalized.adb");
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/src/import_cldr_subset.adb");
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/src/generate_cldr_data.adb");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/conformance.gpr");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/src/check_conformance.adb");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/fixtures/manifest.txt");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/fixtures/message_format.render");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/fixtures/plurals.render");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/fixtures/number_currency.render");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/fixtures/date_time_calendar_tz.render");
+   Project_Tools.Release_Checks.Require_File (Checks, "conformance/fixtures/units_lists_names.render");
    Project_Tools.Release_Checks.Require_File (Checks, "tests/tests.gpr");
    Project_Tools.Release_Checks.Require_File (Checks, "examples/examples.gpr");
    Project_Tools.Release_Checks.Require_File (Checks, "benchmarks/benchmarks.gpr");
@@ -733,6 +789,7 @@ begin
    Project_Tools.Release_Checks.Require_File (Checks, ".github/workflows/ci.yml");
 
    Check_AI_JSON_Metadata;
+   Check_ICU_CLDR_Completion_Checklist;
 
    Require_Text
      ("README.md",
@@ -746,6 +803,10 @@ begin
      ("docs/RELEASE_VERIFICATION.md",
       "alr exec -- gprbuild -P examples/examples.gpr",
       "release verification must include examples project build");
+   Forbid_Text
+     ("docs/RELEASE_VERIFICATION.md",
+      "```sh" & ASCII.LF & "gprbuild -P examples/examples.gpr",
+      "release verification must use Alire-wrapped project build commands");
    Require_Text
      ("docs/RELEASE_VERIFICATION.md",
       "./bin/check_i18n --examples-only",
@@ -754,6 +815,58 @@ begin
      ("docs/RELEASE_VERIFICATION.md",
       "alr exec -- gprbuild -P benchmarks/benchmarks.gpr",
       "release verification must include benchmark project build");
+   Forbid_Text
+     ("docs/RELEASE_VERIFICATION.md",
+      "```sh" & ASCII.LF & "gprbuild -P benchmarks/benchmarks.gpr",
+      "release verification must use Alire-wrapped benchmark build commands");
+   Require_Text
+     ("docs/QUICKSTART.md",
+      "alr exec -- gprbuild -P i18n.gpr",
+      "quickstart must show Alire-wrapped library build");
+   Forbid_Text
+     ("docs/QUICKSTART.md",
+      "```sh" & ASCII.LF & "gprbuild -P i18n.gpr",
+      "quickstart must not use a system gprbuild build command");
+   Require_Text
+     ("docs/QUICKSTART.md",
+      "alr exec -- gprbuild -P examples/examples.gpr",
+      "quickstart must show Alire-wrapped example build");
+   Forbid_Text
+     ("docs/QUICKSTART.md",
+      "```sh" & ASCII.LF & "gprbuild -P examples/examples.gpr",
+      "quickstart must not use a system gprbuild example build command");
+   Require_Text
+     ("docs/EXAMPLES.md",
+      "alr exec -- gprbuild -P examples/examples.gpr",
+      "examples docs must use Alire-wrapped example build command");
+   Forbid_Text
+     ("docs/EXAMPLES.md",
+      "```sh" & ASCII.LF & "gprbuild -P examples/examples.gpr",
+      "examples docs must not use a system gprbuild command");
+   Require_Text
+     ("examples/README.md",
+      "alr exec -- gprbuild -P examples/examples.gpr",
+      "examples README must use Alire-wrapped build command");
+   Forbid_Text
+     ("examples/README.md",
+      "```sh" & ASCII.LF & "gprbuild -P examples/examples.gpr",
+      "examples README must not use a system gprbuild command");
+   Require_Text
+     ("examples/EXAMPLES_INDEX.md",
+      "alr exec -- gprbuild -P examples/examples.gpr",
+      "examples index must use Alire-wrapped build command");
+   Forbid_Text
+     ("examples/EXAMPLES_INDEX.md",
+      "```sh" & ASCII.LF & "gprbuild -P examples/examples.gpr",
+      "examples index must not use a system gprbuild command");
+   Require_Text
+     ("examples/EXPECTED_OUTPUT.md",
+      "alr exec -- gprbuild -P examples/examples.gpr",
+      "expected output doc must use Alire-wrapped build command");
+   Forbid_Text
+     ("examples/EXPECTED_OUTPUT.md",
+      "```sh" & ASCII.LF & "gprbuild -P examples/examples.gpr",
+      "expected output doc must not use a system gprbuild command");
    Require_Text
      ("docs/RELEASE_VERIFICATION.md",
       "./benchmarks/bin/render_benchmarks --smoke",
@@ -766,6 +879,14 @@ begin
      ("docs/RELEASE_VERIFICATION.md",
       "alr test",
       "release verification must include Alire test action");
+   Require_Text
+     ("docs/ICU_CLDR_COMPLETION_CHECKLIST.md",
+      "1. - [x] Add Ada conformance runners",
+      "ICU/CLDR checklist must mark milestone 0 conformance runners complete");
+   Require_Text
+     ("docs/ICU_CLDR_COMPLETION_CHECKLIST.md",
+      "4. - [x] Wire the conformance runners into `check_i18n` and `alr test`.",
+      "ICU/CLDR checklist must mark milestone 0 gate integration complete");
    Require_Text
      ("docs/RELEASE_VERIFICATION.md",
       "## Publication checks run by the guard",

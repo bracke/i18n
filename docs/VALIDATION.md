@@ -73,4 +73,6 @@ Documentation must describe implemented behavior only. A release is invalid if d
 
 ## Toolchain verification
 
-The validation boundary is release-ready only when the project-tools-based `check_i18n` guard launched by `alr test` passes for the intended release channel.
+The full toolchain boundary is exercised through the project-tools-based
+`check_i18n` guard launched by `alr test`, and the same command is used for
+local and publication validation.

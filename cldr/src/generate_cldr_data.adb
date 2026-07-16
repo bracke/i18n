@@ -18,7 +18,7 @@ procedure Generate_CLDR_Data is
    Target_Path : constant String := "../src/i18n-cldr_data.adb";
    Generated_Path : constant String := "/tmp/i18n_cldr_data.generated.adb";
 
-   Max_Rules : constant := 250_000;
+   Max_Rules : constant := 2_000_000;
    Max_TZDB_Zones : constant := 600;
    Max_TZDB_Links : constant := 1000;
    Max_TZDB_Transitions : constant := 120000;
@@ -6231,6 +6231,21 @@ procedure Generate_CLDR_Data is
       end Emit_Unit_Separators;
 
       procedure Emit_Unit_Display_Name is
+         procedure Emit_String_Term (Value : String) is
+            Chunk_Size : constant := 72;
+            Start      : Positive := Value'First;
+            Stop       : Natural;
+         begin
+            if Value'Length = 0 then
+               return;
+            end if;
+
+            while Start <= Value'Last loop
+               Stop := Natural'Min (Start + Chunk_Size - 1, Value'Last);
+               L ("        & """ & Value (Start .. Stop) & """");
+               Start := Stop + 1;
+            end loop;
+         end Emit_String_Term;
       begin
          L;
          L ("   function Unit_Display_Name");
@@ -6242,11 +6257,93 @@ procedure Generate_CLDR_Data is
          L ("   is");
          L ("      Lang   : constant String := Language (Locale);");
          L ("      Plural : constant Boolean := not Singular;");
+         L ("      Unit_Name_Data : constant String :=");
+         L ("        """"");
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "unit_name") then
+               Emit_String_Term
+                 (S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
+                  & S (Rules (Index).C) & "|" & S (Rules (Index).D)
+                  & "|" & Ada_Expression_UTF8_Hex (S (Rules (Index).E))
+                  & "~");
+            end if;
+         end loop;
+         L ("        ;");
          L;
          L ("      function Extended_Unit_Name return String is");
          L ("      begin");
          L ("         return """";");
          L ("      end Extended_Unit_Name;");
+         L;
+         L ("      function Matches_Locale");
+         L ("        (Candidate : String;");
+         L ("         Fallback  : Boolean)");
+         L ("         return Boolean is");
+         L ("      begin");
+         L ("         if Fallback then");
+         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
+         L ("         else");
+         L ("            return Locale_Equals (Locale, Candidate);");
+         L ("         end if;");
+         L ("      end Matches_Locale;");
+         L;
+         L ("      function Search_Unit_Name (Fallback : Boolean) return String is");
+         L ("         Start : Positive := Unit_Name_Data'First;");
+         L ("      begin");
+         L ("         while Start <= Unit_Name_Data'Last loop");
+         L ("            declare");
+         L ("               Sep1 : Natural := 0;");
+         L ("               Sep2 : Natural := 0;");
+         L ("               Sep3 : Natural := 0;");
+         L ("               Sep4 : Natural := 0;");
+         L ("               Stop : Natural := Unit_Name_Data'Last + 1;");
+         L ("            begin");
+         L ("               for Index in Start .. Unit_Name_Data'Last loop");
+         L ("                  if Unit_Name_Data (Index) = '|' then");
+         L ("                     if Sep1 = 0 then");
+         L ("                        Sep1 := Index;");
+         L ("                     elsif Sep2 = 0 then");
+         L ("                        Sep2 := Index;");
+         L ("                     elsif Sep3 = 0 then");
+         L ("                        Sep3 := Index;");
+         L ("                     elsif Sep4 = 0 then");
+         L ("                        Sep4 := Index;");
+         L ("                     end if;");
+         L ("                  elsif Unit_Name_Data (Index) = '~' then");
+         L ("                     Stop := Index;");
+         L ("                     exit;");
+         L ("                  end if;");
+         L ("               end loop;");
+         L;
+         L ("               if Sep1 /= 0");
+         L ("                 and then Sep2 /= 0");
+         L ("                 and then Sep3 /= 0");
+         L ("                 and then Sep4 /= 0");
+         L ("                 and then Sep1 > Start");
+         L ("                 and then Sep2 > Sep1 + 1");
+         L ("                 and then Sep3 > Sep2 + 1");
+         L ("                 and then Sep4 > Sep3 + 1");
+         L ("                 and then Stop > Sep4 + 1");
+         L ("                 and then Unit_Name_Data (Sep1 + 1 .. Sep2 - 1) = Base");
+         L ("                 and then Unit_Name_Data (Sep2 + 1 .. Sep3 - 1) = Width");
+         L ("                 and then ((Singular");
+         L ("                            and then Unit_Name_Data");
+         L ("                              (Sep3 + 1 .. Sep4 - 1) = ""one"")");
+         L ("                           or else (Plural");
+         L ("                            and then Unit_Name_Data");
+         L ("                              (Sep3 + 1 .. Sep4 - 1) /= ""one""))");
+         L ("                 and then Matches_Locale");
+         L ("                   (Unit_Name_Data (Start .. Sep1 - 1), Fallback)");
+         L ("               then");
+         L ("                  return HB (Unit_Name_Data (Sep4 + 1 .. Stop - 1));");
+         L ("               end if;");
+         L;
+         L ("               Start := Stop + 1;");
+         L ("            end;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Search_Unit_Name;");
          L ("   begin");
          L ("      if Width = ""unit-width-short""");
          L ("        or else Width = ""short""");
@@ -6449,28 +6546,21 @@ procedure Generate_CLDR_Data is
          L ("            return """";");
          L ("         end if;");
          L ("      else");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "unit_name") then
-                  L
-                    ("         if "
-                     & (if Pass = 1
-                        then "Locale_Equals"
-                        else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("           and then Base = """ & S (Rules (Index).B) & """");
-                  L ("           and then Width = """ & S (Rules (Index).C) & """");
-                  L
-                    ("           and then "
-                     & (if S (Rules (Index).D) = "one"
-                        then "Singular"
-                        else "not Singular"));
-                  L ("         then");
-                  L ("            return " & S (Rules (Index).E) & ";");
-                  L ("         end if;");
-               end if;
-            end loop;
-         end loop;
+         L ("         declare");
+         L ("            Exact : constant String := Search_Unit_Name (False);");
+         L ("         begin");
+         L ("            if Exact /= """" then");
+         L ("               return Exact;");
+         L ("            end if;");
+         L ("         end;");
+         L ("         declare");
+         L ("            Fallback_Result : constant String :=");
+         L ("              Search_Unit_Name (True);");
+         L ("         begin");
+         L ("            if Fallback_Result /= """" then");
+         L ("               return Fallback_Result;");
+         L ("            end if;");
+         L ("         end;");
          L ("      end if;");
          L;
          L ("      if Extended_Unit_Name /= """" then");

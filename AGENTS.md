@@ -49,7 +49,7 @@ alr test
 ```
 
 `alr test` routes through `check_i18n`, the project-tools-based release guard.
-Use the individual `gprbuild`/AUnit/example commands only for focused debugging.
+Use this as the primary verification command locally and for release gating.
 
 ## Release verification rule
 

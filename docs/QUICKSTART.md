@@ -211,13 +211,13 @@ return `Invalid_Argument`.
 From the project root:
 
 ```sh
-gprbuild -P i18n.gpr
+alr exec -- gprbuild -P i18n.gpr
 ```
 
 To build the maintained v1.1.0 example series:
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 ```
 
 The example suite includes `hello_world.adb` as the shortest start-here program and public API import-boundary smoke examples. The examples intentionally use only public packages such as:

@@ -1,0 +1,30 @@
+# ICU/CLDR conformance harness manifest.
+# Format:
+# baseline|unicode|17.0.0
+# baseline|cldr|48.2
+# baseline|icu|78.3
+# suite|<required-suite-name>
+# fixture|<suite-name>|<relative fixture path>
+
+baseline|unicode|17.0.0
+baseline|cldr|48.2
+baseline|icu|78.3
+
+suite|unicode_core
+suite|normalization
+suite|case_transforms
+suite|segmentation
+suite|collation_search
+suite|locale_ids
+suite|plurals
+suite|number_currency
+suite|date_time_calendar_tz
+suite|message_format
+suite|rbnf
+suite|units_lists_names
+
+fixture|message_format|fixtures/message_format.render
+fixture|plurals|fixtures/plurals.render
+fixture|number_currency|fixtures/number_currency.render
+fixture|date_time_calendar_tz|fixtures/date_time_calendar_tz.render
+fixture|units_lists_names|fixtures/units_lists_names.render

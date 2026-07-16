@@ -10,7 +10,7 @@ on parser, compiler, IR, cache, or execution internals.
 From the repository root:
 
 ```sh
-gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr
 ```
 
 The example executables are emitted into the `examples/` directory by the example

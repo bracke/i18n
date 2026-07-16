@@ -325,6 +325,16 @@ package body I18N.Runtime is
       begin
          Parsed := I18N.Parser.Parse (Source);
       exception
+         when I18N.Parser.Unbalanced_Braces =>
+            I18N.AST.Free (Parsed);
+            Ok := False;
+            Error := I18N.Errors.Unbalanced_Braces;
+            return;
+         when I18N.Parser.Parse_Error =>
+            I18N.AST.Free (Parsed);
+            Ok := False;
+            Error := I18N.Errors.Parse_Error;
+            return;
          when others =>
             I18N.AST.Free (Parsed);
             Ok := False;

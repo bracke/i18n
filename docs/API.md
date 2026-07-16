@@ -495,7 +495,7 @@ South/Southeast Asian dependent vowel, virama, and tone marks, variation
 selectors including U+FE00..U+FE0F and U+E0100..U+E01EF, emoji keycap marks,
 emoji skin-tone modifiers, emoji tag sequences, bounded Unicode Prepend
 characters, Myanmar spacing vowel marks,
-regional indicator flag pairs, simple zero-width-joiner sequences, bounded
+regional indicator flag pairs, multi-code-point zero-width-joiner sequences, bounded
 Hangul Jamo L/V/T sequences, and CRLF pairs while preserving
 original bytes.
 ASCII control characters and bounded Unicode C1 controls remain standalone clusters.

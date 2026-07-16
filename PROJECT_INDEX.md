@@ -57,6 +57,7 @@ Application examples must not `with` these internal packages.
 | `examples/examples.gpr` | v1.1.0 public API examples project, including number/currency/date/time and domain formatter examples. |
 | `benchmarks/benchmarks.gpr` | Render hot-path and bounded `Render_Into` benchmark project. |
 | `cldr/cldr_tools.gpr` | CLDR import and generated-data checker project. |
+| `conformance/conformance.gpr` | ICU/CLDR conformance harness project used by `check_i18n`. |
 | `examples/README.md` | Example directory orientation and public API import rule. |
 | `examples/EXPECTED_OUTPUT.md` | Typical example output notes. |
 | `MANIFEST.txt` | Full release file listing. |
@@ -80,6 +81,7 @@ Application examples must not `with` these internal packages.
 | `cldr/raw/coverage.txt` | Required raw CLDR family/locale/currency coverage checked by the extractor. |
 | `cldr/import/normalized_cldr.txt` | Normalized CLDR-derived import source expanded into the pinned subset. |
 | `cldr/data/cldr_subset.txt` | Pinned CLDR-derived subset source checked against `I18N.CLDR_Data`. |
+| `conformance/fixtures/manifest.txt` | Conformance baseline, suite, and fixture manifest for the ICU/CLDR completion gate. |
 | `docs/ERROR_MODEL.md` | Status semantics and deterministic failure model. |
 | `docs/THREADING.md` | Threading and allocation behavior. |
 | `docs/VALIDATION.md` | Validation rules. |
@@ -87,6 +89,7 @@ Application examples must not `with` these internal packages.
 | `docs/EXAMPLES.md` | Example suite guide. |
 | `docs/COMPATIBILITY.md` | Source/runtime compatibility policy. |
 | `docs/COMPLETION_MILESTONES.md` | Concrete implementation milestones by subsystem and file slices for completion. |
+| `docs/ICU_CLDR_COMPLETION_CHECKLIST.md` | Hard checklist for the full Unicode 17.0.0 / CLDR 48.2 / ICU 78.3 completion target. |
 | `docs/RELEASE_CHECKLIST.md` | Release audit checklist. |
 | `docs/RELEASE_VERIFICATION.md` | GNAT/GPRbuild commands required before tagging v1.1.0. |
 | `docs/AI_CONSUMPTION_GUIDE.md` | AI-oriented project consumption guide. |

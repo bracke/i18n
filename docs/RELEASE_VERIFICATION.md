@@ -25,19 +25,17 @@ These checks establish that the core library builds, the test project builds, th
 
 The build is free of the GNAT warning about `I18N.Errors.Result` object creation possibly raising `Storage_Error`; the internal result value uses non-discriminated storage.
 
-## Hosted CI workflow
+## Verification flow
 
-The GitHub Actions workflow in `.github/workflows/ci.yml` checks out `i18n` and
-the sibling `project_tools` crate, sets up Alire, installs the Ada tooling, and
-runs the release gates as separate CI steps:
+The full verification flow is:
 
 ```text
 alr build
 cd tests && alr exec -- gprbuild -P tests.gpr
 cd tests && alr exec -- ./bin/tests
-alr exec -- gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr -j1
 cd check_i18n && ./bin/check_i18n --examples-only
-alr exec -- gprbuild -P benchmarks/benchmarks.gpr
+alr exec -- gprbuild -P benchmarks/benchmarks.gpr -j1
 ./benchmarks/bin/render_benchmarks --smoke
 alr exec -- gnatdoc -P i18n.gpr
 cd check_i18n && alr build
@@ -46,8 +44,8 @@ alr test
 ```
 
 The explicit steps make test, example build/output, documentation,
-project-tools, and Alire packaging failures visible in CI while preserving
-`alr test` as the release entry point.
+project-tools, and Alire packaging failures visible in one run, and use
+`alr test` as the gate that executes the full package test action.
 
 ## Alire publication readiness audit
 
@@ -67,9 +65,9 @@ drift from the release process.
 The release guard runs the publication checks through `project_tools`:
 
 ```sh
-alr exec -- gprbuild -P examples/examples.gpr
+alr exec -- gprbuild -P examples/examples.gpr -j1
 cd check_i18n && ./bin/check_i18n --examples-only
-alr exec -- gprbuild -P benchmarks/benchmarks.gpr
+alr exec -- gprbuild -P benchmarks/benchmarks.gpr -j1
 ./benchmarks/bin/render_benchmarks --smoke
 cd cldr && alr exec -- gprbuild -P cldr_tools.gpr
 cd cldr && ./bin/check_cldr_sources --check
@@ -84,7 +82,7 @@ alr exec -- gnatdoc -P i18n.gpr
 alr exec -- gnatprove -P i18n.gpr --level=0 --mode=check
 ```
 
-`alr test` is the required release gate and runs the manifest-declared test action. The release is not publication-ready if any command launched by `check_i18n` fails.
+`alr test` is the required full gate and runs the manifest-declared test action. The release is not publication-ready if any command launched by `check_i18n` fails.
 
 ## Private-package sealing checks
 

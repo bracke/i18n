@@ -27,6 +27,13 @@ package body I18N.Parser is
       end if;
    end Append_Quoted_Character;
 
+   procedure Raise_Unbalanced_Braces
+     (Message : String)
+   is
+   begin
+      raise Unbalanced_Braces with Message;
+   end Raise_Unbalanced_Braces;
+
    function Is_Identifier_Character (C : Character) return Boolean is
    begin
       return
@@ -149,7 +156,7 @@ package body I18N.Parser is
       end loop;
 
       if Pos > Source'Last then
-         raise Parse_Error with "Unclosed format option";
+         Raise_Unbalanced_Braces ("Unclosed format option");
       end if;
 
       return Trimmed (Source (Start .. Pos - 1));
@@ -408,7 +415,7 @@ package body I18N.Parser is
 
       if Pos > Source'Last or else Source (Pos) /= '}' then
          I18N.AST.Free (Branch_AST);
-         raise Parse_Error with "Unclosed branch message";
+         Raise_Unbalanced_Braces ("Unclosed branch message");
       end if;
 
       Pos := Pos + 1;
@@ -485,7 +492,7 @@ package body I18N.Parser is
          Skip_Whitespace (Source, Pos);
 
          if Pos > Source'Last then
-            raise Parse_Error with "Unclosed plural block";
+            Raise_Unbalanced_Braces ("Unclosed plural block");
          elsif Source (Pos) = '}' then
             exit;
          end if;
@@ -651,7 +658,7 @@ package body I18N.Parser is
          Skip_Whitespace (Source, Pos);
 
          if Pos > Source'Last then
-            raise Parse_Error with "Unclosed select block";
+            Raise_Unbalanced_Braces ("Unclosed select block");
          elsif Source (Pos) = '}' then
             exit;
          end if;
@@ -727,7 +734,7 @@ package body I18N.Parser is
          Skip_Whitespace (Source, Pos);
 
          if Pos > Source'Last then
-            raise Parse_Error with "Unclosed selectordinal block";
+            Raise_Unbalanced_Braces ("Unclosed selectordinal block");
          elsif Source (Pos) = '}' then
             exit;
          end if;
@@ -1620,7 +1627,9 @@ package body I18N.Parser is
          return True;
       end Unit_Style_From_Skeleton;
    begin
-      if Pos > Source'Last or else Source (Pos) /= '}' then
+      if Pos > Source'Last then
+         Raise_Unbalanced_Braces ("Expected '}' after number keyword");
+      elsif Source (Pos) /= '}' then
          raise Parse_Error with "Expected '}' after number keyword";
       end if;
 
@@ -1691,7 +1700,9 @@ package body I18N.Parser is
    is
       Style : constant String := Read_Format_Option (Source, Pos);
    begin
-      if Pos > Source'Last or else Source (Pos) /= '}' then
+      if Pos > Source'Last then
+         Raise_Unbalanced_Braces ("Expected '}' after date keyword");
+      elsif Source (Pos) /= '}' then
          raise Parse_Error with "Expected '}' after date keyword";
       elsif not Is_Date_Time_Style (Style) then
          raise Parse_Error with "Unsupported date style";
@@ -1714,7 +1725,9 @@ package body I18N.Parser is
    is
       Style : constant String := Read_Format_Option (Source, Pos);
    begin
-      if Pos > Source'Last or else Source (Pos) /= '}' then
+      if Pos > Source'Last then
+         Raise_Unbalanced_Braces ("Expected '}' after time keyword");
+      elsif Source (Pos) /= '}' then
          raise Parse_Error with "Expected '}' after time keyword";
       elsif not Is_Date_Time_Style (Style) then
          raise Parse_Error with "Unsupported time style";
@@ -1737,7 +1750,9 @@ package body I18N.Parser is
    is
       Style : constant String := Read_Format_Option (Source, Pos);
    begin
-      if Pos > Source'Last or else Source (Pos) /= '}' then
+      if Pos > Source'Last then
+         Raise_Unbalanced_Braces ("Expected '}' after datetime keyword");
+      elsif Source (Pos) /= '}' then
          raise Parse_Error with "Expected '}' after datetime keyword";
       elsif not Is_Date_Time_Style (Style) then
          raise Parse_Error with "Unsupported datetime style";
@@ -1762,7 +1777,9 @@ package body I18N.Parser is
    begin
       if Option = "" then
          raise Parse_Error with "Expected currency code";
-      elsif Pos > Source'Last or else Source (Pos) /= '}' then
+      elsif Pos > Source'Last then
+         Raise_Unbalanced_Braces ("Expected '}' after currency code");
+      elsif Source (Pos) /= '}' then
          raise Parse_Error with "Expected '}' after currency code";
       elsif not I18N.Currency.Is_Valid_Code (Option) then
          raise Parse_Error with "Invalid currency code";
@@ -1786,9 +1803,13 @@ package body I18N.Parser is
    is
       Option : constant String := Read_Format_Option (Source, Pos);
    begin
-      if Pos > Source'Last or else Source (Pos) /= '}' then
+      if Pos > Source'Last then
+         Raise_Unbalanced_Braces ("Expected '}' after formatter option");
+      elsif Source (Pos) /= '}' then
          raise Parse_Error with "Expected '}' after formatter option";
-      elsif Kind in I18N.AST.Duration_Format | I18N.AST.Byte_Size_Format
+      end if;
+
+      if Kind in I18N.AST.Duration_Format | I18N.AST.Byte_Size_Format
         and then Option /= ""
       then
          raise Parse_Error with "Unsupported formatter option";
@@ -1829,14 +1850,14 @@ package body I18N.Parser is
       Tail   : in out I18N.AST.Node_Access) is
    begin
       if Pos > Source'Last then
-         raise Parse_Error with "Unclosed brace before identifier";
+         Raise_Unbalanced_Braces ("Unclosed brace before identifier");
       end if;
 
       declare
          Name : constant String := Read_Identifier (Source, Pos);
       begin
          if Pos > Source'Last then
-            raise Parse_Error with "Unclosed brace after identifier";
+            Raise_Unbalanced_Braces ("Unclosed brace after identifier");
          end if;
 
          --  Keep strict variable syntax for simple variables: {name } is still
@@ -2024,7 +2045,7 @@ package body I18N.Parser is
                   return Head;
                else
                   I18N.AST.Free (Head);
-                  raise Parse_Error with "Unmatched '}'";
+                  Raise_Unbalanced_Braces ("Unmatched '}'");
                end if;
 
             when Apostrophe =>
@@ -2085,7 +2106,7 @@ package body I18N.Parser is
 
       if Stop_On_Close then
          I18N.AST.Free (Head);
-         raise Parse_Error with "Unclosed branch";
+         Raise_Unbalanced_Braces ("Unclosed branch");
       end if;
 
       Flush_Text (Head => Head, Tail => Tail, Text => Pending_Text);

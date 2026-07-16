@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  linux-release-check:
-    name: Linux release and packaging checks
+  linux-ci:
+    name: Linux CI checks
     runs-on: ubuntu-latest
     env:
       ALIRE_NONINTERACTIVE: "true"
@@ -25,11 +25,12 @@ jobs:
 
       - name: Set up Alire
         uses: alire-project/setup-alire@v5
+        with:
+          toolchain: gnat_native=15.2.1 gprbuild
 
-      - name: Install Ada toolchain
+      - name: Install workflow dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnat gprbuild gnatprove gnatdoc || sudo apt-get install -y gnat gprbuild gnatdoc
           sudo apt-get install -y libaunit-dev || sudo apt-get install -y libaunit22-dev || sudo apt-get install -y libaunit24-dev
 
       - name: Build library package
@@ -48,14 +49,6 @@ jobs:
         working-directory: i18n
         run: alr exec -- gprbuild -P examples/examples.gpr
 
-      - name: Build release checker
-        working-directory: i18n/check_i18n
-        run: alr build
-
-      - name: Run public example output checks
-        working-directory: i18n/check_i18n
-        run: ./bin/check_i18n --examples-only
-
       - name: Build render benchmarks
         working-directory: i18n
         run: alr exec -- gprbuild -P benchmarks/benchmarks.gpr
@@ -67,6 +60,14 @@ jobs:
       - name: Generate GNATdoc
         working-directory: i18n
         run: alr exec -- gnatdoc -P i18n.gpr
+
+      - name: Build release checker
+        working-directory: i18n/check_i18n
+        run: alr build
+
+      - name: Run public example output checks
+        working-directory: i18n/check_i18n
+        run: ./bin/check_i18n --examples-only
 
       - name: Run project_tools release checker
         working-directory: i18n/check_i18n

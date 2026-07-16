@@ -3320,6 +3320,17 @@ package body I18N.Runtime.Tests.Features is
                 UTF8 ([16#1F469#, 16#200D#, 16#1F4BB#]),
               "public locale grapheme access keeps simple ZWJ sequences");
       Assert (I18N.Locales.Grapheme_Count
+                (UTF8 ([16#1F468#, 16#200D#, 16#1F469#, 16#200D#,
+                        16#1F467#, 16#200D#, 16#1F466#]) & "!", "en") = 2,
+              "public locale grapheme count keeps multi-code-point ZWJ sequences");
+      Assert (I18N.Locales.Grapheme_At
+                (UTF8 ([16#1F468#, 16#200D#, 16#1F469#, 16#200D#,
+                        16#1F467#, 16#200D#, 16#1F466#]) & "!", 1,
+                 "en") =
+                UTF8 ([16#1F468#, 16#200D#, 16#1F469#, 16#200D#,
+                       16#1F467#, 16#200D#, 16#1F466#]),
+              "public locale grapheme access preserves multi-code-point ZWJ sequences");
+      Assert (I18N.Locales.Grapheme_Count
                 (UTF8 ([16#1100#, 16#1161#, 16#11A8#]) & "!", "ko") = 2,
               "public locale grapheme count keeps bounded Hangul Jamo clusters");
       Assert (I18N.Locales.Grapheme_At
@@ -5051,9 +5062,9 @@ package body I18N.Runtime.Tests.Features is
       Assert_Render
         ("hi-IN-x-test", "2",
          "hi 12,34,567.89 " & U (16#20B9#)
-         & "12,34,567.80 " & U (16#92B#) & U (16#93C#)
+         & "12,34,567.80 29. " & U (16#92B#) & U (16#93C#)
          & U (16#930#) & U (16#935#) & U (16#930#)
-         & U (16#940#) & " 29, 2024 09:05 other");
+         & U (16#940#) & " 2024 09:05 other");
       Assert_Render
         ("ar-EG", "3",
          "ar " & Arabic_Number & " " & Arabic_Currency & " "
@@ -6201,22 +6212,22 @@ package body I18N.Runtime.Tests.Features is
                 U (16#9F3#) & "12.30",
               "Bangladeshi taka narrow symbol uses built-in metadata");
       Assert (Rendered (Runtime, "bn", "bdt", Args) =
-                "BDT " & U (16#9E7#) & U (16#9E8#)
-                & "." & U (16#9E9#) & U (16#9E6#),
+                U (16#9E7#) & U (16#9E8#)
+                & "." & U (16#9E9#) & U (16#9E6#) & " BDT",
               "Bengali currency uses Bengali digits and generated CLDR symbol");
       Assert (Rendered (Runtime, "bn", "bdt_iso", Args) =
-                "BDT " & U (16#9E7#) & U (16#9E8#)
-                & "." & U (16#9E9#) & U (16#9E6#),
-              "Bengali currency ISO code renders before the amount");
+                U (16#9E7#) & U (16#9E8#)
+                & "." & U (16#9E9#) & U (16#9E6#) & " BDT",
+              "Bengali currency ISO code follows the locale currency pattern");
       Assert (Rendered (Runtime, "en-u-nu-beng", "bdt", Args) =
                 "BDT " & U (16#9E7#) & U (16#9E8#)
                 & "." & U (16#9E9#) & U (16#9E6#),
               "currency honors explicit Bengali numbering-system digits");
       I18N.Arguments.Set (Args, "amount", "1234.5");
       Assert (Rendered (Runtime, "bn", "bdt", Args) =
-                "BDT " & U (16#9E7#) & "," & U (16#9E8#)
+                U (16#9E7#) & "," & U (16#9E8#)
                 & U (16#9E9#) & U (16#9EA#) & "." & U (16#9EB#)
-                & U (16#9E6#),
+                & U (16#9E6#) & " BDT",
               "Bengali currency uses Indian grouping");
       I18N.Arguments.Set (Args, "amount", "12.3");
       Assert (Rendered (Runtime, "en", "khr", Args) = "KHR 12.30",
@@ -10062,13 +10073,13 @@ package body I18N.Runtime.Tests.Features is
                 Rendered (Runtime, "ko", "full", Args),
               "Korean full skeleton style alias keeps year-month-day order");
       Assert (Rendered (Runtime, "ko", "short_time", Args) =
-                "AM 9:05",
+                U (16#C624#) & U (16#C804#) & " 9:05",
               "Korean short time style uses localized 12-hour output");
       Assert (Rendered (Runtime, "ko", "short_time_alias", Args) =
                 Rendered (Runtime, "ko", "short_time", Args),
               "Korean short skeleton style alias keeps 12-hour output");
       Assert (Rendered (Runtime, "ko", "long_time", Args) =
-                "AM 9:05:07",
+                U (16#C624#) & U (16#C804#) & " 9:05:07",
               "Korean long time style uses localized 12-hour output");
       Assert (Rendered (Runtime, "ko", "long_time_alias", Args) =
                 Rendered (Runtime, "ko", "long_time", Args),
@@ -19831,9 +19842,9 @@ package body I18N.Runtime.Tests.Features is
               "Arabic two branch nests localized number formatting");
       I18N.Arguments.Set (Args, "count", "3");
       Assert (Rendered (Runtime, "ar", "summary", Args) =
-                "few $" & U (16#661#) & U (16#66C#) & U (16#662#)
+                "few " & U (16#661#) & U (16#66C#) & U (16#662#)
                 & U (16#663#) & U (16#664#) & U (16#66B#)
-                & U (16#665#) & U (16#660#),
+                & U (16#665#) & U (16#660#) & " $",
               "Arabic few branch nests localized currency formatting");
 
       I18N.Runtime.Render_Into
@@ -19841,9 +19852,9 @@ package body I18N.Runtime.Tests.Features is
       Assert (Status = I18N.Result.Success,
               "bounded localized corpus render succeeds");
       Assert (Target (1 .. Last) =
-                "few $" & U (16#661#) & U (16#66C#) & U (16#662#)
+                "few " & U (16#661#) & U (16#66C#) & U (16#662#)
                 & U (16#663#) & U (16#664#) & U (16#66B#)
-                & U (16#665#) & U (16#660#),
+                & U (16#665#) & U (16#660#) & " $",
               "bounded localized corpus render matches materialized output");
    end Test_Localized_Select_Plural_Corpus;
 

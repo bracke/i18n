@@ -1,6 +1,4 @@
 with Ada.Containers.Indefinite_Hashed_Maps;
-with Ada.Exceptions;
-with Ada.Strings.Fixed;
 with Ada.Strings.Hash;
 
 with I18N.AST;
@@ -30,23 +28,6 @@ package body I18N.Cache is
    Messages : Message_Maps.Map;
    Compiles : Natural := 0;
 
-   function Parse_Failure_Kind
-     (Occurrence : Ada.Exceptions.Exception_Occurrence)
-      return I18N.Errors.Error_Kind
-   is
-      Message : constant String := Ada.Exceptions.Exception_Message (Occurrence);
-      use Ada.Strings.Fixed;
-   begin
-      if Index (Message, "Unmatched") /= 0
-        or else Index (Message, "Unclosed") /= 0
-        or else Index (Message, "brace") /= 0
-      then
-         return I18N.Errors.Unbalanced_Braces;
-      end if;
-
-      return I18N.Errors.Parse_Error;
-   end Parse_Failure_Kind;
-
    function Get_Or_Compile
      (Key     : String;
       Message : out I18N.Compiled.Compiled_Message)
@@ -64,9 +45,12 @@ package body I18N.Cache is
       begin
          Root := I18N.Parser.Parse (Key);
       exception
-         when Failure : I18N.Parser.Parse_Error =>
+         when I18N.Parser.Unbalanced_Braces =>
             I18N.AST.Free (Root);
-            return I18N.Errors.Failure (Parse_Failure_Kind (Failure));
+            return I18N.Errors.Failure (I18N.Errors.Unbalanced_Braces);
+         when I18N.Parser.Parse_Error =>
+            I18N.AST.Free (Root);
+            return I18N.Errors.Failure (I18N.Errors.Parse_Error);
          when others =>
             I18N.AST.Free (Root);
             return I18N.Errors.Failure (I18N.Errors.Parse_Error);

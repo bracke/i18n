@@ -12932,6 +12932,12 @@ package body I18N.Locales is
             Pos := Last + 1;
             Last := Pos + UTF8_Unit_Length (Text, Pos) - 1;
             Pos := Last + 1;
+            while Pos <= Text'Last
+              and then Is_Bounded_Grapheme_Extend (Text, Pos)
+            loop
+               Last := Pos + Grapheme_Extend_Length (Text, Pos) - 1;
+               Pos := Last + 1;
+            end loop;
          else
             exit;
          end if;

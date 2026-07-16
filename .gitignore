@@ -28,3 +28,13 @@ check_i18n/config/
 # Alire regenerates config/ on every build, including builds of crates that pin
 # i18n as a path dependency — tracking it means their builds dirty this repo.
 /config/
+
+# Vendored upstream CLDR-JSON and large generated data/artifacts: kept local,
+# regenerated from upstream, not committed (they bloat the repo by ~1GB+).
+/cldr/upstream/
+/src/i18n-cldr_data.adb
+/cldr/data/cldr_subset.txt
+/cldr/import/normalized_cldr.txt
+/cldr/raw/cldr_records.txt
+/conformance/bin/
+/conformance/obj/

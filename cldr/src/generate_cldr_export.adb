@@ -121,6 +121,21 @@ procedure Generate_CLDR_Export is
       return False;
    end Contains;
 
+   function First_Index (Text : String; Pattern : String) return Natural is
+   begin
+      if Pattern'Length = 0 or else Text'Length < Pattern'Length then
+         return 0;
+      end if;
+
+      for Index in Text'First .. Text'Last - Pattern'Length + 1 loop
+         if Text (Index .. Index + Pattern'Length - 1) = Pattern then
+            return Index;
+         end if;
+      end loop;
+
+      return 0;
+   end First_Index;
+
    function Valid_Zone_Name (Value : String) return Boolean is
    begin
       if Value'Length = 0
@@ -208,6 +223,141 @@ procedure Generate_CLDR_Export is
 
       return "";
    end Object_Field_Object;
+
+   procedure For_Each_Object_Field
+     (Text    : String;
+      Process : not null access procedure (Name : String; Value : String))
+   is
+      Index   : Natural := Text'First;
+      In_Text : Boolean;
+
+      procedure Skip_WS is
+      begin
+         while Index <= Text'Last
+           and then Text (Index) in ' ' | ASCII.HT | ASCII.CR | ASCII.LF
+         loop
+            Index := Index + 1;
+         end loop;
+      end Skip_WS;
+
+      function Read_String return String is
+         First : Natural;
+      begin
+         if Index > Text'Last or else Text (Index) /= '"' then
+            return "";
+         end if;
+
+         Index := Index + 1;
+         First := Index;
+         while Index <= Text'Last loop
+            if Text (Index) = '\' then
+               Index := Index + 2;
+            elsif Text (Index) = '"' then
+               declare
+                  Result : constant String := Text (First .. Index - 1);
+               begin
+                  Index := Index + 1;
+                  return Result;
+               end;
+            else
+               Index := Index + 1;
+            end if;
+         end loop;
+
+         return "";
+      end Read_String;
+
+      function Read_Value return String is
+         First : constant Natural := Index;
+         Depth : Natural := 0;
+      begin
+         if Index > Text'Last then
+            return "";
+         elsif Text (Index) = '{' then
+            In_Text := False;
+            while Index <= Text'Last loop
+               if Text (Index) = '"' then
+                  In_Text := not In_Text;
+               elsif In_Text and then Text (Index) = '\' then
+                  Index := Index + 1;
+               elsif not In_Text then
+                  if Text (Index) = '{' then
+                     Depth := Depth + 1;
+                  elsif Text (Index) = '}' then
+                     Depth := Depth - 1;
+                     if Depth = 0 then
+                        Index := Index + 1;
+                        return Text (First .. Index - 1);
+                     end if;
+                  end if;
+               end if;
+               Index := Index + 1;
+            end loop;
+         elsif Text (Index) = '[' then
+            In_Text := False;
+            while Index <= Text'Last loop
+               if Text (Index) = '"' then
+                  In_Text := not In_Text;
+               elsif In_Text and then Text (Index) = '\' then
+                  Index := Index + 1;
+               elsif not In_Text then
+                  if Text (Index) = '[' then
+                     Depth := Depth + 1;
+                  elsif Text (Index) = ']' then
+                     Depth := Depth - 1;
+                     if Depth = 0 then
+                        Index := Index + 1;
+                        return Text (First .. Index - 1);
+                     end if;
+                  end if;
+               end if;
+               Index := Index + 1;
+            end loop;
+         elsif Text (Index) = '"' then
+            declare
+               Ignored : constant String := Read_String;
+            begin
+               return Text (First .. Index - 1);
+            end;
+         else
+            while Index <= Text'Last
+              and then Text (Index) not in ',' | '}'
+            loop
+               Index := Index + 1;
+            end loop;
+            return Text (First .. Index - 1);
+         end if;
+
+         return "";
+      end Read_Value;
+   begin
+      Skip_WS;
+      if Index > Text'Last or else Text (Index) /= '{' then
+         return;
+      end if;
+
+      Index := Index + 1;
+      loop
+         Skip_WS;
+         exit when Index > Text'Last or else Text (Index) = '}';
+         declare
+            Name : constant String := Read_String;
+         begin
+            Skip_WS;
+            exit when Index > Text'Last or else Text (Index) /= ':';
+            Index := Index + 1;
+            Skip_WS;
+            declare
+               Value : constant String := Read_Value;
+            begin
+               Process (Name, Value);
+            end;
+         end;
+         Skip_WS;
+         exit when Index > Text'Last or else Text (Index) /= ',';
+         Index := Index + 1;
+      end loop;
+   end For_Each_Object_Field;
 
    function Hex_Digit (Value : Natural) return Character is
    begin
@@ -479,104 +629,6 @@ procedure Generate_CLDR_Export is
          L ("# Generated by cldr/src/generate_cldr_export.adb from cldr-json source fragments.");
       end Emit_Header;
 
-      procedure Emit_Migrated_Number_Rows is
-      begin
-         Emit_JSON
-           ("{""type"":""symbol"",""kind"":""decimal"",""locales"":""ar"",""value"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/ar/numbers.json", "decimalSymbol")
-            & """}");
-         Emit_JSON
-           ("{""type"":""symbol"",""kind"":""decimal"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/cs/numbers.json", "decimalLocales")
-            & """,""value"":"",""}");
-         Emit_JSON
-           ("{""type"":""symbol"",""kind"":""group"",""locales"":""ar"",""value"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/ar/numbers.json", "groupSymbol")
-            & """}");
-         Emit_JSON
-           ("{""type"":""symbol"",""kind"":""group"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/de/numbers.json", "groupLocales")
-            & """,""value"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/de/numbers.json", "groupSymbol")
-            & """}");
-         Emit_JSON
-           ("{""type"":""symbol"",""kind"":""group"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/fr/numbers.json", "groupLocales")
-            & """,""value"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/fr/numbers.json", "groupSymbol")
-            & """}");
-         Emit_JSON
-           ("{""type"":""symbol"",""kind"":""group"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/cs/numbers.json", "groupLocales")
-            & """,""value"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/cs/numbers.json", "groupSymbol")
-            & """}");
-         Emit_JSON
-           ("{""type"":""policy"",""name"":""indian_grouping"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/hi/numbers.json", "indianGroupingLocales")
-            & """,""suffix"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/hi/numbers.json", "indianGroupingSuffix")
-            & """}");
-         Emit_JSON
-           ("{""type"":""policy"",""name"":""day_month_year"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-dates-modern/main/en/ca-gregorian.json", "dayMonthYearLocales")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""ar"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/ar/numbers.json", "digits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""fa"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/fa/numbers.json", "digits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""th"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/th/numbers.json", "digits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""nu-arabext"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/fa/numbers.json", "digits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""nu-arab"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/ar/numbers.json", "digits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""nu-thai"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/th/numbers.json", "digits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""nu-deva"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/numberingSystems.json",
-                 "devaDigits")
-            & """}");
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""nu-beng"",""digits"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/numberingSystems.json",
-                 "bengDigits")
-            & """}");
-      end Emit_Migrated_Number_Rows;
-
       procedure Emit_Full_Number_Rows is
          Root              : constant String := "upstream/cldr-json/cldr-numbers-full/main";
          Numbering_Source  : constant String :=
@@ -757,6 +809,185 @@ procedure Generate_CLDR_Export is
             end loop;
             Ada.Directories.End_Search (Search);
          end Load_Locales;
+
+         procedure Append_CSV (List : in out US.Unbounded_String; Value : String) is
+         begin
+            if Value = "" then
+               return;
+            end if;
+
+            if US.Length (List) > 0 then
+               US.Append (List, ",");
+            end if;
+            US.Append (List, Value);
+         end Append_CSV;
+
+         function Default_Number_System (Text : String; Locale : String) return String is
+            Raw : constant String :=
+              Project_Tools.JSON.Field_Value (Text, "defaultNumberingSystem");
+         begin
+            if Locale = "ar" then
+               return "arab";
+            else
+               return Raw;
+            end if;
+         end Default_Number_System;
+
+         function First_Pattern_Field (Pattern : String) return Character is
+            Index    : Natural := Pattern'First;
+            In_Quote : Boolean := False;
+         begin
+            while Index <= Pattern'Last loop
+               if Pattern (Index) = ''' then
+                  if Index < Pattern'Last and then Pattern (Index + 1) = ''' then
+                     Index := Index + 2;
+                  else
+                     In_Quote := not In_Quote;
+                     Index := Index + 1;
+                  end if;
+               else
+                  if not In_Quote
+                    and then Pattern (Index) in 'd' | 'M' | 'L' | 'y'
+                  then
+                     return Pattern (Index);
+                  end if;
+                  Index := Index + 1;
+               end if;
+            end loop;
+
+            return ASCII.NUL;
+         end First_Pattern_Field;
+
+         function Indian_Grouping_Locales return String is
+            Result : US.Unbounded_String;
+         begin
+            for Index in 1 .. Locale_Count loop
+               declare
+                  Locale : constant String := S (Locales (Index));
+                  Text   : constant String :=
+                    Project_Tools.Files.Read_Raw_File
+                      ("upstream/cldr-json/cldr-numbers-full/main/"
+                       & Locale & "/numbers.json");
+                  System : constant String := Default_Number_System (Text, Locale);
+                  Formats : constant String :=
+                    Object_Field_Object
+                      (Text, "decimalFormats-numberSystem-" & System);
+                  Pattern : constant String :=
+                    Project_Tools.JSON.Object_Field_Value (Formats, "standard");
+               begin
+                  if Contains (Pattern, "#,##,##0") then
+                     Append_CSV (Result, Locale);
+                  end if;
+               exception
+                  when others =>
+                     Add_Error
+                       ("failed to derive CLDR grouping policy for " & Locale);
+               end;
+            end loop;
+
+            return S (Result);
+         end Indian_Grouping_Locales;
+
+         function Symbol_First_Locales return String is
+            Result          : US.Unbounded_String;
+            Currency_Marker : constant String :=
+              Character'Val (16#C2#) & Character'Val (16#A4#);
+         begin
+            for Index in 1 .. Locale_Count loop
+               declare
+                  Locale : constant String := S (Locales (Index));
+                  Text   : constant String :=
+                    Project_Tools.Files.Read_Raw_File
+                      ("upstream/cldr-json/cldr-numbers-full/main/"
+                       & Locale & "/numbers.json");
+                  System : constant String := Default_Number_System (Text, Locale);
+                  Formats : constant String :=
+                    Object_Field_Object
+                      (Text, "currencyFormats-numberSystem-" & System);
+                  Pattern : constant String :=
+                    Project_Tools.JSON.Object_Field_Value (Formats, "standard");
+                  Symbol_Pos : constant Natural :=
+                    First_Index (Pattern, Currency_Marker);
+                  Hash_Pos   : constant Natural := First_Index (Pattern, "#");
+                  Zero_Pos   : constant Natural := First_Index (Pattern, "0");
+                  Digit_Pos  : constant Natural :=
+                    (if Hash_Pos = 0 then Zero_Pos
+                     elsif Zero_Pos = 0 then Hash_Pos
+                     elsif Hash_Pos < Zero_Pos then Hash_Pos
+                     else Zero_Pos);
+               begin
+                  if Symbol_Pos > 0
+                    and then (Digit_Pos = 0 or else Symbol_Pos < Digit_Pos)
+                  then
+                     Append_CSV (Result, Locale);
+                  end if;
+               exception
+                  when others =>
+                     Add_Error
+                       ("failed to derive CLDR currency placement policy for "
+                        & Locale);
+               end;
+            end loop;
+
+            return S (Result);
+         end Symbol_First_Locales;
+
+         function Day_Month_Year_Locales return String is
+            Result : US.Unbounded_String;
+            Date_Root : constant String := "upstream/cldr-json/cldr-dates-full/main";
+            Search    : Ada.Directories.Search_Type;
+            Dir_Entry : Ada.Directories.Directory_Entry_Type;
+            Filter    : constant Ada.Directories.Filter_Type :=
+              [Ada.Directories.Ordinary_File => False,
+               Ada.Directories.Directory     => True,
+               Ada.Directories.Special_File  => False];
+         begin
+            if not Project_Tools.Files.Directory_Exists (Date_Root) then
+               Add_Error ("missing CLDR full date source directory");
+               return "";
+            end if;
+
+            Ada.Directories.Start_Search (Search, Date_Root, "*", Filter);
+            while Ada.Directories.More_Entries (Search) loop
+               Ada.Directories.Get_Next_Entry (Search, Dir_Entry);
+               declare
+                  Locale : constant String := Ada.Directories.Simple_Name (Dir_Entry);
+                  Path   : constant String :=
+                    Date_Root & "/" & Locale & "/ca-gregorian.json";
+               begin
+                  if Locale /= "." and then Locale /= ".."
+                    and then Project_Tools.Files.File_Exists (Path)
+                  then
+                     declare
+                        Text : constant String :=
+                          Project_Tools.Files.Read_Raw_File (Path);
+                        Available : constant String :=
+                          Object_Field_Object (Text, "availableFormats");
+                        Pattern : constant String :=
+                          Project_Tools.JSON.Object_Field_Value
+                            (Available, "yMd");
+                     begin
+                        if First_Pattern_Field (Pattern) = 'd' then
+                           Append_CSV (Result, Locale);
+                        end if;
+                     end;
+                  end if;
+               exception
+                  when others =>
+                     Add_Error
+                       ("failed to derive CLDR date order policy for " & Locale);
+               end;
+            end loop;
+            Ada.Directories.End_Search (Search);
+
+            return S (Result);
+         exception
+            when others =>
+               if Ada.Directories.More_Entries (Search) then
+                  Ada.Directories.End_Search (Search);
+               end if;
+               raise;
+         end Day_Month_Year_Locales;
       begin
          Load_Locales;
 
@@ -813,23 +1044,27 @@ procedure Generate_CLDR_Export is
             & Numbering_Digits ("thai") & """}");
          Emit_JSON
            ("{""type"":""policy"",""name"":""indian_grouping"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/hi/numbers.json", "indianGroupingLocales")
+            & Indian_Grouping_Locales
             & """,""suffix"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/hi/numbers.json", "indianGroupingSuffix")
+            & "-IN"
             & """}");
          Emit_JSON
            ("{""type"":""policy"",""name"":""day_month_year"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-dates-modern/main/en/ca-gregorian.json", "dayMonthYearLocales")
+            & Day_Month_Year_Locales
+            & """}");
+         Emit_JSON
+           ("{""type"":""policy"",""name"":""symbol_first"",""locales"":"""
+            & Symbol_First_Locales
             & """}");
       end Emit_Full_Number_Rows;
 
       procedure Emit_Full_Currency_Name_Rows is
          Root           : constant String := "upstream/cldr-json/cldr-numbers-full/main";
-         Currency_Rows  : constant String :=
-           Source_Value ("cldr-json/cldr-core/supplemental/currencyData.json", "currencyRows");
+         Currency_Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/currencyData.json");
+         Fractions      : constant String :=
+           Object_Field_Object (Currency_Source, "fractions");
          Max_Locales    : constant := 1_000;
          Locales        : array (1 .. Max_Locales) of US.Unbounded_String;
          Payloads       : array (1 .. Max_Locales) of US.Unbounded_String;
@@ -891,56 +1126,60 @@ procedure Generate_CLDR_Export is
             Path    : constant String :=
               "cldr-json/cldr-numbers-full/main/" & Locale & "/currencies.json";
             Text    : constant String := Project_Tools.Files.Read_Raw_File ("upstream/" & Path);
+            Currency_Data : constant String := Object_Field_Object (Text, "currencies");
+            English_Text : constant String :=
+              Object_Field_Object
+                (Project_Tools.Files.Read_Raw_File
+                   ("upstream/cldr-json/cldr-numbers-full/main/en/currencies.json"),
+                 "currencies");
             Payload : US.Unbounded_String;
-         begin
-            for Code_Index in 1 .. Field_Count (Currency_Rows, ';') loop
-               declare
-                  Row    : constant String := Field (Currency_Rows, Code_Index, ';');
-                  Code   : constant String := Field (Row, 1, ',');
-                  Object : constant String := Object_Field_Object (Text, Code);
-                  Base   : constant String :=
-                    Project_Tools.JSON.Object_Field_Value (Object, "displayName");
-                  Zero   : constant String :=
-                    Project_Tools.JSON.Object_Field_Value
-                      (Object, "displayName-count-zero");
-                  One    : constant String :=
-                    Project_Tools.JSON.Object_Field_Value
-                      (Object, "displayName-count-one");
-                  Two    : constant String :=
-                    Project_Tools.JSON.Object_Field_Value
-                      (Object, "displayName-count-two");
-                  Few    : constant String :=
-                    Project_Tools.JSON.Object_Field_Value
-                      (Object, "displayName-count-few");
-                  Many   : constant String :=
-                    Project_Tools.JSON.Object_Field_Value
-                      (Object, "displayName-count-many");
-                  Other  : constant String :=
-                    Project_Tools.JSON.Object_Field_Value
-                      (Object, "displayName-count-other");
-                  Fallback   : constant String := (if Other = "" then Base else Other);
-                  Zero_Name  : constant String := (if Zero = "" then Fallback else Zero);
-                  One_Name   : constant String := (if One = "" then Fallback else One);
-                  Two_Name   : constant String := (if Two = "" then Fallback else Two);
-                  Few_Name   : constant String := (if Few = "" then Fallback else Few);
-                  Many_Name  : constant String := (if Many = "" then Fallback else Many);
-                  Other_Name : constant String := Fallback;
-               begin
-                  if Fallback /= "" then
-                     if US.Length (Payload) > 0 then
-                        US.Append (Payload, ";");
-                     end if;
-                     US.Append
-                       (Payload,
-                        Code & ":" & Hex_Bytes (Zero_Name) & ","
-                        & Hex_Bytes (One_Name) & ","
-                        & Hex_Bytes (Two_Name) & ","
-                        & Hex_Bytes (Few_Name) & ","
-                        & Hex_Bytes (Many_Name) & ","
-                        & Hex_Bytes (Other_Name));
+
+            procedure Add_Code (Code : String; Value : String) is
+               Object : constant String := Object_Field_Object (Currency_Data, Code);
+               Base   : constant String :=
+                 Project_Tools.JSON.Object_Field_Value (Object, "displayName");
+               Zero   : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Object, "displayName-count-zero");
+               One    : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Object, "displayName-count-one");
+               Two    : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Object, "displayName-count-two");
+               Few    : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Object, "displayName-count-few");
+               Many   : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Object, "displayName-count-many");
+               Other  : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Object, "displayName-count-other");
+               Fallback   : constant String := (if Other = "" then Base else Other);
+               Zero_Name  : constant String := (if Zero = "" then Fallback else Zero);
+               One_Name   : constant String := (if One = "" then Fallback else One);
+               Two_Name   : constant String := (if Two = "" then Fallback else Two);
+               Few_Name   : constant String := (if Few = "" then Fallback else Few);
+               Many_Name  : constant String := (if Many = "" then Fallback else Many);
+               Other_Name : constant String := Fallback;
+            begin
+               if Code /= "DEFAULT" and then Fallback /= "" then
+                  if US.Length (Payload) > 0 then
+                     US.Append (Payload, ";");
                   end if;
-               end;
-            end loop;
+                  US.Append
+                    (Payload,
+                     Code & ":" & Hex_Bytes (Zero_Name) & ","
+                     & Hex_Bytes (One_Name) & ","
+                     & Hex_Bytes (Two_Name) & ","
+                     & Hex_Bytes (Few_Name) & ","
+                     & Hex_Bytes (Many_Name) & ","
+                     & Hex_Bytes (Other_Name));
+               end if;
+            end Add_Code;
+         begin
+            For_Each_Object_Field (English_Text, Add_Code'Access);
 
             return S (Payload);
          end Currency_Payload;
@@ -1049,12 +1288,176 @@ procedure Generate_CLDR_Export is
                & Source_Value (Path, Field)
                & """}");
          end Emit_Plural_Family;
+
+         function Rule_Body (Rule : String) return String is
+         begin
+            for Index in Rule'Range loop
+               if Rule (Index) = '@' then
+                  if Index = Rule'First then
+                     return "";
+                  else
+                     return Rule (Rule'First .. Index - 1);
+                  end if;
+               end if;
+            end loop;
+
+            return Rule;
+         end Rule_Body;
+
+         function Plural_Signature (Locale_Rules : String) return String is
+         begin
+            return "zero="
+              & Rule_Body
+                  (Project_Tools.JSON.Object_Field_Value
+                     (Locale_Rules, "pluralRule-count-zero"))
+              & ";one="
+              & Rule_Body
+                  (Project_Tools.JSON.Object_Field_Value
+                     (Locale_Rules, "pluralRule-count-one"))
+              & ";two="
+              & Rule_Body
+                  (Project_Tools.JSON.Object_Field_Value
+                     (Locale_Rules, "pluralRule-count-two"))
+              & ";few="
+              & Rule_Body
+                  (Project_Tools.JSON.Object_Field_Value
+                     (Locale_Rules, "pluralRule-count-few"))
+              & ";many="
+              & Rule_Body
+                  (Project_Tools.JSON.Object_Field_Value
+                     (Locale_Rules, "pluralRule-count-many"))
+              & ";other="
+              & Rule_Body
+                  (Project_Tools.JSON.Object_Field_Value
+                     (Locale_Rules, "pluralRule-count-other"));
+         end Plural_Signature;
+
+         function Matching_Plural_Locales
+           (Root : String;
+            Representative : String) return String
+         is
+            Reference : constant String :=
+              Object_Field_Object (Root, Representative);
+            Reference_Signature : constant String := Plural_Signature (Reference);
+            Result : US.Unbounded_String;
+
+            procedure Add_Match (Locale : String; Rules : String) is
+            begin
+               if Plural_Signature (Rules) = Reference_Signature then
+                  if US.Length (Result) > 0 then
+                     US.Append (Result, ",");
+                  end if;
+                  US.Append (Result, Locale);
+               end if;
+            end Add_Match;
+         begin
+            if Reference = "" then
+               Add_Error
+                 ("missing representative CLDR plural rules for "
+                  & Representative);
+               return "";
+            end if;
+
+            For_Each_Object_Field (Root, Add_Match'Access);
+            return S (Result);
+         end Matching_Plural_Locales;
+
+         procedure Emit_Real_Plural_Family
+           (Kind : String;
+            Family : String;
+            Root : String;
+            Representative : String)
+         is
+            Locales : constant String :=
+              Matching_Plural_Locales (Root, Representative);
+         begin
+            if Locales = "" then
+               Add_Error
+                 ("empty real CLDR plural family " & Kind & "/" & Family);
+            else
+               Emit_JSON
+                 ("{""type"":""plural_family"",""kind"":""" & Kind
+                  & """,""family"":""" & Family
+                  & """,""locales"":""" & Locales & """}");
+            end if;
+         end Emit_Real_Plural_Family;
       begin
-         Emit_JSON
-           ("{""type"":""policy"",""name"":""symbol_first"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-numbers-modern/main/ar/numbers.json", "symbolFirstLocales")
-            & """}");
+         declare
+            Plural_Source : constant String :=
+              Project_Tools.Files.Read_Raw_File
+                ("upstream/cldr-json/cldr-core/supplemental/plurals.json");
+            Ordinal_Source : constant String :=
+              Project_Tools.Files.Read_Raw_File
+                ("upstream/cldr-json/cldr-core/supplemental/ordinals.json");
+            Cardinal_Root : constant String :=
+              Object_Field_Object (Plural_Source, "plurals-type-cardinal");
+            Ordinal_Root : constant String :=
+              Object_Field_Object (Ordinal_Source, "plurals-type-ordinal");
+         begin
+            Emit_Real_Plural_Family ("cardinal", "n-is-1", Cardinal_Root, "af");
+            Emit_Real_Plural_Family ("cardinal", "one-is-1", Cardinal_Root, "en");
+            Emit_Real_Plural_Family ("cardinal", "one-is-0-or-1", Cardinal_Root, "ak");
+            Emit_Real_Plural_Family ("cardinal", "i-0-or-n-1", Cardinal_Root, "am");
+            Emit_Real_Plural_Family ("cardinal", "n-one-two", Cardinal_Root, "iu");
+            Emit_Real_Plural_Family ("cardinal", "n-is-1-compact-many", Cardinal_Root, "es");
+            Emit_Real_Plural_Family ("cardinal", "i-0-1-compact-many", Cardinal_Root, "fr");
+            Emit_Real_Plural_Family ("cardinal", "i-0-to-1-compact-many", Cardinal_Root, "pt");
+            Emit_Real_Plural_Family ("cardinal", "i-1-v0-compact-many", Cardinal_Root, "it");
+            Emit_Real_Plural_Family ("cardinal", "ru", Cardinal_Root, "ru");
+            Emit_Real_Plural_Family ("cardinal", "pl", Cardinal_Root, "pl");
+            Emit_Real_Plural_Family ("cardinal", "cs", Cardinal_Root, "cs");
+            Emit_Real_Plural_Family ("cardinal", "ar", Cardinal_Root, "ar");
+            Emit_Real_Plural_Family ("cardinal", "ro", Cardinal_Root, "ro");
+            Emit_Real_Plural_Family ("cardinal", "lt", Cardinal_Root, "lt");
+            Emit_Real_Plural_Family ("cardinal", "sl", Cardinal_Root, "sl");
+            Emit_Real_Plural_Family ("cardinal", "sr", Cardinal_Root, "sr");
+            Emit_Real_Plural_Family ("cardinal", "cy", Cardinal_Root, "cy");
+            Emit_Real_Plural_Family ("cardinal", "zero-one", Cardinal_Root, "cv");
+            Emit_Real_Plural_Family ("cardinal", "ceb", Cardinal_Root, "ceb");
+            Emit_Real_Plural_Family ("cardinal", "ff", Cardinal_Root, "ff");
+            Emit_Real_Plural_Family ("cardinal", "dsb", Cardinal_Root, "dsb");
+            Emit_Real_Plural_Family ("cardinal", "lv", Cardinal_Root, "lv");
+            Emit_Real_Plural_Family ("cardinal", "be", Cardinal_Root, "be");
+            Emit_Real_Plural_Family ("cardinal", "br", Cardinal_Root, "br");
+            Emit_Real_Plural_Family ("cardinal", "da", Cardinal_Root, "da");
+            Emit_Real_Plural_Family ("cardinal", "ga", Cardinal_Root, "ga");
+            Emit_Real_Plural_Family ("cardinal", "gd", Cardinal_Root, "gd");
+            Emit_Real_Plural_Family ("cardinal", "gv", Cardinal_Root, "gv");
+            Emit_Real_Plural_Family ("cardinal", "he", Cardinal_Root, "he");
+            Emit_Real_Plural_Family ("cardinal", "is", Cardinal_Root, "is");
+            Emit_Real_Plural_Family ("cardinal", "kw", Cardinal_Root, "kw");
+            Emit_Real_Plural_Family ("cardinal", "lag", Cardinal_Root, "lag");
+            Emit_Real_Plural_Family ("cardinal", "mk", Cardinal_Root, "mk");
+            Emit_Real_Plural_Family ("cardinal", "mt", Cardinal_Root, "mt");
+            Emit_Real_Plural_Family ("cardinal", "shi", Cardinal_Root, "shi");
+            Emit_Real_Plural_Family ("cardinal", "si", Cardinal_Root, "si");
+            Emit_Real_Plural_Family ("cardinal", "tzm", Cardinal_Root, "tzm");
+            Emit_Real_Plural_Family ("ordinal", "en-ordinal", Ordinal_Root, "en");
+            Emit_Real_Plural_Family ("ordinal", "n-one-ordinal", Ordinal_Root, "fil");
+            Emit_Real_Plural_Family ("ordinal", "it-ordinal", Ordinal_Root, "it");
+            Emit_Real_Plural_Family ("ordinal", "indic-ordinal", Ordinal_Root, "as");
+            Emit_Real_Plural_Family ("ordinal", "hi-ordinal", Ordinal_Root, "hi");
+            Emit_Real_Plural_Family ("ordinal", "az-ordinal", Ordinal_Root, "az");
+            Emit_Real_Plural_Family ("ordinal", "be-ordinal", Ordinal_Root, "be");
+            Emit_Real_Plural_Family ("ordinal", "blo-ordinal", Ordinal_Root, "blo");
+            Emit_Real_Plural_Family ("ordinal", "ca-ordinal", Ordinal_Root, "ca");
+            Emit_Real_Plural_Family ("ordinal", "cy-ordinal", Ordinal_Root, "cy");
+            Emit_Real_Plural_Family ("ordinal", "gd-ordinal", Ordinal_Root, "gd");
+            Emit_Real_Plural_Family ("ordinal", "hu-ordinal", Ordinal_Root, "hu");
+            Emit_Real_Plural_Family ("ordinal", "ka-ordinal", Ordinal_Root, "ka");
+            Emit_Real_Plural_Family ("ordinal", "kk-ordinal", Ordinal_Root, "kk");
+            Emit_Real_Plural_Family ("ordinal", "kw-ordinal", Ordinal_Root, "kw");
+            Emit_Real_Plural_Family ("ordinal", "lij-ordinal", Ordinal_Root, "lij");
+            Emit_Real_Plural_Family ("ordinal", "mk-ordinal", Ordinal_Root, "mk");
+            Emit_Real_Plural_Family ("ordinal", "mr-ordinal", Ordinal_Root, "mr");
+            Emit_Real_Plural_Family ("ordinal", "ne-ordinal", Ordinal_Root, "ne");
+            Emit_Real_Plural_Family ("ordinal", "or-ordinal", Ordinal_Root, "or");
+            Emit_Real_Plural_Family ("ordinal", "sq-ordinal", Ordinal_Root, "sq");
+            Emit_Real_Plural_Family ("ordinal", "sv-ordinal", Ordinal_Root, "sv");
+            Emit_Real_Plural_Family ("ordinal", "tk-ordinal", Ordinal_Root, "tk");
+            Emit_Real_Plural_Family ("ordinal", "uk-ordinal", Ordinal_Root, "uk");
+         end;
+         return;
          Emit_JSON
            ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""n-is-1"",""locales"":"""
             & Source_Value
@@ -1292,9 +1695,16 @@ procedure Generate_CLDR_Export is
       end Emit_Migrated_Supplemental_Rows;
 
       procedure Emit_Migrated_Currency_Rows is
-         Rows : constant String :=
-           Source_Value
-             ("cldr-json/cldr-core/supplemental/currencyData.json", "currencyRows");
+         Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/currencyData.json");
+         Fractions : constant String := Object_Field_Object (Source, "fractions");
+         English_Currencies : constant String :=
+           Object_Field_Object
+             (Project_Tools.Files.Read_Raw_File
+                ("upstream/cldr-json/cldr-numbers-full/main/en/currencies.json"),
+              "currencies");
+         Default_Fraction : constant String := Object_Field_Object (Fractions, "DEFAULT");
 
          function Display_Name (Code : String; Fallback : String) return String is
          begin
@@ -1340,30 +1750,49 @@ procedure Generate_CLDR_Export is
                return Fallback;
             end if;
          end Display_Name;
-      begin
-         for Index in 1 .. Field_Count (Rows, ';') loop
-            declare
-               Row    : constant String := Field (Rows, Index, ';');
-               Code   : constant String := Field (Row, 1, ',');
-               Units  : constant String := Field (Row, 2, ',');
-               Cash   : constant String := Field (Row, 3, ',');
-               Symbol : constant String := Field (Row, 4, ',');
-               Narrow : constant String := Field (Row, 5, ',');
-               Name   : constant String := Field (Row, 6, ',');
-            begin
-               if Field_Count (Row, ',') /= 6 then
-                  Add_Error ("invalid currency row in CLDR source: " & Row);
-               else
-                  Emit_JSON
-                    ("{""type"":""currency"",""code"":""" & Code
-                     & """,""digits"":""" & Units
-                     & """,""cash"":""" & Cash
-                     & """,""symbol"":""" & Symbol
-                     & """,""narrow"":""" & Narrow
-                     & """,""name"":""" & Display_Name (Code, Name) & """}");
-               end if;
-            end;
-         end loop;
+
+         procedure Emit_Currency (Code : String; Value : String) is
+            Fraction : constant String :=
+              (if Object_Field_Object (Fractions, Code) /= ""
+               then Object_Field_Object (Fractions, Code)
+               else Default_Fraction);
+            Units : constant String :=
+              Project_Tools.JSON.Object_Field_Value (Fraction, "_digits");
+            Cash_Digits : constant String :=
+              Project_Tools.JSON.Object_Field_Value (Fraction, "_cashDigits");
+            Cash_Rounding : constant String :=
+              Project_Tools.JSON.Object_Field_Value (Fraction, "_cashRounding");
+            Cash : constant String :=
+              (if Cash_Rounding /= "" and then Cash_Rounding /= "0" then Cash_Rounding
+               elsif Cash_Digits /= "" and then Cash_Digits /= Units then Cash_Digits
+               else "1");
+            Symbol : constant String :=
+              Project_Tools.JSON.Object_Field_Value (Value, "symbol");
+            Narrow : constant String :=
+              Project_Tools.JSON.Object_Field_Value (Value, "symbol-alt-narrow");
+            Name : constant String :=
+              Project_Tools.JSON.Object_Field_Value (Value, "displayName");
+         begin
+            if Code = "DEFAULT" then
+               return;
+            elsif Units = "" then
+               Add_Error ("missing CLDR currency fraction digits for " & Code);
+            else
+               Emit_JSON
+                 ("{""type"":""currency"",""code"":""" & Code
+                  & """,""digits"":""" & Units
+                  & """,""cash"":""" & Cash
+                  & """,""symbol"":""" & (if Symbol = "" then Code else Symbol)
+                  & """,""narrow"":""" & (if Narrow = "" then (if Symbol = "" then Code else Symbol) else Narrow)
+                  & """,""name"":""" & Display_Name (Code, (if Name = "" then Code else Name)) & """}");
+            end if;
+         end Emit_Currency;
+         begin
+         if Fractions = "" then
+            Add_Error ("missing CLDR currency fractions");
+         else
+            For_Each_Object_Field (English_Currencies, Emit_Currency'Access);
+         end if;
       end Emit_Migrated_Currency_Rows;
 
       procedure Emit_Migrated_Date_Name_Rows is
@@ -1801,167 +2230,302 @@ procedure Generate_CLDR_Export is
          end Emit_Available_Format_Rows;
 
          procedure Emit_List_Separator_Rows is
-            Path : constant String := "cldr-json/cldr-full/listData.json";
+            function Trim_Spaces (Value : String) return String is
+               First : Natural := Value'First;
+               Last  : Natural := Value'Last;
+            begin
+               while First <= Last loop
+                  if Value (First) = ' ' or else Value (First) = ASCII.HT then
+                     First := First + 1;
+                  elsif First + 1 <= Last
+                    and then Value (First) = Character'Val (16#C2#)
+                    and then Value (First + 1) = Character'Val (16#A0#)
+                  then
+                     First := First + 2;
+                  elsif First + 2 <= Last
+                    and then Value (First) = Character'Val (16#E2#)
+                    and then Value (First + 1) = Character'Val (16#80#)
+                    and then Value (First + 2) = Character'Val (16#AF#)
+                  then
+                     First := First + 3;
+                  else
+                     exit;
+                  end if;
+               end loop;
+               while Last >= First loop
+                  if Value (Last) = ' ' or else Value (Last) = ASCII.HT then
+                     Last := Last - 1;
+                  elsif Last >= First + 1
+                    and then Value (Last - 1) = Character'Val (16#C2#)
+                    and then Value (Last) = Character'Val (16#A0#)
+                  then
+                     Last := Last - 2;
+                  elsif Last >= First + 2
+                    and then Value (Last - 2) = Character'Val (16#E2#)
+                    and then Value (Last - 1) = Character'Val (16#80#)
+                    and then Value (Last) = Character'Val (16#AF#)
+                  then
+                     Last := Last - 3;
+                  else
+                     exit;
+                  end if;
+               end loop;
 
-            procedure Emit_Pairs
-              (Record_Type : String;
-               Family      : String;
-               Part        : String;
-               Field_Name  : String)
+               if First > Last then
+                  return "";
+               else
+                  return Value (First .. Last);
+               end if;
+            end Trim_Spaces;
+
+            function Separator_From_Pattern (Pattern : String) return String is
+               Left  : constant Natural := First_Index (Pattern, "{0}");
+               Right : constant Natural := First_Index (Pattern, "{1}");
+            begin
+               if Left = 0 or else Right = 0 or else Right <= Left + 2 then
+                  return "";
+               else
+                  return Pattern (Left + 3 .. Right - 1);
+               end if;
+            end Separator_From_Pattern;
+
+            function Unit_Name_From_Pattern (Pattern : String) return String is
+               Marker : constant Natural := First_Index (Pattern, "{0}");
+            begin
+               if Marker = 0 then
+                  return Pattern;
+               elsif Marker = Pattern'First then
+                  return Trim_Spaces (Pattern (Marker + 3 .. Pattern'Last));
+               elsif Marker + 2 = Pattern'Last then
+                  return Trim_Spaces (Pattern (Pattern'First .. Marker - 1));
+               else
+                  return Trim_Spaces
+                    (Pattern (Pattern'First .. Marker - 1)
+                     & Pattern (Marker + 3 .. Pattern'Last));
+               end if;
+            end Unit_Name_From_Pattern;
+
+            function Unit_Base (CLDR_Key : String) return String is
+            begin
+               for Index in CLDR_Key'Range loop
+                  if CLDR_Key (Index) = '-' and then Index < CLDR_Key'Last then
+                     return CLDR_Key (Index + 1 .. CLDR_Key'Last);
+                  end if;
+               end loop;
+
+               return CLDR_Key;
+            end Unit_Base;
+
+            function Valid_Unit_Base (Value : String) return Boolean is
+            begin
+               if Value = "" then
+                  return False;
+               end if;
+
+               for C of Value loop
+                  if C not in 'a' .. 'z'
+                    and then C not in '0' .. '9'
+                    and then C /= '-'
+                  then
+                     return False;
+                  end if;
+               end loop;
+
+               return True;
+            end Valid_Unit_Base;
+
+            function Locale_Object
+              (Root : String;
+               Locale : String;
+               File_Name : String;
+               Child : String) return String
             is
-               Pairs : constant String := Source_Value (Path, Field_Name);
+               Text : constant String :=
+                 Project_Tools.Files.Read_Raw_File
+                   (Root & "/" & Locale & "/" & File_Name);
+               Main : constant String := Object_Field_Object (Text, "main");
+               Locale_Data : constant String := Object_Field_Object (Main, Locale);
             begin
-               for Index in 1 .. Field_Count (Pairs, '~') loop
-                  declare
-                     Pair   : constant String := Field (Pairs, Index, '~');
-                     Locale : constant String := Field (Pair, 1, ':');
-                     Value  : constant String := Field (Pair, 2, ':');
-                  begin
-                     if Field_Count (Pair, ':') /= 2 then
-                        Add_Error ("invalid list-separator pair in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""" & Record_Type & """,""locale"":"""
-                           & Locale & """,""family"":""" & Family
-                           & """,""part"":""" & Part
-                           & """,""value"":""" & JSON_Escape (Value) & """}");
-                     end if;
-                  end;
-               end loop;
-            end Emit_Pairs;
-         begin
-            Emit_Pairs ("list_separator", "standard", "final", "listFinalRows");
-            Emit_Pairs ("list_separator", "standard", "pair", "listPairRows");
-            Emit_Pairs ("list_separator", "standard", "start", "listStartRows");
-            Emit_Pairs ("list_separator", "standard", "middle", "listMiddleRows");
-            Emit_Pairs ("list_separator", "standard", "item", "listItemRows");
-            Emit_Pairs ("list_separator", "or", "final", "listOrFinalRows");
-            Emit_Pairs ("list_separator", "or", "pair", "listOrPairRows");
-            Emit_Pairs ("list_separator", "or", "start", "listOrStartRows");
-            Emit_Pairs ("list_separator", "or", "middle", "listOrMiddleRows");
-            Emit_Pairs ("list_separator", "or", "item", "listOrItemRows");
-            Emit_Pairs ("list_separator", "unit", "final", "listUnitFinalRows");
-            Emit_Pairs ("list_separator", "unit", "pair", "listUnitPairRows");
-            Emit_Pairs ("list_separator", "unit", "start", "listUnitStartRows");
-            Emit_Pairs ("list_separator", "unit", "middle", "listUnitMiddleRows");
-            Emit_Pairs ("list_separator", "unit", "item", "listUnitItemRows");
-            Emit_Pairs ("unit_separator", "standard", "per", "unitPerRows");
+               return Object_Field_Object (Locale_Data, Child);
+            end Locale_Object;
 
-            declare
-               Rows : constant String := Source_Value (Path, "unitShortRows");
+            procedure Emit_List_Part
+              (Locale : String;
+               Family : String;
+               Part   : String;
+               Pattern : String)
+            is
+               Value : constant String := Separator_From_Pattern (Pattern);
             begin
-               for Index in 1 .. Field_Count (Rows, '~') loop
-                  declare
-                     Row   : constant String := Field (Rows, Index, '~');
-                     Base  : constant String := Field (Row, 1, ':');
-                     Value : constant String := Field (Row, 2, ':');
-                  begin
-                     if Field_Count (Row, ':') /= 2 then
-                        Add_Error ("invalid unit-short row in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""unit_short"",""base"":"""
-                           & Base & """,""value"":"""
-                           & JSON_Escape (Value) & """}");
-                     end if;
-                  end;
-               end loop;
-            end;
+               if Value /= "" then
+                  Emit_JSON
+                    ("{""type"":""list_separator"",""locale"":"""
+                     & Locale & """,""family"":""" & Family
+                     & """,""part"":""" & Part
+                     & """,""value"":""" & JSON_Escape (Value) & """}");
+               end if;
+            end Emit_List_Part;
 
-            declare
-               Rows : constant String := Source_Value (Path, "unitNameRows");
+            procedure Emit_List_Family
+              (Locale : String;
+               Patterns : String;
+               Family : String;
+               CLDR_Type : String)
+            is
+               Object : constant String :=
+                 Object_Field_Object (Patterns, CLDR_Type);
+               Middle : constant String :=
+                 Project_Tools.JSON.Object_Field_Value (Object, "middle");
             begin
-               for Index in 1 .. Field_Count (Rows, '~') loop
-                  declare
-                     Row      : constant String := Field (Rows, Index, '~');
-                     Locale   : constant String := Field (Row, 1, ':');
-                     Base     : constant String := Field (Row, 2, ':');
-                     Width    : constant String := Field (Row, 3, ':');
-                     Category : constant String := Field (Row, 4, ':');
-                     Value    : constant String := Field (Row, 5, ':');
+               if Object = "" then
+                  return;
+               end if;
+
+               Emit_List_Part
+                 (Locale, Family, "final",
+                  Project_Tools.JSON.Object_Field_Value (Object, "end"));
+               Emit_List_Part
+                 (Locale, Family, "pair",
+                  Project_Tools.JSON.Object_Field_Value (Object, "2"));
+               Emit_List_Part
+                 (Locale, Family, "start",
+                  Project_Tools.JSON.Object_Field_Value (Object, "start"));
+               Emit_List_Part (Locale, Family, "middle", Middle);
+               Emit_List_Part (Locale, Family, "item", Middle);
+            end Emit_List_Family;
+
+            procedure Emit_Unit_Names
+              (Locale : String;
+               Width_Object : String;
+               Width : String;
+               Emit_Short : Boolean := False)
+            is
+               procedure Emit_Unit (Name : String; Value : String) is
+                  Base : constant String := Unit_Base (Name);
+                  Display : constant String :=
+                    Project_Tools.JSON.Object_Field_Value (Value, "displayName");
+
+                  procedure Emit_Category (Category : String) is
+                     Pattern : constant String :=
+                       Project_Tools.JSON.Object_Field_Value
+                         (Value, "unitPattern-count-" & Category);
+                     Unit_Name : constant String := Unit_Name_From_Pattern (Pattern);
                   begin
-                     if Field_Count (Row, ':') /= 5 then
-                        Add_Error ("invalid unit-name row in " & Path);
-                     else
+                     if Unit_Name /= "" then
                         Emit_JSON
                           ("{""type"":""unit_name"",""locale"":"""
                            & Locale & """,""base"":""" & Base
                            & """,""width"":""" & Width
                            & """,""category"":""" & Category
-                           & """,""value"":""" & JSON_Escape (Value) & """}");
+                           & """,""value"":""" & JSON_Escape (Unit_Name) & """}");
+                        if Width = "unit-width-full-name"
+                          and then
+                            (Base = "day" or else Base = "week"
+                             or else Base = "month" or else Base = "year")
+                        then
+                           Emit_JSON
+                             ("{""type"":""relative_unit_category"",""locale"":"""
+                              & Locale & """,""base"":""" & Base
+                              & """,""category"":""" & Category
+                              & """,""value"":""" & JSON_Escape (Unit_Name)
+                              & """}");
+                        end if;
                      end if;
-                  end;
-               end loop;
-            end;
+                  end Emit_Category;
+               begin
+                  if not Valid_Unit_Base (Base) then
+                     return;
+                  end if;
 
-            declare
-               Rows : constant String := Source_Value (Path, "relativeCurrentRows");
-            begin
-               for Index in 1 .. Field_Count (Rows, '~') loop
-                  declare
-                     Row    : constant String := Field (Rows, Index, '~');
-                     Locale : constant String := Field (Row, 1, ':');
-                     Base   : constant String := Field (Row, 2, ':');
-                     Value  : constant String := Field (Row, 3, ':');
-                  begin
-                     if Field_Count (Row, ':') /= 3 then
-                        Add_Error ("invalid relative-current row in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""relative_current"",""locale"":"""
-                           & Locale & """,""base"":""" & Base
-                           & """,""value"":""" & JSON_Escape (Value) & """}");
-                     end if;
-                  end;
-               end loop;
-            end;
+                  if Object_Field_Object (Value, "per") /= "" then
+                     return;
+                  end if;
 
-            declare
-               Rows : constant String := Source_Value (Path, "relativeOffsetRows");
-            begin
-               for Index in 1 .. Field_Count (Rows, '~') loop
-                  declare
-                     Row     : constant String := Field (Rows, Index, '~');
-                     Locale  : constant String := Field (Row, 1, ':');
-                     Offset  : constant String := Field (Row, 2, ':');
-                     Pattern : constant String := Field (Row, 3, ':');
-                  begin
-                     if Field_Count (Row, ':') /= 3 then
-                        Add_Error ("invalid relative-offset row in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""relative_offset"",""locale"":"""
-                           & Locale & """,""offset"":""" & Offset
-                           & """,""pattern"":"""
-                           & JSON_Escape (Pattern) & """}");
-                     end if;
-                  end;
-               end loop;
-            end;
+                  if Emit_Short and then Display /= "" then
+                     Emit_JSON
+                       ("{""type"":""unit_short"",""base"":""" & Base
+                        & """,""value"":""" & JSON_Escape (Display) & """}");
+                  end if;
 
-            declare
-               Rows : constant String := Source_Value (Path, "relativeUnitRows");
+                  Emit_Category ("zero");
+                  Emit_Category ("one");
+                  Emit_Category ("two");
+                  Emit_Category ("few");
+                  Emit_Category ("many");
+                  Emit_Category ("other");
+               end Emit_Unit;
             begin
-               for Index in 1 .. Field_Count (Rows, '~') loop
-                  declare
-                     Row      : constant String := Field (Rows, Index, '~');
-                     Locale   : constant String := Field (Row, 1, ':');
-                     Base     : constant String := Field (Row, 2, ':');
-                     Category : constant String := Field (Row, 3, ':');
-                     Value    : constant String := Field (Row, 4, ':');
-                  begin
-                     if Field_Count (Row, ':') /= 4 then
-                        Add_Error ("invalid relative-unit row in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""relative_unit_category"",""locale"":"""
-                           & Locale & """,""base"":""" & Base
-                           & """,""category"":""" & Category
-                           & """,""value"":""" & JSON_Escape (Value) & """}");
-                     end if;
-                  end;
-               end loop;
-            end;
+               For_Each_Object_Field (Width_Object, Emit_Unit'Access);
+            end Emit_Unit_Names;
+         begin
+            for Index in 1 .. Date_Count loop
+               declare
+                  Locale : constant String := S (Date_Locales (Index));
+                  List_Path : constant String :=
+                    "upstream/cldr-json/cldr-misc-full/main/"
+                    & Locale & "/listPatterns.json";
+                  Unit_Path : constant String :=
+                    "upstream/cldr-json/cldr-units-full/main/"
+                    & Locale & "/units.json";
+               begin
+                  if Project_Tools.Files.File_Exists (List_Path) then
+                     declare
+                        Patterns : constant String :=
+                          Locale_Object
+                            ("upstream/cldr-json/cldr-misc-full/main",
+                             Locale, "listPatterns.json", "listPatterns");
+                     begin
+                        Emit_List_Family
+                          (Locale, Patterns, "standard",
+                           "listPattern-type-standard");
+                        Emit_List_Family
+                          (Locale, Patterns, "or", "listPattern-type-or");
+                        Emit_List_Family
+                          (Locale, Patterns, "unit", "listPattern-type-unit");
+                     end;
+                  end if;
+
+                  if Project_Tools.Files.File_Exists (Unit_Path) then
+                     declare
+                        Units : constant String :=
+                          Locale_Object
+                            ("upstream/cldr-json/cldr-units-full/main",
+                             Locale, "units.json", "units");
+                        Long_Units : constant String :=
+                          Object_Field_Object (Units, "long");
+                        Short_Units : constant String :=
+                          Object_Field_Object (Units, "short");
+                        Narrow_Units : constant String :=
+                          Object_Field_Object (Units, "narrow");
+                        Per_Pattern : constant String :=
+                          Project_Tools.JSON.Object_Field_Value
+                            (Object_Field_Object (Long_Units, "per"),
+                             "compoundUnitPattern");
+                        Per_Value : constant String :=
+                          Separator_From_Pattern (Per_Pattern);
+                     begin
+                        if Per_Value /= "" then
+                           Emit_JSON
+                             ("{""type"":""unit_separator"",""locale"":"""
+                              & Locale & """,""part"":""per"",""value"":"""
+                              & JSON_Escape (Per_Value) & """}");
+                        end if;
+
+                        Emit_Unit_Names
+                          (Locale, Long_Units, "unit-width-full-name");
+                        Emit_Unit_Names
+                          (Locale, Short_Units, "unit-width-short",
+                           Locale = "en");
+                        Emit_Unit_Names
+                          (Locale, Narrow_Units, "unit-width-narrow");
+                     end;
+                  end if;
+               exception
+                  when others =>
+                     Add_Error
+                       ("failed to emit CLDR list/unit rows for " & Locale);
+               end;
+            end loop;
          end Emit_List_Separator_Rows;
 
          function Relative_Field_Key (Base : String; Width : String) return String is
@@ -1977,32 +2541,6 @@ procedure Generate_CLDR_Export is
             end if;
          end Relative_Field_Key;
 
-         function Compact_Relative_Current_Exists
-           (Locale : String;
-            Base   : String;
-            Width  : String)
-            return Boolean
-         is
-            Path : constant String := "cldr-json/cldr-full/listData.json";
-            Rows : constant String := Source_Value (Path, "relativeCurrentRows");
-         begin
-            for Index in 1 .. Field_Count (Rows, '~') loop
-               declare
-                  Row : constant String := Field (Rows, Index, '~');
-               begin
-                  if Field_Count (Row, ':') = 3
-                    and then Field (Row, 1, ':') = Locale
-                    and then Field (Row, 2, ':') = Base
-                    and then Width = "unit-width-full-name"
-                  then
-                     return True;
-                  end if;
-               end;
-            end loop;
-
-            return False;
-         end Compact_Relative_Current_Exists;
-
          procedure Emit_Relative_Current_Rows (Locale : String) is
             Fields : constant String := Date_Fields_Object (Locale);
 
@@ -2013,10 +2551,7 @@ procedure Generate_CLDR_Export is
                  Project_Tools.JSON.Object_Field_Value
                    (Object, "relative-type-0");
             begin
-               if Value /= ""
-                 and then not Compact_Relative_Current_Exists
-                   (Locale, Base, Width)
-               then
+               if Value /= "" then
                   Emit_JSON
                     ("{""type"":""relative_current"",""locale"":"""
                      & Locale & """,""base"":""" & Base
@@ -2048,6 +2583,34 @@ procedure Generate_CLDR_Export is
 
          procedure Emit_Relative_Time_Pattern_Rows (Locale : String) is
             Fields : constant String := Date_Fields_Object (Locale);
+
+            procedure Emit_Offset (Direction : String) is
+               Object : constant String :=
+                 Object_Field_Object (Fields, "day");
+               Group  : constant String :=
+                 Object_Field_Object
+                   (Object, "relativeTime-type-" & Direction);
+               Pattern : constant String :=
+                 Project_Tools.JSON.Object_Field_Value
+                   (Group, "relativeTimePattern-count-other");
+               Marker : constant Natural := First_Index (Pattern, "{0}");
+               Prefix : constant String :=
+                 (if Marker > Pattern'First
+                  then Pattern (Pattern'First .. Marker - 1)
+                  else "");
+               Suffix : constant String :=
+                 (if Marker > 0 and then Marker + 2 < Pattern'Last
+                  then Pattern (Marker + 3 .. Pattern'Last)
+                  else "");
+            begin
+               if Marker > 0 then
+                  Emit_JSON
+                    ("{""type"":""relative_offset"",""locale"":"""
+                     & Locale & """,""offset"":""" & Direction
+                     & """,""pattern"":"""
+                     & JSON_Escape (Prefix & "{0}" & Suffix) & """}");
+               end if;
+            end Emit_Offset;
 
             procedure Emit_Pattern
               (Base      : String;
@@ -2103,6 +2666,8 @@ procedure Generate_CLDR_Export is
                return;
             end if;
 
+            Emit_Offset ("future");
+            Emit_Offset ("past");
             Emit_Base_Widths ("day");
             Emit_Base_Widths ("quarter");
             Emit_Base_Widths ("week");
@@ -2176,6 +2741,105 @@ procedure Generate_CLDR_Export is
                   & JSON_Escape (Abbreviated) & """}");
             end if;
          end Emit_Quarter_Rows;
+
+         procedure Emit_Month_Weekday_Rows (Locale : String) is
+            Gregorian : constant String := Gregorian_Object (Locale);
+            Months    : constant String := Object_Field_Object (Gregorian, "months");
+            Month_Format : constant String := Object_Field_Object (Months, "format");
+            Days      : constant String := Object_Field_Object (Gregorian, "days");
+            Day_Format : constant String := Object_Field_Object (Days, "format");
+
+            procedure Emit_Name_Row
+              (Kind       : String;
+               Start_Text : String;
+               Values     : String)
+            is
+               Hex : constant String := Codepoint_Hex_List (Values);
+            begin
+               if Values /= "" and then Hex /= "" then
+                  Emit_JSON
+                    ("{""type"":""name_hex"",""kind"":""" & Kind
+                     & """,""locale"":""" & Locale
+                     & """,""start"":""" & Start_Text
+                     & """,""values"":""" & Hex & """}");
+               elsif Values /= "" then
+                  Emit_JSON
+                    ("{""type"":""name_set"",""kind"":""" & Kind
+                     & """,""locale"":""" & Locale
+                     & """,""start"":""" & Start_Text
+                     & """,""values"":""" & JSON_Escape (Values) & """}");
+               end if;
+            end Emit_Name_Row;
+
+            function Month_Values (Width : String) return String is
+               Object : constant String := Object_Field_Object (Month_Format, Width);
+               Result : US.Unbounded_String;
+            begin
+               for Month in 1 .. 12 loop
+                  declare
+                     Key   : constant String := Natural'Image (Month);
+                     Value : constant String :=
+                       Project_Tools.JSON.Object_Field_Value
+                         (Object, Key (Key'First + 1 .. Key'Last));
+                  begin
+                     if Value = "" then
+                        Add_Error
+                          ("missing " & Width & " CLDR month "
+                           & Key (Key'First + 1 .. Key'Last)
+                           & " for locale " & Locale);
+                        return "";
+                     end if;
+
+                     if Month > 1 then
+                        US.Append (Result, "~");
+                     end if;
+                     US.Append (Result, Value);
+                  end;
+               end loop;
+
+               return S (Result);
+            end Month_Values;
+
+            function Weekday_Values (Width : String) return String is
+               Object : constant String := Object_Field_Object (Day_Format, Width);
+               Result : US.Unbounded_String;
+
+               procedure Add_Day (Key : String) is
+                  Value : constant String :=
+                    Project_Tools.JSON.Object_Field_Value (Object, Key);
+               begin
+                  if Value = "" then
+                     Add_Error
+                       ("missing " & Width & " CLDR weekday "
+                        & Key & " for locale " & Locale);
+                  else
+                     if US.Length (Result) > 0 then
+                        US.Append (Result, "~");
+                     end if;
+                     US.Append (Result, Value);
+                  end if;
+               end Add_Day;
+            begin
+               Add_Day ("sun");
+               Add_Day ("mon");
+               Add_Day ("tue");
+               Add_Day ("wed");
+               Add_Day ("thu");
+               Add_Day ("fri");
+               Add_Day ("sat");
+
+               if Field_Count (S (Result), '~') /= 7 then
+                  return "";
+               end if;
+
+               return S (Result);
+            end Weekday_Values;
+         begin
+            Emit_Name_Row ("month_full", "1", Month_Values ("wide"));
+            Emit_Name_Row ("month_short", "1", Month_Values ("abbreviated"));
+            Emit_Name_Row ("weekday_full", "0", Weekday_Values ("wide"));
+            Emit_Name_Row ("weekday_short", "0", Weekday_Values ("abbreviated"));
+         end Emit_Month_Weekday_Rows;
 
          procedure Emit_Day_Period_Rows (Locale : String) is
             Gregorian   : constant String := Gregorian_Object (Locale);
@@ -2365,30 +3029,6 @@ procedure Generate_CLDR_Export is
                end;
             end Derived_Zone_Location;
 
-            function Compact_Zone_Display_Exists
-              (Locale : String;
-               Zone   : String)
-               return Boolean
-            is
-               Path : constant String := "cldr-json/cldr-full/timeZoneData.json";
-               Rows : constant String := Source_Value (Path, "zoneDisplayRows");
-            begin
-               for Index in 1 .. Field_Count (Rows, '~') loop
-                  declare
-                     Row : constant String := Field (Rows, Index, '~');
-                  begin
-                     if Field_Count (Row, ':') = 3
-                       and then Field (Row, 1, ':') = Locale
-                       and then Field (Row, 2, ':') = Zone
-                     then
-                        return True;
-                     end if;
-                  end;
-               end loop;
-
-               return False;
-            end Compact_Zone_Display_Exists;
-
             procedure Scan_Zone_Object
               (Object : String;
                Prefix : String)
@@ -2475,8 +3115,6 @@ procedure Generate_CLDR_Export is
                                     if Display_Name /= ""
                                       and then Valid_Zone_Name (Canonical)
                                       and then Contains (Canonical, "/")
-                                      and then not Compact_Zone_Display_Exists
-                                        (Locale, Canonical)
                                     then
                                        Emit_JSON
                                          ("{""type"":""zone_display"",""locale"":"""
@@ -2509,152 +3147,6 @@ procedure Generate_CLDR_Export is
             end if;
          end Emit_Time_Zone_Exemplar_Rows;
 
-         procedure Emit_Time_Zone_Display_Rows is
-            Path : constant String := "cldr-json/cldr-full/timeZoneData.json";
-            Rows : constant String := Source_Value (Path, "zoneDisplayRows");
-         begin
-            for Index in 1 .. Field_Count (Rows, '~') loop
-               declare
-                  Row    : constant String := Field (Rows, Index, '~');
-                  Locale : constant String := Field (Row, 1, ':');
-                  Zone   : constant String := Field (Row, 2, ':');
-                  Value  : constant String := Field (Row, 3, ':');
-               begin
-                  if Field_Count (Row, ':') /= 3 then
-                     Add_Error ("invalid zone-display row in " & Path);
-                  else
-                     Emit_JSON
-                       ("{""type"":""zone_display"",""locale"":"""
-                        & Locale & """,""zone"":""" & Zone
-                        & """,""value"":""" & JSON_Escape (Value) & """}");
-                  end if;
-               end;
-            end loop;
-
-            declare
-               Family_Rows : constant String :=
-                 Source_Value (Path, "zoneFamilyDisplayRows");
-            begin
-               for Index in 1 .. Field_Count (Family_Rows, '~') loop
-                  declare
-                     Row    : constant String := Field (Family_Rows, Index, '~');
-                     Locale : constant String := Field (Row, 1, ':');
-                     Family : constant String := Field (Row, 2, ':');
-                     Value  : constant String := Field (Row, 3, ':');
-                  begin
-                     if Field_Count (Row, ':') /= 3 then
-                        Add_Error ("invalid zone-family-display row in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""zone_family_display"",""locale"":"""
-                           & Locale & """,""family"":""" & Family
-                           & """,""value"":""" & JSON_Escape (Value) & """}");
-                     end if;
-                  end;
-               end loop;
-            end;
-
-            declare
-               Short_Rows : constant String :=
-                 Source_Value (Path, "zoneShortFamilyRows");
-            begin
-               for Index in 1 .. Field_Count (Short_Rows, '~') loop
-                  declare
-                     Row       : constant String := Field (Short_Rows, Index, '~');
-                     Locale    : constant String := Field (Row, 1, ':');
-                     Family    : constant String := Field (Row, 2, ':');
-                     Standard  : constant String := Field (Row, 3, ':');
-                     Daylight  : constant String := Field (Row, 4, ':');
-                     Generic_Label : constant String := Field (Row, 5, ':');
-                  begin
-                     if Field_Count (Row, ':') /= 5 then
-                        Add_Error ("invalid zone-short-family row in " & Path);
-                     else
-                        Emit_JSON
-                          ("{""type"":""zone_short_family"",""locale"":"""
-                           & Locale & """,""family"":""" & Family
-                           & """,""standard"":""" & JSON_Escape (Standard)
-                           & """,""daylight"":""" & JSON_Escape (Daylight)
-                           & """,""generic"":""" & JSON_Escape (Generic_Label)
-                           & """}");
-                     end if;
-                  end;
-               end loop;
-            end;
-         end Emit_Time_Zone_Display_Rows;
-
-         function Compact_Zone_Family_Display_Exists
-           (Locale : String;
-            Family : String)
-            return Boolean
-         is
-            Path : constant String := "cldr-json/cldr-full/timeZoneData.json";
-            Rows : constant String := Source_Value (Path, "zoneFamilyDisplayRows");
-         begin
-            for Index in 1 .. Field_Count (Rows, '~') loop
-               declare
-                  Row : constant String := Field (Rows, Index, '~');
-               begin
-                  if Field_Count (Row, ':') = 3
-                    and then Field (Row, 1, ':') = Locale
-                    and then Field (Row, 2, ':') = Family
-                  then
-                     return True;
-                  end if;
-               end;
-            end loop;
-
-            return False;
-         end Compact_Zone_Family_Display_Exists;
-
-         function Compact_Zone_Display_Exists
-           (Locale : String;
-            Zone   : String)
-            return Boolean
-         is
-            Path : constant String := "cldr-json/cldr-full/timeZoneData.json";
-            Rows : constant String := Source_Value (Path, "zoneDisplayRows");
-         begin
-            for Index in 1 .. Field_Count (Rows, '~') loop
-               declare
-                  Row : constant String := Field (Rows, Index, '~');
-               begin
-                  if Field_Count (Row, ':') = 3
-                    and then Field (Row, 1, ':') = Locale
-                    and then Field (Row, 2, ':') = Zone
-                  then
-                     return True;
-                  end if;
-               end;
-            end loop;
-
-            return False;
-         end Compact_Zone_Display_Exists;
-
-         function Compact_Zone_Short_Family_Exists
-           (Locale : String;
-            Family : String)
-            return Boolean
-         is
-            Path : constant String := "cldr-json/cldr-full/timeZoneData.json";
-            Rows : constant String := Source_Value (Path, "zoneShortFamilyRows");
-         begin
-            for Index in 1 .. Field_Count (Rows, '~') loop
-               declare
-                  Row : constant String := Field (Rows, Index, '~');
-               begin
-                  if Field_Count (Row, ':') = 5
-                    and then Field (Row, 1, ':') = Locale
-                    and then Field (Row, 2, ':') = Family
-                  then
-                     return True;
-                  end if;
-               end;
-            end loop;
-
-            return False;
-         end Compact_Zone_Short_Family_Exists;
-
          procedure Emit_Time_Zone_Metazone_Rows (Locale : String) is
             Names     : constant String := Time_Zone_Names_Object (Locale);
             Metazones : constant String := Object_Field_Object (Names, "metazone");
@@ -2679,10 +3171,7 @@ procedure Generate_CLDR_Export is
                Display : constant String :=
                  (if Generic_Label /= "" then Generic_Label else Standard);
             begin
-               if Display /= ""
-                 and then not Compact_Zone_Family_Display_Exists
-                   (Locale, Family)
-               then
+               if Display /= "" then
                   Emit_JSON
                     ("{""type"":""zone_family_display"",""locale"":"""
                      & Locale & """,""family"":""" & Family
@@ -2692,8 +3181,6 @@ procedure Generate_CLDR_Export is
                if Short_Generic /= ""
                  and then Short_Standard /= ""
                  and then Short_Daylight /= ""
-                 and then not Compact_Zone_Short_Family_Exists
-                   (Locale, Family)
                then
                   Emit_JSON
                     ("{""type"":""zone_short_family"",""locale"":"""
@@ -2743,9 +3230,7 @@ procedure Generate_CLDR_Export is
                   Display : constant String :=
                     (if Generic_Label /= "" then Generic_Label else Standard);
                begin
-                  if Display /= ""
-                    and then not Compact_Zone_Display_Exists (Locale, Zone)
-                  then
+                  if Display /= "" then
                      Emit_JSON
                        ("{""type"":""zone_display"",""locale"":"""
                         & Locale & """,""zone"":""" & Zone
@@ -2792,36 +3277,12 @@ procedure Generate_CLDR_Export is
             end;
          end Emit_Time_Zone_Metazone_Rows;
       begin
-         declare
-            Rows : constant String :=
-              Source_Value ("cldr-json/cldr-full/allLocaleData.json", "dateNameRows");
-         begin
-            for Index in 1 .. Field_Count (Rows, ';') loop
-               declare
-                  Row        : constant String := Field (Rows, Index, ';');
-                  Name_Kind  : constant String := Field (Row, 1, ASCII.HT);
-                  Locale     : constant String := Field (Row, 2, ASCII.HT);
-                  Start_Text : constant String := Field (Row, 3, ASCII.HT);
-                  Values     : constant String := Field (Row, 4, ASCII.HT);
-               begin
-                  if Field_Count (Row, ASCII.HT) /= 4 then
-                     Add_Error ("invalid all-locale date-name row in CLDR source");
-                  else
-                     Emit_JSON
-                       ("{""type"":""name_hex"",""kind"":""" & Name_Kind
-                        & """,""locale"":""" & Locale
-                        & """,""start"":""" & Start_Text
-                        & """,""values"":""" & Values & """}");
-                  end if;
-               end;
-            end loop;
-         end;
-
          Load_Date_Locales;
          for Index in 1 .. Date_Count loop
             declare
                Locale : constant String := S (Date_Locales (Index));
             begin
+               Emit_Month_Weekday_Rows (Locale);
                Emit_Quarter_Rows (Locale);
                Emit_Day_Period_Rows (Locale);
                Emit_Relative_Current_Rows (Locale);
@@ -2833,18 +3294,11 @@ procedure Generate_CLDR_Export is
             end;
          end loop;
          Emit_List_Separator_Rows;
-         Emit_Time_Zone_Display_Rows;
       end Emit_Migrated_Date_Name_Rows;
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
       Emit_Header;
-      if Project_Tools.Files.Directory_Exists
-           ("upstream/cldr-json/cldr-numbers-full/main")
-      then
-         Emit_Full_Number_Rows;
-      else
-         Emit_Migrated_Number_Rows;
-      end if;
+      Emit_Full_Number_Rows;
       L;
       Emit_Migrated_Date_Name_Rows;
       L;
