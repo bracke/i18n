@@ -1871,7 +1871,7 @@ begin
            "measure-unit skeleton localizes Czech nautical miles");
    Assert (Rendered (Runtime, "ru", "measure_nautical_mile", Args) =
              "1,5 " & UTF8 ([16#43C#, 16#43E#, 16#440#, 16#441#,
-                               16#43A#, 16#438#, 16#435#, 16#20#,
+                               16#43A#, 16#43E#, 16#439#, 16#20#,
                                16#43C#, 16#438#, 16#43B#, 16#438#]),
            "measure-unit skeleton localizes Russian nautical miles");
    Assert (Rendered (Runtime, "de", "measure_astronomical_unit", Args) =
@@ -1897,13 +1897,13 @@ begin
              & "i astronomice",
            "measure-unit skeleton localizes Romanian astronomical units");
    Assert (Rendered (Runtime, "lt", "measure_astronomical_unit", Args) =
-             "1,5 astronominiai vienetai",
+             "1,5 astronominio vieneto",
            "measure-unit skeleton localizes Lithuanian astronomical units");
    Assert (Rendered (Runtime, "sl", "measure_astronomical_unit", Args) =
              "1,5 astronomske enote",
            "measure-unit skeleton localizes Slovenian astronomical units");
    Assert (Rendered (Runtime, "pl", "measure_astronomical_unit", Args) =
-             "1,5 jednostki astronomiczne",
+             "1,5 jednostki astronomicznej",
            "measure-unit skeleton localizes Polish astronomical units");
    Assert (Rendered (Runtime, "cs", "measure_astronomical_unit", Args) =
              "1,5 astronomick" & U (16#E9#) & " jednotky",
@@ -1912,7 +1912,7 @@ begin
              "1,5 "
              & UTF8 ([16#430#, 16#441#, 16#442#, 16#440#, 16#43E#,
                        16#43D#, 16#43E#, 16#43C#, 16#438#, 16#447#,
-                       16#435#, 16#441#, 16#43A#, 16#438#, 16#435#,
+                       16#435#, 16#441#, 16#43A#, 16#43E#, 16#439#,
                        16#20#, 16#435#, 16#434#, 16#438#, 16#43D#,
                        16#438#, 16#446#, 16#44B#]),
            "measure-unit skeleton localizes Russian astronomical units");
@@ -1938,16 +1938,16 @@ begin
              "1,5 ani lumin" & U (16#103#),
            "measure-unit skeleton localizes Romanian light years");
    Assert (Rendered (Runtime, "lt", "measure_light_year", Args) =
-             "1,5 " & U (16#161#) & "viesme" & U (16#10D#) & "iai",
+             "1,5 " & U (16#161#) & "viesme" & U (16#10D#) & "io",
            "measure-unit skeleton localizes Lithuanian light years");
    Assert (Rendered (Runtime, "sl", "measure_light_year", Args) =
              "1,5 svetlobna leta",
            "measure-unit skeleton localizes Slovenian light years");
    Assert (Rendered (Runtime, "pl", "measure_light_year", Args) =
-             "1,5 lata " & U (16#15B#) & "wietlne",
+             "1,5 roku " & U (16#15B#) & "wietlnego",
            "measure-unit skeleton localizes Polish light years");
    Assert (Rendered (Runtime, "cs", "measure_light_year", Args) =
-             "1,5 sv" & U (16#11B#) & "teln" & U (16#E9#) & " roky",
+             "1,5 sv" & U (16#11B#) & "teln" & U (16#E9#) & "ho roku",
            "measure-unit skeleton localizes Czech light years");
    Assert (Rendered (Runtime, "ru", "measure_light_year", Args) =
              "1,5 " & UTF8 ([16#441#, 16#432#, 16#435#, 16#442#,
@@ -1984,20 +1984,20 @@ begin
              "1,5 parseci",
            "measure-unit skeleton localizes Romanian parsecs");
    Assert (Rendered (Runtime, "lt", "measure_parsec", Args) =
-             "1,5 parsekai",
+             "1,5 parseko",
            "measure-unit skeleton localizes Lithuanian parsecs");
    Assert (Rendered (Runtime, "sl", "measure_parsec", Args) =
              "1,5 parseki",
            "measure-unit skeleton localizes Slovenian parsecs");
    Assert (Rendered (Runtime, "pl", "measure_parsec", Args) =
-             "1,5 parseki",
+             "1,5 parseka",
            "measure-unit skeleton localizes Polish parsecs");
    Assert (Rendered (Runtime, "cs", "measure_parsec", Args) =
-             "1,5 parseky",
+             "1,5 parseku",
            "measure-unit skeleton localizes Czech parsecs");
    Assert (Rendered (Runtime, "ru", "measure_parsec", Args) =
              "1,5 " & UTF8 ([16#43F#, 16#430#, 16#440#, 16#441#,
-                               16#435#, 16#43A#, 16#438#]),
+                               16#435#, 16#43A#, 16#430#]),
            "measure-unit skeleton localizes Russian parsecs");
    Assert (Rendered (Runtime, "en", "measure_parsec_short", Args) =
              "1.5 pc",
@@ -2021,25 +2021,27 @@ begin
              "1,5 bra" & U (16#E7#) & "a",
            "unit formatter localizes Portuguese fathoms");
    Assert (Rendered (Runtime, "nl", "unit_fathom_alias", Args) =
-             "1,5 vadem",
+             "1,5 vadems",
            "unit formatter localizes Dutch fathoms");
    Assert (Rendered (Runtime, "ro", "unit_fathom_alias", Args) =
-             "1,5 st" & U (16#E2#) & "njeni",
+             "1,5 fathomi",
            "unit formatter localizes Romanian fathoms");
    Assert (Rendered (Runtime, "lt", "unit_fathom_alias", Args) =
-             "1,5 sieksniai",
+             "1,5 fadomo",
            "unit formatter localizes Lithuanian fathoms");
    Assert (Rendered (Runtime, "sl", "unit_fathom_alias", Args) =
              "1,5 se" & U (16#17E#) & "nji",
            "unit formatter localizes Slovenian fathoms");
    Assert (Rendered (Runtime, "pl", "unit_fathom_alias", Args) =
-             "1,5 s" & U (16#105#) & U (16#17C#) & "nie",
+             "1,5 s" & U (16#105#) & U (16#17C#) & "nia",
            "unit formatter localizes Polish fathoms");
    Assert (Rendered (Runtime, "cs", "unit_fathom_alias", Args) =
-             "1,5 s" & U (16#E1#) & "hy",
+             "1,5 s" & U (16#E1#) & "hu",
            "unit formatter localizes Czech fathoms");
    Assert (Rendered (Runtime, "ru", "unit_fathom_alias", Args) =
-             "1,5 " & UTF8 ([16#441#, 16#430#, 16#436#, 16#435#,
+             "1,5 " & UTF8 ([16#43C#, 16#43E#, 16#440#, 16#441#,
+                               16#43A#, 16#43E#, 16#439#, 16#20#,
+                               16#441#, 16#430#, 16#436#, 16#435#,
                                16#43D#, 16#438#]),
            "unit formatter localizes Russian fathoms");
    Assert (Rendered (Runtime, "en", "measure_furlong_short", Args) =
@@ -2070,26 +2072,26 @@ begin
              "1,5 pixeli",
            "measure-unit skeleton localizes Romanian pixels");
    Assert (Rendered (Runtime, "lt", "measure_pixel", Args) =
-             "1,5 pikseliai",
+             "1,5 pikselio",
            "measure-unit skeleton localizes Lithuanian pixels");
    Assert (Rendered (Runtime, "sl", "measure_pixel", Args) =
-             "1,5 slikovne pike",
+             "1,5 piksli",
            "measure-unit skeleton localizes Slovenian pixels");
    Assert (Rendered (Runtime, "pl", "measure_pixel", Args) =
-             "1,5 piksele",
+             "1,5 piksela",
            "measure-unit skeleton localizes Polish pixels");
    Assert (Rendered (Runtime, "cs", "measure_pixel", Args) =
-             "1,5 pixely",
+             "1,5 pixelu",
            "measure-unit skeleton localizes Czech pixels");
    Assert (Rendered (Runtime, "ru", "measure_pixel", Args) =
              "1,5 " & UTF8 ([16#43F#, 16#438#, 16#43A#, 16#441#,
-                               16#435#, 16#43B#, 16#438#]),
+                               16#435#, 16#43B#, 16#44F#]),
            "measure-unit skeleton localizes Russian pixels");
    Assert (Rendered (Runtime, "en", "measure_point_short", Args) =
              "1.5 pt",
            "measure-unit skeleton accepts short length-point output");
    Assert (Rendered (Runtime, "de", "measure_point", Args) =
-             "1,5 Punkte",
+             "1,5 DTP-Punkte",
            "measure-unit skeleton localizes German points");
    Assert (Rendered (Runtime, "en", "measure_solar_radius", Args) =
              "1.5 solar radii",
@@ -2110,30 +2112,29 @@ begin
              "1,5 raio solar",
            "measure-unit skeleton localizes Portuguese solar radii");
    Assert (Rendered (Runtime, "nl", "measure_solar_radius", Args) =
-             "1,5 zonsstralen",
+             "1,5 solar radii",
            "measure-unit skeleton localizes Dutch solar radii");
    Assert (Rendered (Runtime, "ro", "measure_solar_radius", Args) =
              "1,5 raze solare",
            "measure-unit skeleton localizes Romanian solar radii");
    Assert (Rendered (Runtime, "lt", "measure_solar_radius", Args) =
-             "1,5 saul" & U (16#117#) & "s spinduliai",
+             "1,5 R" & U (16#2609#),
            "measure-unit skeleton localizes Lithuanian solar radii");
    Assert (Rendered (Runtime, "sl", "measure_solar_radius", Args) =
-             "1,5 son" & U (16#10D#) & "evi polmeri",
+             "1,5 polmeri sonca",
            "measure-unit skeleton localizes Slovenian solar radii");
    Assert (Rendered (Runtime, "pl", "measure_solar_radius", Args) =
-             "1,5 promienie s" & U (16#142#) & "oneczne",
+             "1,5 promienia S" & U (16#142#) & "o" & U (16#144#) & "ca",
            "measure-unit skeleton localizes Polish solar radii");
    Assert (Rendered (Runtime, "cs", "measure_solar_radius", Args) =
-             "1,5 slune" & U (16#10D#) & "n" & U (16#ED#)
-             & " polom" & U (16#11B#) & "ry",
+             "1,5 polom" & U (16#11B#) & "ru Slunce",
            "measure-unit skeleton localizes Czech solar radii");
    Assert (Rendered (Runtime, "ru", "measure_solar_radius", Args) =
              "1,5 "
              & UTF8 ([16#441#, 16#43E#, 16#43B#, 16#43D#, 16#435#,
-                       16#447#, 16#43D#, 16#44B#, 16#435#, 16#20#,
-                       16#440#, 16#430#, 16#434#, 16#438#, 16#443#,
-                       16#441#, 16#44B#]),
+                       16#447#, 16#43D#, 16#43E#, 16#433#, 16#43E#,
+                       16#20#, 16#440#, 16#430#, 16#434#, 16#438#,
+                       16#443#, 16#441#, 16#430#]),
            "measure-unit skeleton localizes Russian solar radii");
    I18N.Arguments.Set (Args, "volume", "1");
    Assert (Rendered (Runtime, "en", "measure_liter", Args) = "1 liter",
@@ -2181,25 +2182,27 @@ begin
              "2 x" & U (16#ED#) & "caras",
            "unit formatter localizes Portuguese cups");
    Assert (Rendered (Runtime, "nl", "unit_cup_alias", Args) =
-             "2 kopjes",
+             "2 cup",
            "unit formatter localizes Dutch cups");
    Assert (Rendered (Runtime, "ro", "unit_cup_alias", Args) =
-             "2 ce" & U (16#219#) & "ti",
+             "2 c" & U (16#103#) & "ni",
            "unit formatter localizes Romanian cups");
    Assert (Rendered (Runtime, "lt", "unit_cup_alias", Args) =
-             "2 puodeliai",
+             "2 stiklin" & U (16#117#) & "s",
            "unit formatter localizes Lithuanian cups");
    Assert (Rendered (Runtime, "sl", "unit_cup_alias", Args) =
              "2 skodelici",
            "unit formatter localizes Slovenian cups");
    Assert (Rendered (Runtime, "pl", "unit_cup_alias", Args) =
-             "2 kubki",
+             "2 " & U (16#107#) & "wier" & U (16#107#) & "kwarty ameryka" &
+             U (16#144#) & "skie",
            "unit formatter localizes Polish cups");
    Assert (Rendered (Runtime, "cs", "unit_cup_alias", Args) =
-             "2 hrnky",
+             "2 " & U (16#161#) & U (16#E1#) & "lky",
            "unit formatter localizes Czech cups");
    Assert (Rendered (Runtime, "ru", "unit_cup_alias", Args) =
-             "2 " & UTF8 ([16#447#, 16#430#, 16#448#, 16#43A#,
+             "2 " & UTF8 ([16#430#, 16#43C#, 16#435#, 16#440#, 16#2E#,
+                            16#20#, 16#447#, 16#430#, 16#448#, 16#43A#,
                             16#438#]),
            "unit formatter localizes Russian cups");
    Assert (Rendered (Runtime, "en", "measure_fluid_ounce", Args) =
@@ -2221,13 +2224,13 @@ begin
              "2 onzas l" & U (16#ED#) & "quidas",
            "measure-unit skeleton localizes Spanish fluid ounces");
    Assert (Rendered (Runtime, "it", "measure_fluid_ounce", Args) =
-             "2 once fluide",
+             "2 once liquide",
            "measure-unit skeleton localizes Italian fluid ounces");
    Assert (Rendered (Runtime, "pt", "measure_fluid_ounce", Args) =
              "2 on" & U (16#E7#) & "as fluidas",
            "measure-unit skeleton localizes Portuguese fluid ounces");
    Assert (Rendered (Runtime, "nl", "measure_fluid_ounce", Args) =
-             "2 fluid ounces",
+             "2 fluid ounce",
            "measure-unit skeleton localizes Dutch fluid ounces");
    Assert (Rendered (Runtime, "ro", "measure_fluid_ounce", Args) =
              "2 uncii lichide",
@@ -2236,18 +2239,18 @@ begin
              "2 skys" & U (16#10D#) & "io uncijos",
            "measure-unit skeleton localizes Lithuanian fluid ounces");
    Assert (Rendered (Runtime, "sl", "measure_fluid_ounce", Args) =
-             "2 teko" & U (16#10D#) & "inske un" & U (16#10D#) & "e",
+             "2 teko" & U (16#10D#) & "i un" & U (16#10D#) & "i",
            "measure-unit skeleton localizes Slovenian fluid ounces");
    Assert (Rendered (Runtime, "pl", "measure_fluid_ounce", Args) =
-             "2 uncje p" & U (16#142#) & "ynu",
+             "2 uncje p" & U (16#142#) & "ynu ameryka" & U (16#144#) & "skie",
            "measure-unit skeleton localizes Polish fluid ounces");
    Assert (Rendered (Runtime, "cs", "measure_fluid_ounce", Args) =
-             "2 kapaln" & U (16#E9#) & " unce",
+             "2 dut" & U (16#E9#) & " unce",
            "measure-unit skeleton localizes Czech fluid ounces");
    Assert (Rendered (Runtime, "ru", "measure_fluid_ounce", Args) =
-             "2 " & UTF8 ([16#436#, 16#438#, 16#434#, 16#43A#,
-                            16#438#, 16#435#, 16#20#, 16#443#,
-                            16#43D#, 16#446#, 16#438#, 16#438#]),
+             "2 " & UTF8 ([16#430#, 16#43C#, 16#435#, 16#440#]) & ". " &
+             UTF8 ([16#436#, 16#438#, 16#434#, 16#43A#, 16#438#, 16#435#]) & " " &
+             UTF8 ([16#443#, 16#43D#, 16#446#, 16#438#, 16#438#]),
            "measure-unit skeleton localizes Russian fluid ounces");
    Assert (Rendered (Runtime, "en", "measure_pint_short", Args) =
              "2 pt",
@@ -2271,29 +2274,29 @@ begin
              "2 quartos",
            "measure-unit skeleton localizes Portuguese quarts");
    Assert (Rendered (Runtime, "nl", "measure_quart", Args) =
-             "2 quarts",
+             "2 quart",
            "measure-unit skeleton localizes Dutch quarts");
    Assert (Rendered (Runtime, "ro", "measure_quart", Args) =
-             "2 quarturi",
+             "2 quarte",
            "measure-unit skeleton localizes Romanian quarts");
    Assert (Rendered (Runtime, "lt", "measure_quart", Args) =
              "2 kvortos",
            "measure-unit skeleton localizes Lithuanian quarts");
    Assert (Rendered (Runtime, "sl", "measure_quart", Args) =
-             "2 kvarti",
+             "2 " & U (16#10D#) & "etrtini",
            "measure-unit skeleton localizes Slovenian quarts");
    Assert (Rendered (Runtime, "pl", "measure_quart", Args) =
-             "2 kwarty",
+             "2 kwarty ameryka" & U (16#144#) & "skie",
            "measure-unit skeleton localizes Polish quarts");
    Assert (Rendered (Runtime, "cs", "measure_quart", Args) =
              "2 kvarty",
            "measure-unit skeleton localizes Czech quarts");
    Assert (Rendered (Runtime, "ru", "measure_quart", Args) =
-             "2 " & UTF8 ([16#43A#, 16#432#, 16#430#, 16#440#,
-                            16#442#, 16#44B#]),
+             "2 " & UTF8 ([16#430#, 16#43C#, 16#435#, 16#440#]) & ". " &
+             UTF8 ([16#43A#, 16#432#, 16#430#, 16#440#, 16#442#, 16#44B#]),
            "measure-unit skeleton localizes Russian quarts");
    Assert (Rendered (Runtime, "en", "unit_cubic_meter_short", Args) =
-             "2 m3",
+             "2 m" & U (16#B3#),
            "unit formatter accepts short volume-cubic-metre alias");
    Assert (Rendered (Runtime, "en", "unit_cubic_inch", Args) =
              "2 cubic inches",
@@ -2305,7 +2308,7 @@ begin
              "2 cubic centimeters",
            "measure-unit skeleton accepts volume-cubic-centimeter");
    Assert (Rendered (Runtime, "en", "measure_cubic_foot_short", Args) =
-             "2 ft3",
+             "2 ft" & U (16#B3#),
            "measure-unit skeleton accepts short volume-cubic-foot");
    Assert (Rendered (Runtime, "en", "measure_cubic_yard", Args) =
              "2 cubic yards",
@@ -2331,7 +2334,7 @@ begin
              "1,5 kil" & U (16#F3#) & "metros por hora",
            "measure-unit skeleton localizes Spanish per-unit output");
    Assert (Rendered (Runtime, "it", "measure_per", Args) =
-             "1,5 chilometri per ora",
+             "1,5 chilometri al ora",
            "measure-unit skeleton localizes Italian per-unit output");
    Assert (Rendered (Runtime, "pt", "measure_per", Args) =
              "1,5 quil" & U (16#F4#) & "metro por hora",
@@ -2343,73 +2346,79 @@ begin
              "1,5 kilometri pe or" & U (16#103#),
            "measure-unit skeleton localizes Romanian per-unit output");
    Assert (Rendered (Runtime, "lt", "measure_per", Args) =
-             "1,5 kilometrai per valanda",
+             "1,5 kilometro/valanda",
            "measure-unit skeleton localizes Lithuanian per-unit output");
    Assert (Rendered (Runtime, "sl", "measure_per", Args) =
-             "1,5 kilometra na ura",
+             "1,5 kilometri/ura",
            "measure-unit skeleton localizes Slovenian per-unit output");
    Assert (Rendered (Runtime, "pl", "measure_per", Args) =
-             "1,5 kilometry na godzina",
+             "1,5 kilometra na godzina",
            "measure-unit skeleton localizes Polish per-unit output");
    Assert (Rendered (Runtime, "cs", "measure_per", Args) =
-             "1,5 kilometry za hodina",
+             "1,5 kilometru/hodina",
            "measure-unit skeleton localizes Czech per-unit output");
    Assert (Rendered (Runtime, "ru", "measure_per", Args) =
              "1,5 "
              & UTF8 ([16#43A#, 16#438#, 16#43B#, 16#43E#, 16#43C#,
-                       16#435#, 16#442#, 16#440#, 16#44B#])
-             & " " & U (16#432#) & " "
-             & UTF8 ([16#447#, 16#430#, 16#441#]),
+                       16#435#, 16#442#, 16#440#, 16#430#])
+             & "/" & UTF8 ([16#447#, 16#430#, 16#441#]),
            "measure-unit skeleton localizes Russian per-unit output");
    Assert (Rendered (Runtime, "ar", "measure_per", Args) =
              U (16#0661#) & U (16#066B#) & U (16#0665#) & " "
              & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#,
-                       16#62A#, 16#631#, 16#627#, 16#62A#])
+                       16#62A#, 16#631#])
              & " " & UTF8 ([16#644#, 16#643#, 16#644#]) & " "
              & UTF8 ([16#633#, 16#627#, 16#639#, 16#629#]),
            "measure-unit skeleton localizes Arabic per-unit output");
    Assert (Rendered (Runtime, "ar-u-nu-latn", "measure_per", Args) =
              "1" & U (16#066B#) & "5 "
              & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#,
-                       16#62A#, 16#631#, 16#627#, 16#62A#])
+                       16#62A#, 16#631#])
              & " " & UTF8 ([16#644#, 16#643#, 16#644#]) & " "
              & UTF8 ([16#633#, 16#627#, 16#639#, 16#629#]),
            "measure-unit skeleton honors explicit Latin digits");
    Assert (Rendered (Runtime, "ja", "measure_per", Args) =
              "1.5" & UTF8 ([16#30AD#, 16#30ED#, 16#30E1#, 16#30FC#,
                               16#30C8#, 16#30EB#])
-             & "/" & UTF8 ([16#6642#, 16#9593#]),
+             & U (16#6BCE#) & UTF8 ([16#6642#, 16#9593#]),
            "measure-unit skeleton localizes Japanese per-unit output");
    Assert (Rendered (Runtime, "zh", "measure_per", Args) =
              "1.5" & UTF8 ([16#516C#, 16#91CC#])
-             & "/" & UTF8 ([16#5C0F#, 16#65F6#]),
+             & " per " & UTF8 ([16#5C0F#, 16#65F6#]),
            "measure-unit skeleton localizes Chinese per-unit output");
    Assert (Rendered (Runtime, "ko", "measure_per", Args) =
              "1.5" & UTF8 ([16#D0AC#, 16#B85C#, 16#BBF8#, 16#D130#])
-             & "/" & UTF8 ([16#C2DC#, 16#AC04#]),
+             & " per " & UTF8 ([16#C2DC#, 16#AC04#]),
            "measure-unit skeleton localizes Korean per-unit output");
    Assert (Rendered (Runtime, "tr", "measure_per", Args) =
-             "1,5 kilometers ba" & U (16#15F#) & U (16#131#)
-             & "na hour",
+             "1,5 kilometre/saat",
            "measure-unit skeleton uses source-backed Turkish per separator");
    Assert (Rendered (Runtime, "da", "measure_per", Args) =
-             "1,5 kilometer pr. hour",
+             "1,5 kilometer pr. time",
            "measure-unit skeleton uses source-backed Danish per separator");
    Assert (Rendered (Runtime, "hi", "measure_per", Args) =
-             "1.5 kilometers "
+             "1.5 "
+             & UTF8 ([16#915#, 16#93F#, 16#932#, 16#94B#, 16#92E#, 16#940#,
+                       16#91F#, 16#930#])
+             & " "
              & UTF8 ([16#92A#, 16#94D#, 16#930#, 16#924#, 16#93F#])
-             & " hour",
+             & " " & UTF8 ([16#918#, 16#902#, 16#91F#, 16#93E#]),
            "measure-unit skeleton uses source-backed Hindi per separator");
    Assert (Rendered (Runtime, "el", "measure_per", Args) =
-             "1,5 kilometers "
-             & UTF8 ([16#3B1#, 16#3BD#, 16#3AC#]) & " hour",
+             "1,5 "
+             & UTF8 ([16#3C7#, 16#3B9#, 16#3BB#, 16#3B9#, 16#3CC#, 16#3BC#,
+                       16#3B5#, 16#3C4#, 16#3C1#, 16#3B1#])
+             & " " & UTF8 ([16#3B1#, 16#3BD#, 16#3AC#])
+             & " " & UTF8 ([16#3CE#, 16#3C1#, 16#3B1#]),
            "measure-unit skeleton uses source-backed Greek per separator");
    Assert (Rendered (Runtime, "he", "measure_per", Args) =
-             "1.5 kilometers "
-             & UTF8 ([16#5DC#, 16#5DB#, 16#5DC#]) & " hour",
+             "1.5 "
+             & UTF8 ([16#5E7#, 16#5D9#, 16#5DC#, 16#5D5#, 16#5DE#, 16#5D8#,
+                       16#5E8#, 16#5D9#, 16#5DD#])
+             & " " & UTF8 ([16#5DC#, 16#5E9#, 16#5E2#, 16#5D4#]),
            "measure-unit skeleton uses source-backed Hebrew per separator");
    Assert (Rendered (Runtime, "en", "measure_per_short", Args) =
-             "1.5 km/h",
+             "1.5 km/hr",
            "short measure-unit skeleton renders slash per-unit form");
    I18N.Arguments.Set (Args, "weight", "2");
    Assert (Rendered (Runtime, "en", "measure_narrow", Args) = "2 kg",
@@ -2448,7 +2457,7 @@ begin
              "2 miligramai",
            "unit formatter localizes Lithuanian milligrams");
    Assert (Rendered (Runtime, "sl", "unit_milligram_alias", Args) =
-             "2 miligrami",
+             "2 miligrama",
            "unit formatter localizes Slovenian milligrams");
    Assert (Rendered (Runtime, "pl", "unit_milligram_alias", Args) =
              "2 miligramy",
@@ -2457,9 +2466,8 @@ begin
              "2 miligramy",
            "unit formatter localizes Czech milligrams");
    Assert (Rendered (Runtime, "ru", "unit_milligram_alias", Args) =
-             "2 " & UTF8 ([16#43C#, 16#438#, 16#43B#, 16#43B#,
-                            16#438#, 16#433#, 16#440#, 16#430#,
-                            16#43C#, 16#43C#, 16#44B#]),
+             "2 " &
+             UTF8 ([16#43C#, 16#438#, 16#43B#, 16#43B#, 16#438#, 16#433#, 16#440#, 16#430#, 16#43C#, 16#43C#, 16#430#]),
            "unit formatter localizes Russian milligrams");
    Assert (Rendered (Runtime, "en", "measure_milligram_short", Args) =
              "2 mg",
@@ -2478,22 +2486,22 @@ begin
              "2 toneladas",
            "measure-unit skeleton localizes Spanish tonnes");
    Assert (Rendered (Runtime, "it", "measure_tonne", Args) =
-             "2 tonnellate",
+             "2 tonnellate metriche",
            "measure-unit skeleton localizes Italian tonnes");
    Assert (Rendered (Runtime, "pt", "measure_tonne", Args) =
-             "2 toneladas",
+             "2 toneladas m" & U (16#E9#) & "tricas",
            "measure-unit skeleton localizes Portuguese tonnes");
    Assert (Rendered (Runtime, "nl", "measure_tonne", Args) =
-             "2 ton",
+             "2 metrische ton",
            "measure-unit skeleton localizes Dutch tonnes");
    Assert (Rendered (Runtime, "ro", "measure_tonne", Args) =
-             "2 tone",
+             "2 tone metrice",
            "measure-unit skeleton localizes Romanian tonnes");
    Assert (Rendered (Runtime, "lt", "measure_tonne", Args) =
-             "2 tonos",
+             "2 metrin" & U (16#117#) & "s tonos",
            "measure-unit skeleton localizes Lithuanian tonnes");
    Assert (Rendered (Runtime, "sl", "measure_tonne", Args) =
-             "2 toni",
+             "2 metri" & U (16#10D#) & "ni toni",
            "measure-unit skeleton localizes Slovenian tonnes");
    Assert (Rendered (Runtime, "pl", "measure_tonne", Args) =
              "2 tony",
@@ -2511,19 +2519,19 @@ begin
              "2 stones",
            "unit formatter accepts mass-stone alias");
    Assert (Rendered (Runtime, "de", "unit_stone_alias", Args) =
-             "2 Stone",
+             "2 Stones",
            "unit formatter localizes German stones");
    Assert (Rendered (Runtime, "fr", "unit_stone_alias", Args) =
              "2 stones",
            "unit formatter localizes French stones");
    Assert (Rendered (Runtime, "es", "unit_stone_alias", Args) =
-             "2 stone",
+             "2 stones",
            "unit formatter localizes Spanish stones");
    Assert (Rendered (Runtime, "it", "unit_stone_alias", Args) =
              "2 stone",
            "unit formatter localizes Italian stones");
    Assert (Rendered (Runtime, "pt", "unit_stone_alias", Args) =
-             "2 stone",
+             "2 stones",
            "unit formatter localizes Portuguese stones");
    Assert (Rendered (Runtime, "nl", "unit_stone_alias", Args) =
              "2 stone",
@@ -2535,20 +2543,19 @@ begin
              "2 stonai",
            "unit formatter localizes Lithuanian stones");
    Assert (Rendered (Runtime, "sl", "unit_stone_alias", Args) =
-             "2 stoni",
+             "2 stona",
            "unit formatter localizes Slovenian stones");
    Assert (Rendered (Runtime, "pl", "unit_stone_alias", Args) =
-             "2 stony",
+             "2 kamienie",
            "unit formatter localizes Polish stones");
    Assert (Rendered (Runtime, "cs", "unit_stone_alias", Args) =
-             "2 stony",
+             "2 kameny",
            "unit formatter localizes Czech stones");
    Assert (Rendered (Runtime, "ru", "unit_stone_alias", Args) =
-             "2 " & UTF8 ([16#441#, 16#442#, 16#43E#, 16#443#,
-                            16#43D#, 16#44B#]),
+             "2 " & UTF8 ([16#441#, 16#442#, 16#43E#, 16#443#, 16#43D#, 16#430#]),
            "unit formatter localizes Russian stones");
    Assert (Rendered (Runtime, "en", "measure_carat_short", Args) =
-             "2 ct",
+             "2 CD",
            "measure-unit skeleton accepts short mass-carat output");
    I18N.Arguments.Set (Args, "elapsed", "2");
    Assert (Rendered (Runtime, "en", "measure_millisecond", Args) =
@@ -2561,11 +2568,11 @@ begin
              "2 ns",
            "measure-unit skeleton accepts short duration-nanosecond output");
    Assert (Rendered (Runtime, "en", "measure_fortnight_short", Args) =
-             "2 fortnight",
+             "2 fw",
            "measure-unit skeleton accepts short duration-fortnight output");
    I18N.Arguments.Set (Args, "area", "12.5");
    Assert (Rendered (Runtime, "en", "measure_square_meter_short", Args) =
-             "12.5 m2",
+             "12.5 m" & U (16#B2#),
            "measure-unit skeleton accepts area-square-meter short output");
    Assert (Rendered (Runtime, "en", "measure_square_kilometre", Args) =
              "12.5 square kilometers",
@@ -2608,13 +2615,13 @@ begin
              "1 akr",
            "unit formatter uses source-backed Czech acre one form");
    Assert (Rendered (Runtime, "ru", "unit_acre_alias", Args) =
-             "1 akr",
+             "1 " & UTF8 ([16#430#, 16#43A#, 16#440#]),
            "unit formatter uses source-backed Russian acre one form");
    Assert (Rendered (Runtime, "ar", "unit_acre_alias", Args) =
-             U (16#0661#) & " faddan",
+             U (16#661#) & " " & UTF8 ([16#641#, 16#62F#, 16#627#, 16#646#]),
            "unit formatter uses source-backed Arabic acre one form");
    Assert (Rendered (Runtime, "ja", "unit_acre_alias", Args) =
-             "1eekaa",
+             "1" & UTF8 ([16#30A8#, 16#30FC#, 16#30AB#, 16#30FC#]),
            "unit formatter uses source-backed Japanese acre one form");
    Assert (Rendered (Runtime, "zh", "unit_acre_alias", Args) =
              "1" & UTF8 ([16#82F1#, 16#4EA9#]),
@@ -2627,13 +2634,13 @@ begin
              "12.5 square feet",
            "measure-unit skeleton accepts area-square-foot");
    Assert (Rendered (Runtime, "en", "unit_square_centimeter_short", Args) =
-             "12.5 cm2",
+             "12.5 cm" & U (16#B2#),
            "unit formatter accepts short area-square-centimetre alias");
    Assert (Rendered (Runtime, "en", "unit_square_yard", Args) =
              "12.5 square yards",
            "unit formatter accepts area-square-yard alias");
    Assert (Rendered (Runtime, "en", "measure_square_inch_short", Args) =
-             "12.5 in2",
+             "12.5 in" & U (16#B2#),
            "measure-unit skeleton accepts short area-square-inch");
    Assert (Rendered (Runtime, "de", "measure_square_foot", Args) =
              "12,5 Quadratfu" & U (16#DF#),
@@ -2664,20 +2671,20 @@ begin
              "12,5 kvadratni " & U (16#10D#) & "evlji",
            "measure-unit skeleton localizes Slovenian square feet");
    Assert (Rendered (Runtime, "pl", "measure_square_foot", Args) =
-             "12,5 stopy kwadratowe",
+             "12,5 stopy kwadratowej",
            "measure-unit skeleton localizes Polish square feet");
    Assert (Rendered (Runtime, "cs", "measure_square_foot", Args) =
              "12,5 stopy " & U (16#10D#) & "tvere"
              & U (16#10D#) & "n" & U (16#ED#),
            "measure-unit skeleton localizes Czech square feet");
    Assert (Rendered (Runtime, "ru", "measure_square_foot", Args) =
-             "12,5 "
-             & UTF8 ([16#43A#, 16#432#, 16#430#, 16#434#, 16#440#,
-                       16#430#, 16#442#, 16#43D#, 16#44B#, 16#435#,
-                       16#20#, 16#444#, 16#443#, 16#442#, 16#44B#]),
+             "12,5 " &
+             UTF8 ([16#43A#, 16#432#, 16#430#, 16#434#, 16#440#, 16#430#,
+                    16#442#, 16#43D#, 16#43E#, 16#433#, 16#43E#]) &
+             " " & UTF8 ([16#444#, 16#443#, 16#442#, 16#430#]),
            "measure-unit skeleton localizes Russian square feet");
    Assert (Rendered (Runtime, "en", "measure_square_mile_short", Args) =
-             "12.5 mi2",
+             "12.5 sq mi",
            "measure-unit skeleton accepts short area-square-mile output");
    Assert (Rendered (Runtime, "de", "measure_square_mile", Args) =
              "12,5 Quadratmeilen",
@@ -2695,7 +2702,7 @@ begin
              "12,5 milhas quadradas",
            "measure-unit skeleton localizes Portuguese square miles");
    Assert (Rendered (Runtime, "nl", "measure_square_mile", Args) =
-             "12,5 vierkante mijlen",
+             "12,5 vierkante mijl",
            "measure-unit skeleton localizes Dutch square miles");
    Assert (Rendered (Runtime, "ro", "measure_square_mile", Args) =
              "12,5 mile p" & U (16#103#) & "trate",
@@ -2707,17 +2714,16 @@ begin
              "12,5 kvadratne milje",
            "measure-unit skeleton localizes Slovenian square miles");
    Assert (Rendered (Runtime, "pl", "measure_square_mile", Args) =
-             "12,5 mile kwadratowe",
+             "12,5 mili kwadratowej",
            "measure-unit skeleton localizes Polish square miles");
    Assert (Rendered (Runtime, "cs", "measure_square_mile", Args) =
              "12,5 m" & U (16#ED#) & "le " & U (16#10D#)
              & "tvere" & U (16#10D#) & "n" & U (16#ED#),
            "measure-unit skeleton localizes Czech square miles");
    Assert (Rendered (Runtime, "ru", "measure_square_mile", Args) =
-             "12,5 "
-             & UTF8 ([16#43A#, 16#432#, 16#430#, 16#434#, 16#440#,
-                       16#430#, 16#442#, 16#43D#, 16#44B#, 16#435#,
-                       16#20#, 16#43C#, 16#438#, 16#43B#, 16#438#]),
+             "12,5 " &
+             UTF8 ([16#43A#, 16#432#, 16#430#, 16#434#, 16#440#, 16#430#, 16#442#, 16#43D#, 16#43E#, 16#439#]) & " " &
+             UTF8 ([16#43C#, 16#438#, 16#43B#, 16#438#]),
            "measure-unit skeleton localizes Russian square miles");
    Assert (Rendered (Runtime, "de", "measure_hectare", Args) =
              "12,5 Hektar",
@@ -2732,9 +2738,7 @@ begin
              "12,5 ettari",
            "measure-unit skeleton localizes Italian hectares");
    Assert (Rendered (Runtime, "ru", "measure_hectare", Args) =
-             "12,5 "
-             & UTF8 ([16#433#, 16#435#, 16#43A#, 16#442#,
-                       16#430#, 16#440#, 16#44B#]),
+             "12,5 " & UTF8 ([16#433#, 16#435#, 16#43A#, 16#442#, 16#430#, 16#440#, 16#430#]),
            "measure-unit skeleton localizes Russian hectares");
    Assert (Rendered (Runtime, "ko", "measure_hectare", Args) =
              "12.5" & UTF8 ([16#D5E5#, 16#D0C0#, 16#B974#]),
@@ -2744,7 +2748,7 @@ begin
              "21 degrees Celsius",
            "measure-unit skeleton accepts temperature-celsius");
    Assert (Rendered (Runtime, "en", "measure_fahrenheit_short", Args) =
-             "21 F",
+             "21 " & U (16#B0#) & "F",
            "measure-unit skeleton accepts temperature-fahrenheit short output");
    I18N.Arguments.Set (Args, "angle", "90");
    Assert (Rendered (Runtime, "en", "measure_degree_short", Args) =
@@ -2752,7 +2756,7 @@ begin
            "measure-unit skeleton accepts angle-degree short output");
    I18N.Arguments.Set (Args, "size", "2");
    Assert (Rendered (Runtime, "en", "measure_byte_short", Args) =
-             "2 B",
+             "2 byte",
            "measure-unit skeleton accepts digital-byte short output");
    Assert (Rendered (Runtime, "en", "unit_bit_alias", Args) = "2 bits",
            "unit formatter accepts digital-bit alias");
@@ -2773,20 +2777,20 @@ begin
            "unit formatter localizes Romanian bits");
    Assert (Rendered (Runtime, "lt", "unit_bit_alias", Args) = "2 bitai",
            "unit formatter localizes Lithuanian bits");
-   Assert (Rendered (Runtime, "sl", "unit_bit_alias", Args) = "2 biti",
+   Assert (Rendered (Runtime, "sl", "unit_bit_alias", Args) = "2 bita",
            "unit formatter localizes Slovenian bits");
    Assert (Rendered (Runtime, "pl", "unit_bit_alias", Args) = "2 bity",
            "unit formatter localizes Polish bits");
    Assert (Rendered (Runtime, "cs", "unit_bit_alias", Args) = "2 bity",
            "unit formatter localizes Czech bits");
    Assert (Rendered (Runtime, "ru", "unit_bit_alias", Args) =
-             "2 " & UTF8 ([16#431#, 16#438#, 16#442#, 16#44B#]),
+             "2 " & UTF8 ([16#431#, 16#438#, 16#442#, 16#430#]),
            "unit formatter localizes Russian bits");
    Assert (Rendered (Runtime, "en", "measure_gigabyte", Args) =
              "2 gigabytes",
            "measure-unit skeleton accepts digital-gigabyte");
    Assert (Rendered (Runtime, "en", "measure_megabit_short", Args) =
-             "2 Mbit",
+             "2 Mb",
            "measure-unit skeleton accepts short digital-megabit output");
    Assert (Rendered (Runtime, "en", "measure_gigabit", Args) =
              "2 gigabits",
@@ -2807,7 +2811,7 @@ begin
              "2 gigabits",
            "measure-unit skeleton localizes Portuguese gigabits");
    Assert (Rendered (Runtime, "nl", "measure_gigabit", Args) =
-             "2 gigabit",
+             "2 gigabits",
            "measure-unit skeleton localizes Dutch gigabits");
    Assert (Rendered (Runtime, "ro", "measure_gigabit", Args) =
              "2 gigabi" & U (16#21B#) & "i",
@@ -2816,7 +2820,7 @@ begin
              "2 gigabitai",
            "measure-unit skeleton localizes Lithuanian gigabits");
    Assert (Rendered (Runtime, "sl", "measure_gigabit", Args) =
-             "2 gigabiti",
+             "2 gigabita",
            "measure-unit skeleton localizes Slovenian gigabits");
    Assert (Rendered (Runtime, "pl", "measure_gigabit", Args) =
              "2 gigabity",
@@ -2825,8 +2829,7 @@ begin
              "2 gigabity",
            "measure-unit skeleton localizes Czech gigabits");
    Assert (Rendered (Runtime, "ru", "measure_gigabit", Args) =
-             "2 " & UTF8 ([16#433#, 16#438#, 16#433#, 16#430#,
-                            16#431#, 16#438#, 16#442#, 16#44B#]),
+             "2 " & UTF8 ([16#433#, 16#438#, 16#433#, 16#430#, 16#431#, 16#438#, 16#442#, 16#430#]),
            "measure-unit skeleton localizes Russian gigabits");
    Assert (Rendered (Runtime, "en", "measure_petabyte_short", Args) =
              "2 PB",
@@ -2874,27 +2877,24 @@ begin
              "2 calor" & U (16#ED#) & "as",
            "measure-unit skeleton localizes Spanish calories");
    Assert (Rendered (Runtime, "pt", "measure_kilowatt_hour", Args) =
-             "2 quilowatt-horas",
+             "2 quilowatts-hora",
            "measure-unit skeleton localizes Portuguese kilowatt-hours");
    Assert (Rendered (Runtime, "nl", "measure_joule", Args) =
-             "2 joule",
+             "2 joules",
            "measure-unit skeleton localizes Dutch joules");
    Assert (Rendered (Runtime, "pl", "measure_calorie", Args) =
              "2 kalorie",
            "measure-unit skeleton localizes Polish calories");
    Assert (Rendered (Runtime, "ru", "measure_joule", Args) =
-             "2 " & UTF8 ([16#434#, 16#436#, 16#43E#, 16#443#,
-                            16#43B#, 16#438#]),
+             "2 " & UTF8 ([16#434#, 16#436#, 16#43E#, 16#443#, 16#43B#, 16#44F#]),
            "measure-unit skeleton localizes Russian joules");
    Assert (Rendered (Runtime, "ar", "measure_joule", Args) =
              U (16#0662#) & " "
              & UTF8 ([16#62C#, 16#648#, 16#644#]),
            "measure-unit skeleton localizes Arabic joules");
    Assert (Rendered (Runtime, "ar", "measure_kilowatt_hour", Args) =
-             U (16#0662#) & " "
-             & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#,
-                       16#648#, 16#627#, 16#637#, 16#20#,
-                       16#633#, 16#627#, 16#639#, 16#629#]),
+             U (16#662#) & " " & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#]) & " " &
+             UTF8 ([16#648#, 16#627#, 16#637#]) & "/" & UTF8 ([16#633#, 16#627#, 16#639#, 16#629#]),
            "measure-unit skeleton localizes Arabic kilowatt-hours");
    Assert (Rendered (Runtime, "ja", "measure_kilojoule", Args) =
              "2" & UTF8 ([16#30AD#, 16#30ED#, 16#30B8#,
@@ -2932,9 +2932,7 @@ begin
              "2 kW",
            "measure-unit skeleton accepts short power-kilowatt output");
    Assert (Rendered (Runtime, "ru", "measure_kilowatt", Args) =
-             "2 " & UTF8 ([16#43A#, 16#438#, 16#43B#, 16#43E#,
-                            16#432#, 16#430#, 16#442#, 16#442#,
-                            16#44B#]),
+             "2 " & UTF8 ([16#43A#, 16#438#, 16#43B#, 16#43E#, 16#432#, 16#430#, 16#442#, 16#442#, 16#430#]),
            "measure-unit skeleton localizes Russian kilowatts");
    Assert (Rendered (Runtime, "ar", "measure_kilowatt", Args) =
              U (16#0662#) & " "
@@ -2968,9 +2966,8 @@ begin
                             16#430#]),
            "measure-unit skeleton localizes Russian megahertz");
    Assert (Rendered (Runtime, "ar", "measure_megahertz", Args) =
-             U (16#0662#) & " "
-             & UTF8 ([16#645#, 16#64A#, 16#63A#, 16#627#,
-                       16#647#, 16#631#, 16#62A#, 16#632#]),
+             U (16#662#) & " " & UTF8 ([16#645#, 16#64A#, 16#63A#, 16#627#]) & " " &
+             UTF8 ([16#647#, 16#631#, 16#62A#, 16#632#]),
            "measure-unit skeleton localizes Arabic megahertz");
    Assert (Rendered (Runtime, "ja", "measure_megahertz", Args) =
              "2" & UTF8 ([16#30E1#, 16#30AC#, 16#30D8#,
@@ -2997,17 +2994,14 @@ begin
              "1013 Millibar",
            "measure-unit skeleton localizes German millibars");
    Assert (Rendered (Runtime, "sl", "measure_millibar", Args) =
-             "1013 milibara",
+             "1013 milibarov",
            "measure-unit skeleton localizes Slovenian millibars");
    Assert (Rendered (Runtime, "ru", "measure_millibar", Args) =
-             "1013 " & UTF8 ([16#43C#, 16#438#, 16#43B#, 16#43B#,
-                               16#438#, 16#431#, 16#430#, 16#440#,
-                               16#44B#]),
+             "1013 " & UTF8 ([16#43C#, 16#438#, 16#43B#, 16#43B#, 16#438#, 16#431#, 16#430#, 16#440#]),
            "measure-unit skeleton localizes Russian millibars");
    Assert (Rendered (Runtime, "ar", "measure_millibar", Args) =
-             U (16#0661#) & U (16#0660#) & U (16#0661#) & U (16#0663#)
-             & " " & UTF8 ([16#645#, 16#644#, 16#64A#, 16#628#,
-                             16#627#, 16#631#]),
+             UTF8 ([16#661#, 16#660#, 16#661#, 16#663#]) & " " & UTF8 ([16#645#, 16#644#, 16#64A#]) & " " &
+             UTF8 ([16#628#, 16#627#, 16#631#]),
            "measure-unit skeleton localizes Arabic millibars");
    Assert (Rendered (Runtime, "ja", "measure_millibar", Args) =
              "1013" & UTF8 ([16#30DF#, 16#30EA#, 16#30D0#,
@@ -3027,11 +3021,11 @@ begin
              "2 volts",
            "measure-unit skeleton accepts electric-volt");
    Assert (Rendered (Runtime, "en", "measure_ohm_short", Args) =
-             "2 ohm",
+             "2 " & U (16#3A9#),
            "measure-unit skeleton accepts short electric-ohm output");
    I18N.Arguments.Set (Args, "light", "2");
    Assert (Rendered (Runtime, "en", "measure_lumen", Args) =
-             "2 lumens",
+             "2 lumen",
            "measure-unit skeleton accepts light-lumen");
    Assert (Rendered (Runtime, "en", "measure_lux_short", Args) =
              "2 lx",
@@ -3044,26 +3038,23 @@ begin
              "50 pour cent",
            "measure-unit skeleton localizes French percent");
    Assert (Rendered (Runtime, "lt", "measure_percent", Args) =
-             "50 procentai",
+             "50 procentas",
            "measure-unit skeleton localizes Lithuanian percent");
    Assert (Rendered (Runtime, "zh", "measure_percent", Args) =
-             "50" & U (16#767E#) & U (16#5206#) & U (16#6BD4#),
+             "50%",
            "measure-unit skeleton localizes Chinese percent");
    Assert (Rendered (Runtime, "ru", "measure_percent", Args) =
-             "50 " & UTF8 ([16#43F#, 16#440#, 16#43E#, 16#446#,
-                             16#435#, 16#43D#, 16#442#, 16#44B#]),
+             "50 " & UTF8 ([16#43F#, 16#440#, 16#43E#, 16#446#, 16#435#, 16#43D#, 16#442#, 16#43E#, 16#432#]),
            "measure-unit skeleton localizes Russian percent");
    Assert (Rendered (Runtime, "ar", "measure_percent", Args) =
-             U (16#0665#) & U (16#0660#) & " "
-             & UTF8 ([16#641#, 16#64A#, 16#20#, 16#627#,
-                       16#644#, 16#645#, 16#626#, 16#629#]),
+             UTF8 ([16#665#, 16#660#]) & " " & U (16#66A#),
            "measure-unit skeleton localizes Arabic percent");
    Assert (Rendered (Runtime, "ja", "measure_percent", Args) =
              "50" & UTF8 ([16#30D1#, 16#30FC#, 16#30BB#,
                             16#30F3#, 16#30C8#]),
            "measure-unit skeleton localizes Japanese percent");
    Assert (Rendered (Runtime, "ko", "measure_percent", Args) =
-             "50" & UTF8 ([16#D37C#, 16#C13C#, 16#D2B8#]),
+             "50%",
            "measure-unit skeleton localizes Korean percent");
    Assert (Rendered (Runtime, "en", "measure_percent_short", Args) =
              "50 %",
@@ -3098,7 +3089,7 @@ begin
              "2 Earth masses",
            "measure-unit skeleton accepts mass-earth-mass");
    Assert (Rendered (Runtime, "en", "measure_solar_mass_short", Args) =
-             "2 M_sun",
+             "2 M" & U (16#2609#),
            "measure-unit skeleton accepts short mass-solar-mass");
    I18N.Arguments.Set (Args, "volume", "2");
    Assert (Rendered (Runtime, "en", "measure_barrel_short", Args) =
@@ -3106,7 +3097,7 @@ begin
            "measure-unit skeleton accepts short volume-barrel");
    I18N.Arguments.Set (Args, "temperature", "2");
    Assert (Rendered (Runtime, "en", "measure_kelvin", Args) =
-             "2 kelvin",
+             "2 kelvins",
            "measure-unit skeleton accepts temperature-kelvin");
    I18N.Arguments.Set (Args, "power", "2");
    Assert (Rendered (Runtime, "en", "measure_horsepower_short", Args) =
@@ -3133,11 +3124,11 @@ begin
              "2 knots",
            "measure-unit skeleton accepts speed-knot");
    Assert (Rendered (Runtime, "en", "measure_beaufort_short", Args) =
-             "2 Bft",
+             "2 B",
            "measure-unit skeleton accepts short speed-beaufort");
    I18N.Arguments.Set (Args, "pressure", "2");
    Assert (Rendered (Runtime, "en", "measure_psi", Args) =
-             "2 pounds per square inch",
+             "2 pounds-force per square inch",
            "measure-unit skeleton accepts pressure PSI");
    I18N.Arguments.Set (Args, "electric", "2");
    Assert (Rendered (Runtime, "en", "measure_milliampere", Args) =
@@ -3148,10 +3139,10 @@ begin
            "measure-unit skeleton accepts short electric-millivolt");
    I18N.Arguments.Set (Args, "light", "2");
    Assert (Rendered (Runtime, "en", "measure_candela", Args) =
-             "2 candelas",
+             "2 candela",
            "measure-unit skeleton accepts light-candela");
    Assert (Rendered (Runtime, "en", "measure_solar_luminosity_short", Args) =
-             "2 L_sun",
+             "2 L" & U (16#2609#),
            "measure-unit skeleton accepts short light-solar-luminosity");
 
    I18N.Arguments.Set (Args, "offset", "-3");
@@ -3231,7 +3222,7 @@ begin
              "for 3 dage siden",
            "relative-time formatter localizes Danish past offsets");
    Assert (Rendered (Runtime, "eo", "relative", Args) =
-             "-3 d",
+             "anta" & U (16#16D#) & " 3 tagoj",
            "relative-time formatter localizes Esperanto past offsets");
    Assert (Rendered (Runtime, "vi", "relative", Args) =
              "3 " & UTF8 ([16#6E#, 16#67#, 16#E0#, 16#79#])
@@ -3345,7 +3336,7 @@ begin
            "relative-time formatter localizes Swedish future offsets");
    Assert (Rendered (Runtime, "da", "relative", Args) = "om 2 dage",
            "relative-time formatter localizes Danish future offsets");
-   Assert (Rendered (Runtime, "eo", "relative", Args) = "+2 d",
+   Assert (Rendered (Runtime, "eo", "relative", Args) = "post 2 tagoj",
            "relative-time formatter localizes Esperanto future offsets");
    Assert (Rendered (Runtime, "vi", "relative", Args) =
              "sau 2 " & UTF8 ([16#6E#, 16#67#, 16#E0#, 16#79#])
@@ -3496,7 +3487,8 @@ begin
            "relative-time formatter renders CLDR current second");
    Assert (Rendered (Runtime, "de", "relative", Args) = "heute",
            "relative-time formatter localizes German zero day");
-   Assert (Rendered (Runtime, "fr", "relative", Args) = "aujourd'hui",
+   Assert (Rendered (Runtime, "fr", "relative", Args) =
+             "aujourd" & U (16#2019#) & "hui",
            "relative-time formatter localizes French zero day");
    Assert (Rendered (Runtime, "es", "relative", Args) = "hoy",
            "relative-time formatter localizes Spanish zero day");
@@ -3536,7 +3528,7 @@ begin
    Assert (Rendered (Runtime, "tr", "relative", Args) =
              UTF8 ([16#62#, 16#75#, 16#67#, 16#FC#, 16#6E#]),
            "relative-time formatter localizes Turkish zero day");
-   Assert (Rendered (Runtime, "sv", "relative", Args) = "idag",
+   Assert (Rendered (Runtime, "sv", "relative", Args) = "i dag",
            "relative-time formatter localizes Swedish zero day");
    Assert (Rendered (Runtime, "da", "relative", Args) = "i dag",
            "relative-time formatter localizes Danish zero day");
@@ -3547,7 +3539,7 @@ begin
              UTF8 ([16#68#, 16#6F#, 16#64#, 16#69#, 16#61#, 16#16D#]),
            "relative-time formatter localizes Esperanto zero day");
    Assert (Rendered (Runtime, "vi", "relative", Args) =
-             UTF8 ([16#68#, 16#F4#, 16#6D#, 16#20#, 16#6E#, 16#61#,
+             UTF8 ([16#48#, 16#F4#, 16#6D#, 16#20#, 16#6E#, 16#61#,
                     16#79#]),
            "relative-time formatter localizes Vietnamese zero day");
    Assert (Rendered (Runtime, "hu", "relative", Args) = "ma",
@@ -3557,7 +3549,7 @@ begin
    Assert (Rendered (Runtime, "de", "relative_week", Args) =
              "diese Woche",
            "relative-time formatter localizes German current week");
-   Assert (Rendered (Runtime, "fr", "relative_month", Args) = "ce mois",
+   Assert (Rendered (Runtime, "fr", "relative_month", Args) = "ce mois-ci",
            "relative-time formatter localizes French current month");
    Assert (Rendered (Runtime, "es", "relative_year", Args) =
              "este a" & U (16#F1#) & "o",
@@ -3588,9 +3580,7 @@ begin
              UTF8 ([16#62#, 16#75#, 16#20#, 16#79#, 16#131#, 16#6C#]),
            "relative-time formatter localizes Turkish current year");
    Assert (Rendered (Runtime, "sv", "relative_week", Args) =
-             UTF8 ([16#64#, 16#65#, 16#6E#, 16#20#, 16#68#, 16#E4#,
-                    16#72#, 16#20#, 16#76#, 16#65#, 16#63#, 16#6B#,
-                    16#61#, 16#6E#]),
+             "denna vecka",
            "relative-time formatter localizes Swedish current week");
    Assert (Rendered (Runtime, "da", "relative_month", Args) =
              UTF8 ([16#64#, 16#65#, 16#6E#, 16#6E#, 16#65#, 16#20#,
@@ -3602,18 +3592,14 @@ begin
                     16#6C#, 16#61#]),
            "relative-time formatter localizes Finnish current week");
    Assert (Rendered (Runtime, "eo", "relative_month", Args) =
-             UTF8 ([16#109#, 16#69#, 16#20#, 16#74#, 16#69#, 16#75#,
-                    16#20#, 16#6D#, 16#6F#, 16#6E#, 16#61#, 16#74#,
-                    16#6F#]),
+             "nuna monato",
            "relative-time formatter localizes Esperanto current month");
    Assert (Rendered (Runtime, "vi", "relative_year", Args) =
              UTF8 ([16#6E#, 16#103#, 16#6D#, 16#20#, 16#6E#, 16#61#,
                     16#79#]),
            "relative-time formatter localizes Vietnamese current year");
    Assert (Rendered (Runtime, "hu", "relative_month", Args) =
-             UTF8 ([16#65#, 16#62#, 16#62#, 16#65#, 16#6E#, 16#20#,
-                    16#61#, 16#20#, 16#68#, 16#F3#, 16#6E#, 16#61#,
-                    16#70#, 16#62#, 16#61#, 16#6E#]),
+             "ez a h" & U (16#F3#) & "nap",
            "relative-time formatter localizes Hungarian current month");
    Assert (Rendered (Runtime, "sk", "relative_week", Args) =
              UTF8 ([16#74#, 16#65#, 16#6E#, 16#74#, 16#6F#, 16#20#,
@@ -3644,7 +3630,7 @@ begin
 
    I18N.Arguments.Set (Args, "items", "red|green|blue");
    Assert (Rendered (Runtime, "en", "list", Args) =
-           "red, green and blue",
+           "red, green, and blue",
            "list formatter renders deterministic conjunction lists");
    Assert (Rendered (Runtime, "en", "list_standard", Args) =
            Rendered (Runtime, "en", "list", Args),
@@ -3653,7 +3639,7 @@ begin
            Rendered (Runtime, "en", "list", Args),
            "list formatter accepts explicit and option");
    Assert (Rendered (Runtime, "en", "list_or", Args) =
-           "red, green or blue",
+           "red, green, or blue",
            "list formatter renders deterministic disjunction lists");
    Assert (Rendered (Runtime, "en", "list_disjunction", Args) =
            Rendered (Runtime, "en", "list_or", Args),
@@ -3674,7 +3660,7 @@ begin
            "red, green ho" & U (16#1EB7#) & "c blue",
            "list formatter uses generated Vietnamese disjunction");
    Assert (Rendered (Runtime, "ja", "list_unit", Args) =
-           "red" & U (16#3001#) & "green" & U (16#3001#) & "blue",
+           "red green blue",
            "list formatter uses generated Japanese unit list separators");
    Assert (Rendered (Runtime, "de", "list", Args) =
            "red, green und blue",
@@ -3707,13 +3693,13 @@ begin
            "red, green i blue",
            "list formatter localizes Polish conjunction");
    Assert (Rendered (Runtime, "cs", "list", Args) =
-           "red, green a blue",
+           "red, green a" & U (16#A0#) & "blue",
            "list formatter localizes Czech conjunction");
    Assert (Rendered (Runtime, "ru", "list", Args) =
            "red, green " & U (16#438#) & " blue",
            "list formatter localizes Russian conjunction");
    Assert (Rendered (Runtime, "ar", "list", Args) =
-           "red, green " & U (16#648#) & "blue",
+           "red " & U (16#648#) & "green " & U (16#648#) & "blue",
            "list formatter localizes Arabic conjunction");
    Assert (Rendered (Runtime, "ja", "list", Args) =
            "red" & U (16#3001#) & "green" & U (16#3001#) & "blue",
@@ -3750,7 +3736,7 @@ begin
            "red, green ja blue",
            "list formatter localizes Finnish conjunction");
    Assert (Rendered (Runtime, "id", "list", Args) =
-           "red, green dan blue",
+           "red, green, dan blue",
            "list formatter localizes Indonesian conjunction");
    Assert (Rendered (Runtime, "ms", "list", Args) =
            "red, green dan blue",
@@ -3783,14 +3769,14 @@ begin
            "red, green " & U (16#456#) & " blue",
            "list formatter localizes Ukrainian conjunction");
    Assert (Rendered (Runtime, "fa", "list", Args) =
-           "red, green " & U (16#648#) & " blue",
+           "red" & U (16#60C#) & U (16#200F#) & " green" & U (16#60C#)
+           & " " & U (16#648#) & " blue",
            "list formatter localizes Persian conjunction");
    Assert (Rendered (Runtime, "th", "list", Args) =
-           "red, green " & U (16#E41#) & U (16#E25#)
-           & U (16#E30#) & " blue",
+           "red green " & U (16#E41#) & U (16#E25#) & U (16#E30#) & "blue",
            "list formatter localizes Thai conjunction");
    Assert (Rendered (Runtime, "hi", "list", Args) =
-           "red, green " & U (16#914#) & U (16#930#) & " blue",
+           "red, green, " & U (16#914#) & U (16#930#) & " blue",
            "list formatter localizes Hindi conjunction");
    Assert (Rendered (Runtime, "el", "list", Args) =
            "red, green " & U (16#3BA#) & U (16#3B1#)
@@ -3804,7 +3790,7 @@ begin
      (Runtime, "en", "list", Args, Target, Last, Status);
    Assert (Status = I18N.Result.Success,
            "bounded list formatting succeeds");
-   Assert (Target (1 .. Last) = "red, green and blue",
+   Assert (Target (1 .. Last) = "red, green, and blue",
            "bounded list output matches materialized output");
 
    I18N.Arguments.Set (Args, "bad", "1.2.3");
