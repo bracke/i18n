@@ -60,6 +60,15 @@ jobs:
         working-directory: i18n
         run: ./benchmarks/bin/render_benchmarks --smoke
 
+      - name: Install GNATdoc
+        # gnatdoc is not part of the gnat_native toolchain, so a bare
+        # `alr exec -- gnatdoc` fails with "Executable not found in PATH".
+        # Install the prebuilt crate as a tool and put ~/.alire/bin on PATH;
+        # `alr exec` inherits it, so the next step resolves gnatdoc.
+        run: |
+          alr install gnatdoc_bin
+          echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
+
       - name: Generate GNATdoc
         working-directory: i18n
         run: alr exec -- gnatdoc -P i18n.gpr
