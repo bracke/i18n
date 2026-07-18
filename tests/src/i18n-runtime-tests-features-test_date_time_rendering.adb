@@ -795,10 +795,11 @@ begin
            "iso8601 calendar extension uses ISO week data");
    I18N.Arguments.Set (Args, "day", "2024-02-29");
    Assert (Rendered (Runtime, "th-u-ca-buddhist", "buddhist", Args) =
-             U (16#E01#) & U (16#E38#) & U (16#E21#)
+             U (16#E52#) & U (16#E59#) & ". "
+             & U (16#E01#) & U (16#E38#) & U (16#E21#)
              & U (16#E20#) & U (16#E32#) & U (16#E1E#)
              & U (16#E31#) & U (16#E19#) & U (16#E18#)
-             & U (16#E4C#) & " " & U (16#E52#) & U (16#E59#) & ", "
+             & U (16#E4C#) & " "
              & U (16#E52#) & U (16#E55#) & U (16#E56#) & U (16#E57#),
            "Buddhist calendar year is formatted from locale extension");
    Assert (Rendered (Runtime, "ja-u-ca-japanese", "japanese", Args) =
@@ -1649,13 +1650,13 @@ begin
              "9:05",
            "C skeleton uses German preferred 24-hour cycle");
    Assert (Rendered (Runtime, "ko", "preferred_hour", Args) =
-             "9:05 AM",
+             "9:05 " & U (16#C624#) & U (16#C804#),
            "j skeleton uses Korean preferred 12-hour cycle");
    Assert (Rendered (Runtime, "ko", "preferred_hour_no_period", Args) =
              "9:05",
            "J skeleton uses Korean preferred 12-hour cycle without period");
    Assert (Rendered (Runtime, "ko", "preferred_hour_flexible", Args) =
-             "9:05 AM",
+             "9:05 " & U (16#C624#) & U (16#C804#),
            "C skeleton uses Korean preferred 12-hour cycle");
    Assert (Rendered (Runtime, "th", "time_skeleton", Args) =
              U (16#E50#) & U (16#E59#) & ":"
@@ -1715,7 +1716,7 @@ begin
              U (16#4E0A#) & U (16#5348#),
            "time skeleton localizes Chinese abbreviated AM period");
    Assert (Rendered (Runtime, "ko", "period_am", Args) =
-             "AM",
+             U (16#C624#) & U (16#C804#),
            "time skeleton localizes Korean abbreviated AM period");
    I18N.Arguments.Set (Args, "clock", "15:00:00");
    Assert (Rendered (Runtime, "nl", "period_pm", Args) = "p.m.",
@@ -1796,7 +1797,7 @@ begin
              & U (16#E9#) & "ricain|America/New_York",
            "long z zone skeleton uses generated CLDR metazone rows");
    Assert (Rendered (Runtime, "en", "berlin_zone_names", Args) =
-             "CEST|CET|Central European Time|Europe/Berlin",
+             "GMT+2|GMT+2|Central European Time|Europe/Berlin",
            "European short z and v skeletons render abbreviations");
    Assert (Rendered (Runtime, "de", "berlin_zone_names", Args) =
              "Mitteleurop" & U (16#E4#) & "ische Zeit|Mitteleurop"
@@ -1828,31 +1829,41 @@ begin
              "Zentral-/Westaustralische Zeit|Zentral-/Westaustralische Zeit|Australia/Eucla",
            "Eucla zone skeleton names use generated CLDR central-western Australia rows");
    Assert (Rendered (Runtime, "ru", "zone_names", Args) =
-             UTF8 ([16#432#, 16#43E#, 16#441#, 16#442#, 16#43E#,
-                    16#447#, 16#43D#, 16#43E#, 16#435#, 16#20#,
-                    16#432#, 16#440#, 16#435#, 16#43C#, 16#44F#])
+             UTF8 ([16#412#, 16#43E#, 16#441#, 16#442#, 16#43E#,
+                    16#447#, 16#43D#, 16#430#, 16#44F#, 16#20#,
+                    16#410#, 16#43C#, 16#435#, 16#440#, 16#438#,
+                    16#43A#, 16#430#])
              & "|"
-             & UTF8 ([16#432#, 16#43E#, 16#441#, 16#442#, 16#43E#,
-                      16#447#, 16#43D#, 16#43E#, 16#435#, 16#20#,
-                      16#432#, 16#440#, 16#435#, 16#43C#, 16#44F#])
+             & UTF8 ([16#412#, 16#43E#, 16#441#, 16#442#, 16#43E#,
+                      16#447#, 16#43D#, 16#430#, 16#44F#, 16#20#,
+                      16#410#, 16#43C#, 16#435#, 16#440#, 16#438#,
+                      16#43A#, 16#430#])
              & "|America/New_York",
            "zone skeleton names localize Russian generic names");
    Assert (Rendered (Runtime, "ar", "zone_names", Args) =
              UTF8 ([16#627#, 16#644#, 16#62A#, 16#648#, 16#642#,
                     16#64A#, 16#62A#, 16#20#, 16#627#, 16#644#,
-                    16#634#, 16#631#, 16#642#, 16#64A#])
+                    16#634#, 16#631#, 16#642#, 16#64A#, 16#20#,
+                    16#644#, 16#623#, 16#645#, 16#631#, 16#64A#,
+                    16#643#, 16#627#, 16#20#, 16#627#, 16#644#,
+                    16#634#, 16#645#, 16#627#, 16#644#, 16#64A#,
+                    16#629#])
              & "|"
              & UTF8 ([16#627#, 16#644#, 16#62A#, 16#648#, 16#642#,
                       16#64A#, 16#62A#, 16#20#, 16#627#, 16#644#,
-                      16#634#, 16#631#, 16#642#, 16#64A#])
+                      16#634#, 16#631#, 16#642#, 16#64A#, 16#20#,
+                      16#644#, 16#623#, 16#645#, 16#631#, 16#64A#,
+                      16#643#, 16#627#, 16#20#, 16#627#, 16#644#,
+                      16#634#, 16#645#, 16#627#, 16#644#, 16#64A#,
+                      16#629#])
              & "|America/New_York",
            "zone skeleton names localize Arabic generic names");
    Assert (Rendered (Runtime, "ja", "zone_names", Args) =
-             UTF8 ([16#30A2#, 16#30E1#, 16#30EA#, 16#30AB#,
-                    16#6771#, 16#90E8#, 16#6642#, 16#9593#])
+             UTF8 ([16#7C73#, 16#56FD#, 16#6771#, 16#90E8#,
+                    16#6642#, 16#9593#])
              & "|"
-             & UTF8 ([16#30A2#, 16#30E1#, 16#30EA#, 16#30AB#,
-                      16#6771#, 16#90E8#, 16#6642#, 16#9593#])
+             & UTF8 ([16#7C73#, 16#56FD#, 16#6771#, 16#90E8#,
+                      16#6642#, 16#9593#])
              & "|America/New_York",
            "zone skeleton names localize Japanese generic names");
    Assert (Rendered (Runtime, "zh", "zone_names", Args) =
@@ -1864,11 +1875,11 @@ begin
              & "|America/New_York",
            "zone skeleton names localize Chinese generic names");
    Assert (Rendered (Runtime, "ko", "zone_names", Args) =
-             UTF8 ([16#BD81#, 16#BBF8#, 16#20#, 16#B3D9#,
-                    16#BD80#, 16#20#, 16#C2DC#, 16#AC04#])
+             UTF8 ([16#BBF8#, 16#20#, 16#B3D9#, 16#BD80#,
+                    16#20#, 16#C2DC#, 16#AC04#])
              & "|"
-             & UTF8 ([16#BD81#, 16#BBF8#, 16#20#, 16#B3D9#,
-                      16#BD80#, 16#20#, 16#C2DC#, 16#AC04#])
+             & UTF8 ([16#BBF8#, 16#20#, 16#B3D9#, 16#BD80#,
+                      16#20#, 16#C2DC#, 16#AC04#])
              & "|America/New_York",
            "zone skeleton names localize Korean generic names");
    Assert (Rendered (Runtime, "en", "tokyo_short_generic", Args) =
@@ -1908,13 +1919,11 @@ begin
              "Hawaii-Aleuten-Zeit|Hawaii-Aleuten-Zeit|Pacific/Honolulu",
            "fixed Hawaii-Aleutian zone skeleton names use generated CLDR metazone rows");
    Assert (Rendered (Runtime, "ru", "tokyo_zone_names", Args) =
-             UTF8 ([16#44F#, 16#43F#, 16#43E#, 16#43D#, 16#441#,
-                    16#43A#, 16#43E#, 16#435#, 16#20#, 16#432#,
-                    16#440#, 16#435#, 16#43C#, 16#44F#])
+             UTF8 ([16#42F#, 16#43F#, 16#43E#, 16#43D#, 16#438#,
+                    16#44F#])
              & "|"
-             & UTF8 ([16#44F#, 16#43F#, 16#43E#, 16#43D#, 16#441#,
-                      16#43A#, 16#43E#, 16#435#, 16#20#, 16#432#,
-                      16#440#, 16#435#, 16#43C#, 16#44F#])
+             & UTF8 ([16#42F#, 16#43F#, 16#43E#, 16#43D#, 16#438#,
+                      16#44F#])
              & "|Asia/Tokyo",
            "fixed zone skeleton names localize Russian names");
    Assert (Rendered (Runtime, "ar", "tokyo_zone_names", Args) =

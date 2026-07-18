@@ -666,10 +666,10 @@ package body I18N.Runtime.Tests.Features is
       function Arabic_Currency return String is
       begin
          return
-           "$" & U (16#661#) & U (16#66C#) & U (16#662#)
+           U (16#661#) & U (16#66C#) & U (16#662#)
            & U (16#663#) & U (16#664#) & U (16#66C#)
            & U (16#665#) & U (16#666#) & U (16#667#)
-           & U (16#66B#) & U (16#668#) & U (16#660#);
+           & U (16#66B#) & U (16#668#) & U (16#660#) & " $";
       end Arabic_Currency;
 
       function Arabic_Date return String is
@@ -696,10 +696,10 @@ package body I18N.Runtime.Tests.Features is
       function Persian_Currency return String is
       begin
          return
-           U (16#6F1#) & U (16#66C#) & U (16#6F2#) & U (16#6F3#)
+           "$" & U (16#6F1#) & U (16#66C#) & U (16#6F2#) & U (16#6F3#)
            & U (16#6F4#) & U (16#66C#) & U (16#6F5#)
            & U (16#6F6#) & U (16#6F7#) & U (16#66B#)
-           & U (16#6F8#) & U (16#6F0#) & " $";
+           & U (16#6F8#) & U (16#6F0#);
       end Persian_Currency;
 
       function Persian_Date return String is
@@ -836,19 +836,19 @@ package body I18N.Runtime.Tests.Features is
         ("lt-LT", "2",
          "lt 1" & U (16#A0#) & "234" & U (16#A0#)
          & "567,89 1" & U (16#A0#) & "234" & U (16#A0#)
-         & "567,80 " & U (16#20AC#) & " 29. vasario 2024 09:05 few");
+         & "567,80 " & U (16#20AC#) & " vasario 29, 2024 09:05 few");
       Assert_Render
         ("sl-SI", "2",
          "sl 1.234.567,89 1.234.567,80 " & U (16#20AC#)
          & " 29. februar 2024 09:05 two");
       Assert_Render
         ("th-u-ca-buddhist-extra", "2",
-         "th " & U (16#E01#) & U (16#E38#) & U (16#E21#)
+         "th " & U (16#E52#) & U (16#E59#) & ". "
+         & U (16#E01#) & U (16#E38#) & U (16#E21#)
          & U (16#E20#) & U (16#E32#) & U (16#E1E#)
          & U (16#E31#) & U (16#E19#) & U (16#E18#)
-         & U (16#E4C#) & " " & U (16#E52#) & U (16#E59#) & ", "
-         & U (16#E52#) & U (16#E55#) & U (16#E56#)
-         & U (16#E57#));
+         & U (16#E4C#) & " " & U (16#E52#) & U (16#E55#)
+         & U (16#E56#) & U (16#E57#));
       Assert_Render
         ("ja-u-ca-japanese-extra", "2",
          "ja " & U (16#4EE4#) & U (16#548C#) & " 6"

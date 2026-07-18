@@ -25,6 +25,44 @@ package body I18N.Date_Time_Format is
       return False;
    end Contains;
 
+   --  Return Locale without its BCP-47 singleton extension (e.g. drop
+   --  "-u-ca-buddhist" from "th-u-ca-buddhist", yielding "th"). The CLDR
+   --  name/era tables are keyed by canonical locale WITHOUT extensions, so an
+   --  extended locale must be reduced before those lookups or it matches
+   --  nothing. The extension keywords themselves (calendar, numbering system,
+   --  hour cycle) are read separately from the raw Locale, so stripping here is
+   --  safe. Mirrors I18N.Locales.Base_Locale, which is private to that unit.
+   function Base_Locale (Locale : String) return String is
+      Subtag_First : Positive := Locale'First;
+      Ext          : Natural := 0;
+   begin
+      if Locale'Length = 0 then
+         return Locale;
+      end if;
+
+      for Index in Locale'Range loop
+         if Locale (Index) = '-' then
+            if Index - Subtag_First = 1 then
+               Ext := Subtag_First;
+               exit;
+            end if;
+            Subtag_First := Index + 1;
+         end if;
+      end loop;
+
+      if Ext = 0 and then Locale'Last - Subtag_First + 1 = 1 then
+         Ext := Subtag_First;
+      end if;
+
+      if Ext = 0 then
+         return Locale;
+      elsif Ext = Locale'First then
+         return "";
+      else
+         return Locale (Locale'First .. Ext - 2);
+      end if;
+   end Base_Locale;
+
    function Calendar_From_Name (Name : String) return Calendar_System is
    begin
       if Name = "buddhist" then
@@ -1137,7 +1175,7 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Month_Name (Locale, Month);
       else
-         return I18N.CLDR_Data.Month_Name (Locale, Month);
+         return I18N.CLDR_Data.Month_Name (Base_Locale (Locale), Month);
       end if;
    end Month_Name;
 
@@ -1158,7 +1196,7 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Weekday_Name (Locale, Day);
       else
-         return I18N.CLDR_Data.Weekday_Name (Locale, Day);
+         return I18N.CLDR_Data.Weekday_Name (Base_Locale (Locale), Day);
       end if;
    end Weekday_Name;
 
@@ -1706,7 +1744,7 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Month_Name_Short (Locale, Month);
       else
-         return I18N.CLDR_Data.Month_Name_Short (Locale, Month);
+         return I18N.CLDR_Data.Month_Name_Short (Base_Locale (Locale), Month);
       end if;
    end Month_Name_Short;
 
@@ -1750,7 +1788,7 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Weekday_Name_Short (Locale, Day);
       else
-         return I18N.CLDR_Data.Weekday_Name_Short (Locale, Day);
+         return I18N.CLDR_Data.Weekday_Name_Short (Base_Locale (Locale), Day);
       end if;
    end Weekday_Name_Short;
 
@@ -1873,7 +1911,7 @@ package body I18N.Date_Time_Format is
       else
          return
            I18N.CLDR_Data.Day_Period_Name
-             (Locale, Period, Width = 4 or else Width > 5);
+             (Base_Locale (Locale), Period, Width = 4 or else Width > 5);
       end if;
    end Day_Period_Name;
 
@@ -1890,7 +1928,7 @@ package body I18N.Date_Time_Format is
    begin
       return
         (if Found then Value
-         else I18N.CLDR_Data.Era_Name (Locale, Calendar, Era));
+         else I18N.CLDR_Data.Era_Name (Base_Locale (Locale), Calendar, Era));
    end Era_Name;
 
    function Era_Year_Separator

@@ -275,7 +275,7 @@ begin
       & "en-UC.unit = ""{v, unit, length-meter}""" & ASCII.LF
       & "en-UC.short_unit = ""{v, unit, length-meter/unit-width-short}"""
       & ASCII.LF
-      & "cu.rate = ""{v, unit, meter/unit-width-full-name/second}"""
+      & "qcu.rate = ""{v, unit, meter/unit-width-full-name/second}"""
       & ASCII.LF
       & "cs.rate = ""{v, unit, meter/unit-width-short/second}"""
       & ASCII.LF
@@ -1079,7 +1079,7 @@ begin
       & "</unitLength>" & ASCII.LF
       & "</units>" & ASCII.LF
       & "</ldml>" & ASCII.LF
-      & "<compoundUnitPattern locale=""cu"" type=""per"" width=""long"">{0} PER {1}</compoundUnitPattern>"
+      & "<compoundUnitPattern locale=""qcu"" type=""per"" width=""long"">{0} PER {1}</compoundUnitPattern>"
       & ASCII.LF
       & "<compoundUnitPattern locale=""cs"" type=""per"" width=""short"">{0}/{1}</compoundUnitPattern>"
       & ASCII.LF
@@ -2440,7 +2440,7 @@ begin
    Assert (Rendered (Runtime, "en-UC", "short_unit", Args) =
              "2.0 ctx m",
            "CLDR unitLength containers feed short unitPattern rows");
-   Assert (Rendered (Runtime, "cu", "rate", Args) =
+   Assert (Rendered (Runtime, "qcu", "rate", Args) =
              "2.0 meters PER second",
            "LDML compoundUnitPattern rows feed per-unit separators");
    Assert (Rendered (Runtime, "cs", "rate", Args) =
@@ -3382,7 +3382,7 @@ begin
       & ASCII.LF);
    Assert (Data.Status = I18N.Runtime.Invalid_Data,
            "malformed LDML compoundUnitPattern rows are rejected");
-   Assert (Rendered (Runtime, "cu", "rate", Args) =
+   Assert (Rendered (Runtime, "qcu", "rate", Args) =
              "2.0 meters PER second",
            "failed compoundUnitPattern load leaves previous overrides intact");
    Data := I18N.Runtime.Load_Data_Text

@@ -1104,7 +1104,8 @@ package body I18N.Extra_Format is
       end Fallback_Name;
 
       Generated : constant String :=
-        I18N.CLDR_Data.Unit_Display_Name ("en", Base, Width, Singular);
+        I18N.CLDR_Data.Unit_Display_Name
+          ("en", Base, Width, (if Singular then "one" else "other"));
    begin
       if Width /= "unit-width-full-name"
         and then Width /= "full-name"
@@ -1139,7 +1140,7 @@ package body I18N.Extra_Format is
       return
         (if Found then Value
          else I18N.CLDR_Data.Unit_Display_Name
-           (Locale, Base, Width, Singular));
+           (Locale, Base, Width, (if Singular then "one" else "other")));
    end Locale_Unit_Name;
 
    function Locale_Unit_Name
@@ -1149,20 +1150,52 @@ package body I18N.Extra_Format is
       Category : I18N.Plurals.Plural_Category)
       return String
    is
+      Prefix : constant String := "unit." & Base & "." & Width & ".";
+
+      function Runtime_Name
+        (Suffix : String;
+         Found  : out Boolean)
+         return String
+      is
+      begin
+         return I18N.Runtime_Data.Locale_Text (Locale, Prefix & Suffix, Found);
+      end Runtime_Name;
+
       Found : Boolean;
       Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale,
-           "unit." & Base & "." & Width & "."
-           & Plural_Category_Name (Category),
-           Found);
+        Runtime_Name (Plural_Category_Name (Category), Found);
    begin
+      --  A runtime-provided unit name is selected by plural category, with the
+      --  CLDR category fallback (category -> other -> one) so that a value
+      --  whose category (for example "two" under Arabic-style rules) has no
+      --  explicit row still resolves through the catalog before the built-in
+      --  data is consulted.
       if Found then
          return Value;
-      else
-         return Locale_Unit_Name
-           (Locale, Base, Width, Category = I18N.Plurals.One);
       end if;
+
+      if Category /= I18N.Plurals.Other then
+         declare
+            Other_Value : constant String := Runtime_Name ("other", Found);
+         begin
+            if Found then
+               return Other_Value;
+            end if;
+         end;
+      end if;
+
+      if Category /= I18N.Plurals.One then
+         declare
+            One_Value : constant String := Runtime_Name ("one", Found);
+         begin
+            if Found then
+               return One_Value;
+            end if;
+         end;
+      end if;
+
+      return I18N.CLDR_Data.Unit_Display_Name
+        (Locale, Base, Width, Plural_Category_Name (Category));
    end Locale_Unit_Name;
 
    function Unit_Category_For_Value

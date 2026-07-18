@@ -10,8 +10,8 @@ is
    Last    : Natural := 0;
    Status  : I18N.Result.Render_Status;
    Arabic_USD : constant String :=
-     "$" & U (16#661#) & U (16#662#) & U (16#66B#)
-     & U (16#663#) & U (16#660#);
+     U (16#661#) & U (16#662#) & U (16#66B#)
+     & U (16#663#) & U (16#660#) & " $";
 begin
    I18N.Runtime.Load_Text
      (Runtime, "base",
@@ -544,7 +544,7 @@ begin
              "1.000 Bahraini dinar",
            "currency display names singularize three-minor-unit BHD output");
    Assert (Rendered (Runtime, "en", "additional_zero_names", Args) =
-             "1.00 Colombian peso|1 Icelandic kr" & U (16#F3#) & "na|1 Malagasy ariary|"
+             "1 Colombian peso|1 Icelandic kr" & U (16#F3#) & "na|1 Malagasy ariary|"
              & "1 Paraguayan guarani|1 Rwandan franc|"
              & "1 Ugandan shilling|1 Uruguayan peso (indexed units)|"
              & "1 Vietnamese dong|1 Central African CFA franc|"
@@ -555,7 +555,7 @@ begin
              & "1.000 Omani rial|1.000 Tunisian dinar",
            "currency display names singularize added three-minor corpus");
    Assert (Rendered (Runtime, "en", "huf_name", Args) =
-             "1.00 Hungarian forint",
+             "1 Hungarian forint",
            "currency display names singularize HUF output");
    Assert (Rendered (Runtime, "en", "clf_name", Args) =
              "1.0000 Chilean unit of account (UF)",
@@ -732,7 +732,7 @@ begin
              "2.000 Bahraini dinars",
            "currency display names pluralize three-minor-unit BHD output");
    Assert (Rendered (Runtime, "en", "additional_zero_names", Args) =
-             "2.00 Colombian pesos|2 Icelandic kr" & U (16#F3#) & "nur|2 Malagasy ariaries|"
+             "2 Colombian pesos|2 Icelandic kr" & U (16#F3#) & "nur|2 Malagasy ariaries|"
              & "2 Paraguayan guaranis|2 Rwandan francs|"
              & "2 Ugandan shillings|2 Uruguayan pesos (indexed units)|"
              & "2 Vietnamese dong|2 Central African CFA francs|"
@@ -743,7 +743,7 @@ begin
              & "2.000 Omani rials|2.000 Tunisian dinars",
            "currency display names pluralize added three-minor corpus");
    Assert (Rendered (Runtime, "en", "huf_name", Args) =
-             "2.00 Hungarian forints",
+             "2 Hungarian forints",
            "currency display names pluralize HUF output");
    Assert (Rendered (Runtime, "en", "clf_name", Args) =
              "2.0000 Chilean units of account (UF)",
@@ -768,7 +768,7 @@ begin
    Assert (Rendered (Runtime, "ar", "price", Args) = Arabic_USD,
            "Arabic currency uses localized digits and decimal separator");
    Assert (Rendered (Runtime, "ar-u-nu-latn", "price", Args) =
-             "$12" & U (16#66B#) & "30",
+             "12" & U (16#66B#) & "30 $",
            "currency numbering-system extension overrides Arabic digits");
 
    I18N.Arguments.Set (Args, "amount", "1.234");
@@ -832,7 +832,7 @@ begin
    Assert (Rendered (Runtime, "en", "cad_cash_slash", Args) =
              Rendered (Runtime, "en", "cad_cash", Args),
            "currency cash/unit-width/iso-code option rounds to the cash increment");
-   Assert (Rendered (Runtime, "en", "huf_cash", Args) = "HUF 1.03",
+   Assert (Rendered (Runtime, "en", "huf_cash", Args) = "HUF 0",
            "Hungarian forint cash option uses CLDR cash metadata");
    I18N.Arguments.Set (Args, "amount", "1.26");
    Assert (Rendered (Runtime, "en", "dkk_cash", Args) = "DKK 1.50",

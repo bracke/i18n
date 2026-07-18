@@ -1463,12 +1463,12 @@ begin
    Assert (Rendered (Runtime, "ru", "unit", Args) =
              "2 " & UTF8 ([16#43A#, 16#438#, 16#43B#, 16#43E#,
                             16#43C#, 16#435#, 16#442#, 16#440#,
-                            16#44B#]),
+                            16#430#]),
            "unit formatter localizes Russian full unit names");
    Assert (Rendered (Runtime, "ar", "unit", Args) =
              U (16#0662#) & " "
              & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#,
-                       16#62A#, 16#631#, 16#627#, 16#62A#]),
+                       16#62A#, 16#631#]),
            "unit formatter localizes Arabic full unit names");
    Assert (Rendered (Runtime, "ja", "unit", Args) =
              "2" & UTF8 ([16#30AD#, 16#30ED#, 16#30E1#, 16#30FC#,
@@ -1487,8 +1487,7 @@ begin
    Assert (Rendered (Runtime, "ar", "unit_decimal", Args) =
              U (16#0661#) & U (16#066B#) & U (16#0665#)
              & " " & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#,
-                             16#645#, 16#62A#, 16#631#, 16#627#,
-                             16#62A#]),
+                             16#645#, 16#62A#, 16#631#]),
            "unit formatter localizes decimal digits and separator");
    Assert (Rendered (Runtime, "en-u-nu-beng", "unit_decimal", Args) =
              U (16#09E7#) & "." & U (16#09EB#) & " kilometers",
@@ -1496,8 +1495,7 @@ begin
    Assert (Rendered (Runtime, "ar-u-nu-latn", "unit_decimal", Args) =
              "1" & U (16#066B#) & "5 "
              & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#,
-                      16#645#, 16#62A#, 16#631#, 16#627#,
-                      16#62A#]),
+                      16#645#, 16#62A#, 16#631#]),
            "unit formatter honors explicit Latin digits");
    Expect_Bounded
      ("en", "unit_decimal", "1.5 kilometers",
@@ -1532,7 +1530,7 @@ begin
              "2 pounds",
            "unit formatter accepts mass-pound alias");
    Assert (Rendered (Runtime, "en", "unit_tonne_alias", Args) =
-             "2 tonnes",
+             "2 metric tons",
            "unit formatter accepts mass-tonne alias");
    I18N.Arguments.Set (Args, "elapsed", "1");
    Assert (Rendered (Runtime, "en", "unit_nanosecond_alias", Args) =
@@ -1577,17 +1575,17 @@ begin
              "45 rev",
            "unit formatter accepts short angle-revolution alias");
    Assert (Rendered (Runtime, "en", "unit_arc_minute", Args) =
-             "45 arc minutes",
+             "45 arcminutes",
            "unit formatter accepts angle-arc-minute alias");
    Assert (Rendered (Runtime, "en", "unit_arc_second_short", Args) =
-             "45 arcsec",
+             "45 arcsecs",
            "unit formatter accepts short angle-arc-second alias");
    I18N.Arguments.Set (Args, "acceleration", "2");
    Assert (Rendered (Runtime, "en", "unit_g_force", Args) =
-             "2 g-forces",
+             "2 g-force",
            "unit formatter accepts acceleration-g-force alias");
    Assert (Rendered (Runtime, "en", "unit_acceleration_short", Args) =
-             "2 m/s2",
+             "2 m/s" & U (16#B2#),
            "unit formatter accepts acceleration metre-per-square-second alias");
    I18N.Arguments.Set (Args, "force", "2");
    Assert (Rendered (Runtime, "en", "unit_newton", Args) =
@@ -1598,7 +1596,7 @@ begin
            "unit formatter accepts short force-pound-force alias");
    I18N.Arguments.Set (Args, "torque", "2");
    Assert (Rendered (Runtime, "en", "unit_torque", Args) =
-             "2 newton meters",
+             "2 newton-meters",
            "unit formatter accepts torque-newton-metre alias");
    I18N.Arguments.Set (Args, "size", "2");
    Assert (Rendered (Runtime, "en", "unit_byte_alias", Args) =
@@ -1621,13 +1619,13 @@ begin
            "unit formatter accepts unit-width/short alias");
    I18N.Arguments.Set (Args, "consumption", "5.5");
    Assert (Rendered (Runtime, "en", "unit_l_per_100km_short", Args) =
-             "5.5 L/100km",
+             "5.5 L/100 km",
            "unit formatter accepts short consumption litre-per-100-kilometre alias");
    Assert (Rendered (Runtime, "en", "unit_mpg", Args) =
              "5.5 miles per gallon",
            "unit formatter accepts consumption-mile-per-gallon alias");
    Assert (Rendered (Runtime, "en", "unit_mpg_imperial", Args) =
-             "5.5 miles per imperial gallon",
+             "5.5 miles per Imp. gallon",
            "unit formatter accepts imperial gallon consumption alias");
    I18N.Arguments.Set (Args, "energy", "2");
    Assert (Rendered (Runtime, "en", "unit_electronvolt_short", Args) =
@@ -1641,7 +1639,7 @@ begin
            "unit formatter accepts energy-therm-us alias");
    I18N.Arguments.Set (Args, "share", "50");
    Assert (Rendered (Runtime, "en", "unit_permille_short", Args) =
-             "50 permille",
+             "50 " & U (16#2030#),
            "unit formatter accepts short concentr-permille alias");
    Assert (Rendered (Runtime, "en", "unit_permillion", Args) =
              "50 parts per million",
@@ -1664,7 +1662,7 @@ begin
            "unit formatter accepts graphics-dot-per-centimetre alias");
    I18N.Arguments.Set (Args, "distance", "2");
    Assert (Rendered (Runtime, "en", "unit_earth_radius_short", Args) =
-             "2 R_E",
+             "2 R" & U (16#2295#),
            "unit formatter accepts short length-earth-radius alias");
    Assert (Rendered (Runtime, "en", "unit_decimetre_short", Args) =
              "2 dm",
@@ -1753,7 +1751,7 @@ begin
            "measure-unit skeleton accepts length-metre alias");
    I18N.Arguments.Set (Args, "acceleration", "1.5");
    Assert (Rendered (Runtime, "en", "measure_acceleration", Args) =
-             "1.5 meters per square second",
+             "1.5 meters per second squared",
            "measure-unit skeleton accepts acceleration units");
    I18N.Arguments.Set (Args, "angle", "1.5");
    Assert (Rendered (Runtime, "en", "measure_radian_short", Args) =
@@ -1765,7 +1763,7 @@ begin
            "measure-unit skeleton accepts short force units");
    I18N.Arguments.Set (Args, "torque", "1.5");
    Assert (Rendered (Runtime, "en", "measure_torque", Args) =
-             "1.5 newton meters",
+             "1.5 newton-meters",
            "measure-unit skeleton accepts torque units");
    I18N.Arguments.Set (Args, "consumption", "5.5");
    Assert (Rendered (Runtime, "en", "measure_consumption", Args) =
@@ -1826,7 +1824,7 @@ begin
              "1.5 decimeters",
            "measure-unit skeleton accepts length-decimeter");
    Assert (Rendered (Runtime, "en", "measure_micrometre_short", Args) =
-             "1.5 um",
+             "1.5 " & U (16#3BC#) & "m",
            "measure-unit skeleton accepts short length-micrometre output");
    Assert (Rendered (Runtime, "en", "measure_nanometer", Args) =
              "1.5 nanometers",
@@ -1865,7 +1863,7 @@ begin
              "1,5 navti" & U (16#10D#) & "ne milje",
            "measure-unit skeleton localizes Slovenian nautical miles");
    Assert (Rendered (Runtime, "pl", "measure_nautical_mile", Args) =
-             "1,5 mile morskie",
+             "1,5 mili morskiej",
            "measure-unit skeleton localizes Polish nautical miles");
    Assert (Rendered (Runtime, "cs", "measure_nautical_mile", Args) =
              "1,5 n" & U (16#E1#) & "mo" & U (16#159#)
@@ -1934,10 +1932,10 @@ begin
              "1,5 ano-luz",
            "measure-unit skeleton localizes Portuguese light years");
    Assert (Rendered (Runtime, "nl", "measure_light_year", Args) =
-             "1,5 lichtjaren",
+             "1,5 lichtjaar",
            "measure-unit skeleton localizes Dutch light years");
    Assert (Rendered (Runtime, "ro", "measure_light_year", Args) =
-             "1,5 ani-lumin" & U (16#103#),
+             "1,5 ani lumin" & U (16#103#),
            "measure-unit skeleton localizes Romanian light years");
    Assert (Rendered (Runtime, "lt", "measure_light_year", Args) =
              "1,5 " & U (16#161#) & "viesme" & U (16#10D#) & "iai",
@@ -1953,9 +1951,9 @@ begin
            "measure-unit skeleton localizes Czech light years");
    Assert (Rendered (Runtime, "ru", "measure_light_year", Args) =
              "1,5 " & UTF8 ([16#441#, 16#432#, 16#435#, 16#442#,
-                               16#43E#, 16#432#, 16#44B#, 16#435#,
-                               16#20#, 16#433#, 16#43E#, 16#434#,
-                               16#44B#]),
+                               16#43E#, 16#432#, 16#43E#, 16#433#,
+                               16#43E#, 16#20#, 16#433#, 16#43E#,
+                               16#434#, 16#430#]),
            "measure-unit skeleton localizes Russian light years");
    Assert
      (Rendered (Runtime, "en", "measure_astronomical_unit_short", Args) =
@@ -1971,7 +1969,7 @@ begin
              "1,5 parsec",
            "measure-unit skeleton localizes French parsecs");
    Assert (Rendered (Runtime, "es", "measure_parsec", Args) =
-             "1,5 p" & U (16#E1#) & "rsecs",
+             "1,5 parsecs",
            "measure-unit skeleton localizes Spanish parsecs");
    Assert (Rendered (Runtime, "it", "measure_parsec", Args) =
              "1,5 parsec",

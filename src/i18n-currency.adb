@@ -672,6 +672,32 @@ package body I18N.Currency is
             Display (1 .. Display_Last) := Text;
          end if;
       end Load_Display;
+
+      procedure Set_Rounded (Value : Long_Long_Integer) is
+         Digits_Buf : String (1 .. 32);
+         Count      : Natural := 0;
+         Rest       : Long_Long_Integer := Value;
+      begin
+         if Rest <= 0 then
+            Integer_Text (Integer_Text'First) := '0';
+            Integer_Last := 1;
+            return;
+         end if;
+
+         while Rest > 0 loop
+            Count := Count + 1;
+            Digits_Buf (Count) :=
+              Character'Val
+                (Character'Pos ('0') + Natural (Rest mod 10));
+            Rest := Rest / 10;
+         end loop;
+
+         Integer_Last := Count;
+         for Offset in 1 .. Count loop
+            Integer_Text (Integer_Text'First + Offset - 1) :=
+              Digits_Buf (Count - Offset + 1);
+         end loop;
+      end Set_Rounded;
    begin
       Last := 0;
       Ok := False;
@@ -719,9 +745,14 @@ package body I18N.Currency is
       if Dot_Pos /= 0 then
          if Frac_To < Frac_From then
             return;
-         elsif Natural (Frac_To - Frac_From + 1) >
-           Scale + (if Style.Cash then 1 else 0)
+         elsif not (Style.Cash and then Scale = 0)
+           and then Natural (Frac_To - Frac_From + 1) >
+             Scale + (if Style.Cash then 1 else 0)
          then
+            --  A zero-decimal cash currency (for example HUF with a cash
+            --  increment of 5) accepts a fractional amount and rounds it into
+            --  the integer part below; every other style keeps the strict
+            --  precision limit.
             return;
          end if;
       end if;
@@ -750,37 +781,79 @@ package body I18N.Currency is
       end if;
 
       Unit := Power_10 (Scale);
-      if Style.Cash then
-         if Extra_Digit >= 5 then
-            Frac_Value := Frac_Value + 1;
+      Increment := (if Style.Cash then Cash_Increment (Style.Code) else 1);
+
+      if Style.Cash and then Scale = 0 and then Increment > 1 then
+         --  Zero-decimal cash currency: the cash increment applies to whole
+         --  units, so round the integer amount to the nearest increment using
+         --  the fractional part to decide the direction (round half up).
+         Normalize_Integer
+           (Source       => Amount_Text,
+            Integer_From => Integer_From,
+            Integer_To   => Integer_To,
+            Add_One      => False,
+            Target       => Integer_Text,
+            Last         => Integer_Last);
+         declare
+            Value     : constant Long_Long_Integer :=
+              Saturating_Integer_Value (Integer_Text, Integer_Last);
+            Inc       : constant Long_Long_Integer :=
+              Long_Long_Integer (Increment);
+            Remainder : constant Long_Long_Integer := Value mod Inc;
+            Denom     : Long_Long_Integer := 1;
+            Frac_Num  : Long_Long_Integer := 0;
+         begin
+            if Dot_Pos /= 0 then
+               for Index in Frac_From .. Frac_To loop
+                  exit when Denom >= 1_000_000_000;
+                  Denom := Denom * 10;
+                  Frac_Num :=
+                    Frac_Num * 10
+                    + Long_Long_Integer
+                        (Character'Pos (Amount_Text (Index))
+                         - Character'Pos ('0'));
+               end loop;
+            end if;
+
+            if (Remainder * Denom + Frac_Num) * 2 >= Inc * Denom then
+               Set_Rounded (Value - Remainder + Inc);
+            else
+               Set_Rounded (Value - Remainder);
+            end if;
+         end;
+         Frac_Value := 0;
+      else
+         if Style.Cash then
+            if Extra_Digit >= 5 then
+               Frac_Value := Frac_Value + 1;
+            end if;
+
+            if Increment > 1 then
+               declare
+                  Remainder : constant Natural := Frac_Value mod Increment;
+               begin
+                  if Remainder * 2 >= Increment then
+                     Frac_Value := Frac_Value + Increment - Remainder;
+                  else
+                     Frac_Value := Frac_Value - Remainder;
+                  end if;
+               end;
+            end if;
          end if;
 
-         Increment := Cash_Increment (Style.Code);
-         if Increment > 1 then
-            declare
-               Remainder : constant Natural := Frac_Value mod Increment;
-            begin
-               if Remainder * 2 >= Increment then
-                  Frac_Value := Frac_Value + Increment - Remainder;
-               else
-                  Frac_Value := Frac_Value - Remainder;
-               end if;
-            end;
+         if Frac_Value >= Unit then
+            Carry := True;
+            Frac_Value := Frac_Value - Unit;
          end if;
-      end if;
 
-      if Frac_Value >= Unit then
-         Carry := True;
-         Frac_Value := Frac_Value - Unit;
+         Normalize_Integer
+           (Source       => Amount_Text,
+            Integer_From => Integer_From,
+            Integer_To   => Integer_To,
+            Add_One      => Carry,
+            Target       => Integer_Text,
+            Last         => Integer_Last);
       end if;
-
-      Normalize_Integer
-        (Source       => Amount_Text,
-         Integer_From => Integer_From,
-         Integer_To   => Integer_To,
-         Add_One      => Carry,
-         Target       => Integer_Text,
-         Last         => Integer_Last);
 
       if Style.Display = Name_Display then
          Load_Display

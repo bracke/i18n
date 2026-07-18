@@ -39,7 +39,10 @@ jobs:
 
       - name: Build AUnit tests
         working-directory: i18n/tests
-        run: alr exec -- gprbuild -P tests.gpr
+        # tests/ is its own Alire root; `alr build` generates its gitignored
+        # config/tests_config.gpr (which tests.gpr withs) before building. A raw
+        # `gprbuild -P tests.gpr` skips that generation and fails on the missing file.
+        run: alr build
 
       - name: Run AUnit tests
         working-directory: i18n/tests
