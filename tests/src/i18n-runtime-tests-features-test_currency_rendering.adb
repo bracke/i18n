@@ -544,9 +544,9 @@ begin
              "1.000 Bahraini dinar",
            "currency display names singularize three-minor-unit BHD output");
    Assert (Rendered (Runtime, "en", "additional_zero_names", Args) =
-             "1 Colombian peso|1 Icelandic krona|1 Malagasy ariary|"
+             "1 Colombian peso|1 Icelandic kr" & U (16#F3#) & "na|1 Malagasy ariary|"
              & "1 Paraguayan guarani|1 Rwandan franc|"
-             & "1 Ugandan shilling|1 Uruguayan indexed unit|"
+             & "1 Ugandan shilling|1 Uruguayan peso (indexed units)|"
              & "1 Vietnamese dong|1 Central African CFA franc|"
              & "1 West African CFA franc|1 CFP franc",
            "currency display names singularize added minor-unit corpus");
@@ -732,9 +732,9 @@ begin
              "2.000 Bahraini dinars",
            "currency display names pluralize three-minor-unit BHD output");
    Assert (Rendered (Runtime, "en", "additional_zero_names", Args) =
-             "2 Colombian pesos|2 Icelandic kronur|2 Malagasy ariaries|"
+             "2 Colombian pesos|2 Icelandic kr" & U (16#F3#) & "nur|2 Malagasy ariaries|"
              & "2 Paraguayan guaranis|2 Rwandan francs|"
-             & "2 Ugandan shillings|2 Uruguayan indexed units|"
+             & "2 Ugandan shillings|2 Uruguayan pesos (indexed units)|"
              & "2 Vietnamese dong|2 Central African CFA francs|"
              & "2 West African CFA francs|2 CFP francs",
            "currency display names pluralize added minor-unit corpus");
