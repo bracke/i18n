@@ -6225,7 +6225,10 @@ procedure Generate_CLDR_Data is
             end loop;
          end loop;
          L;
-         L ("      return "" per "";");
+         --  CLDR root (und) per-unit separator is "/", not English " per ". Only
+         --  locales without their own unit_separator rule reach this fallback (en has
+         --  an explicit " per " entry), so they must fall back to und, not en.
+         L ("      return ""/"";");
          L ("   end Per_Unit_Separator;");
       end Emit_Per_Unit_Separator;
 

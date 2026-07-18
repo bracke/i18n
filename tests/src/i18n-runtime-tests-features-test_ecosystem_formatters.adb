@@ -2384,11 +2384,11 @@ begin
            "measure-unit skeleton localizes Japanese per-unit output");
    Assert (Rendered (Runtime, "zh", "measure_per", Args) =
              "1.5" & UTF8 ([16#516C#, 16#91CC#])
-             & " per " & UTF8 ([16#5C0F#, 16#65F6#]),
+             & "/" & UTF8 ([16#5C0F#, 16#65F6#]),
            "measure-unit skeleton localizes Chinese per-unit output");
    Assert (Rendered (Runtime, "ko", "measure_per", Args) =
              "1.5" & UTF8 ([16#D0AC#, 16#B85C#, 16#BBF8#, 16#D130#])
-             & " per " & UTF8 ([16#C2DC#, 16#AC04#]),
+             & "/" & UTF8 ([16#C2DC#, 16#AC04#]),
            "measure-unit skeleton localizes Korean per-unit output");
    Assert (Rendered (Runtime, "tr", "measure_per", Args) =
              "1,5 kilometre/saat",
