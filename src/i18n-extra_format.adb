@@ -1999,17 +1999,43 @@ package body I18N.Extra_Format is
          end;
       end if;
 
-      Put
-        (Target, Last, Overflow,
-         Relative_Offset_Prefix (Locale, Future));
-      Put_Natural (Target, Last, Overflow, Locale, Amount);
-      Put
-        (Target, Last, Overflow,
-         Unit_Value_Separator (Locale));
-      Put (Target, Last, Overflow, Unit);
-      Put
-        (Target, Last, Overflow,
-         Relative_Offset_Suffix (Locale, Future));
+      --  Caller-supplied affixes replace the built-in ones; they do not join
+      --  them. A caller that gives a prefix and no suffix means "no suffix" --
+      --  taking the missing half from the built-in data splices an override
+      --  onto a locale that happens to exist (the fixture locale "dv" is also
+      --  real Divehi, whose "+{0} d" left a stray " d" on the end).
+      declare
+         Overridden : constant Boolean :=
+           Runtime_Relative_Override_Present
+             (Locale, Base, Category_Name, Future);
+
+         function Affix (Field : String; Built_In : String) return String is
+            Found : Boolean;
+            Value : constant String :=
+              I18N.Runtime_Data.Locale_Text
+                (Locale,
+                 Field & "." & (if Future then "future" else "past"),
+                 Found);
+         begin
+            if Found then
+               return Value;
+            end if;
+
+            return (if Overridden then "" else Built_In);
+         end Affix;
+      begin
+         Put
+           (Target, Last, Overflow,
+            Affix ("relative_prefix", Relative_Offset_Prefix (Locale, Future)));
+         Put_Natural (Target, Last, Overflow, Locale, Amount);
+         Put
+           (Target, Last, Overflow,
+            Unit_Value_Separator (Locale));
+         Put (Target, Last, Overflow, Unit);
+         Put
+           (Target, Last, Overflow,
+            Affix ("relative_suffix", Relative_Offset_Suffix (Locale, Future)));
+      end;
    end Put_Relative_Offset;
 
    function Is_Valid_Option
