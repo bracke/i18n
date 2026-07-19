@@ -2180,9 +2180,14 @@ procedure Generate_CLDR_Data is
       --  lookup walked up to 1,532 Locale_In_List calls, each canonicalising
       --  both strings before comparing. The table is bisected instead, and the
       --  same 6 KB-per-766-locales trade as the date-pattern index applies.
+      --  Raw leaves the packed value alone instead of decoding it as hex: a
+      --  value that is already an encoded blob, as the date-name rows are,
+      --  would otherwise be hex-encoded a second time and stored at twice
+      --  the size for nothing.
       procedure Emit_Locale_Table
         (Name         : String;
-         Default_Expr : String)
+         Default_Expr : String;
+         Raw          : Boolean := False)
       is
          Values : US.Unbounded_String;
          Index_Data : US.Unbounded_String;
@@ -2238,7 +2243,11 @@ procedure Generate_CLDR_Data is
          L ("         T : constant Natural :=");
          L ("           Natural'Value (Index_Data (Base + 7 .. Base + 13));");
          L ("      begin");
-         L ("         return HB (Values (F .. T));");
+         if Raw then
+            L ("         return Values (F .. T);");
+         else
+            L ("         return HB (Values (F .. T));");
+         end if;
          L ("      end Value_At;");
          L;
          L ("      function Lookup (Cand : String; Canonical : Boolean) return String is");
@@ -3391,6 +3400,7 @@ procedure Generate_CLDR_Data is
          Default_Kind : String)
       is
          First : Boolean := True;
+         Start_Index : Integer := -1;
 
          procedure Emit_Return
            (Expression : String;
@@ -3415,60 +3425,50 @@ procedure Generate_CLDR_Data is
                Term_Number := Term_Number + 1;
             end loop;
          end Emit_Return;
-
-         procedure Emit_String_Argument
-           (Value  : String;
-            Indent : String)
-         is
-            Chunk_Size : constant := 72;
-            First      : Positive := Value'First;
-            Last       : Natural;
-            Term       : Positive := 1;
-         begin
-            while First <= Value'Last loop
-               Last := Natural'Min (First + Chunk_Size - 1, Value'Last);
-               L (Indent & (if Term = 1 then " " else "& ")
-                  & """" & Value (First .. Last) & """"
-                  & (if Last = Value'Last then "," else ""));
-               First := Last + 1;
-               Term := Term + 1;
-            end loop;
-         end Emit_String_Argument;
       begin
+         --  The start index is the same for every locale of a kind, so it is
+         --  a literal in the emitted function rather than a column.
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "name_set_hex")
+              and then S (Rules (Index).A) = Kind
+            then
+               if Start_Index < 0 then
+                  Start_Index := Decimal_Value (S (Rules (Index).C));
+               elsif Decimal_Value (S (Rules (Index).C)) /= Start_Index then
+                  Add_Error ("start index varies by locale for " & Kind);
+               end if;
+
+               --  Raw: the row is already a hex blob that Hex_List_Item
+               --  parses, so it is stored as it stands.
+               Add_Table_Entry (S (Rules (Index).B), S (Rules (Index).D));
+            end if;
+         end loop;
+
+         if Start_Index < 0 then
+            Start_Index := 0;
+         end if;
+         Emit_Locale_Table (Name & "_Row", """""", Raw => True);
+
          L;
          L ("   function " & Name & " (Locale : String; " & Index_Name & " : Natural) return String is");
          L ("      Lang : constant String := Language (Locale);");
+         L ("      Row : constant String := " & Name & "_Row (Locale);");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "name_set_hex") and then S (Rules (Index).A) = Kind then
-                  L ("      " & (if First then "if" else "elsif")
-                     & (if Pass = 1 then " Locale_Equals" else " Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).B) & """) then");
-                  declare
-                     Start : constant Natural := Decimal_Value (S (Rules (Index).C));
-                     Count : constant Natural := Expr_Item_Count (S (Rules (Index).D));
-                  begin
-                     L ("         if " & Index_Name & " < "
-                        & Natural'Image (Start) (2 .. Natural'Image (Start)'Last)
-                        & " or else " & Index_Name & " > "
-                        & Natural'Image (Start + Count - 1)
-                          (2 .. Natural'Image (Start + Count - 1)'Last)
-                        & " then");
-                     L ("            return """";");
-                     L ("         else");
-                     L ("            return Hex_List_Item");
-                     L ("              (");
-                     Emit_String_Argument (S (Rules (Index).D), "               ");
-                     L ("               " & Index_Name & " - "
-                        & Natural'Image (Start) (2 .. Natural'Image (Start)'Last)
-                        & " + 1);");
-                     L ("         end if;");
-                  end;
-                  First := False;
-               end if;
-            end loop;
-         end loop;
+         L ("      if Row /= """" then");
+         L ("         if " & Index_Name & " < " & Trim (Integer'Image (Start_Index))
+            & " then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
+         L ("         --  Hex_List_Item answers """" past the end of the row, so");
+         L ("         --  only the low bound needs a guard here -- and it does");
+         L ("         --  need one, since Number is Positive.");
+         L ("         return Hex_List_Item");
+         L ("           (Row, " & Index_Name & " - " & Trim (Integer'Image (Start_Index))
+            & " + 1);");
+         L ("      end if;");
+         L;
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, Kind) then
                L ("      " & (if First then "if" else "elsif")
@@ -3478,17 +3478,21 @@ procedure Generate_CLDR_Data is
                First := False;
             end if;
          end loop;
-         L ("      else");
-         L ("         case " & Index_Name & " is");
+
+         if not First then
+            L ("      end if;");
+            L;
+         end if;
+
+         L ("      case " & Index_Name & " is");
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, Default_Kind) and then S (Rules (Index).A) = "en" then
-               L ("            when " & S (Rules (Index).B) & " =>");
-               Emit_Return (S (Rules (Index).C), "               ");
+               L ("         when " & S (Rules (Index).B) & " =>");
+               Emit_Return (S (Rules (Index).C), "            ");
             end if;
          end loop;
-         L ("            when others => return """";");
-         L ("         end case;");
-         L ("      end if;");
+         L ("         when others => return """";");
+         L ("      end case;");
          L ("   end " & Name & ";");
       end Emit_Date_Name_Function;
 
