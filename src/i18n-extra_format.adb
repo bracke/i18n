@@ -1662,6 +1662,37 @@ package body I18N.Extra_Format is
          else I18N.CLDR_Data.Unit_Short_Per_Separator (Locale));
    end Unit_Short_Per_Separator;
 
+   --  Does this text carry the value's placeholder -- that is, is it a pattern
+   --  rather than a plain name?
+   function Has_Placeholder (Text : String) return Boolean is
+   begin
+      for Index in Text'Range loop
+         if Index <= Text'Last - 2
+           and then Text (Index .. Index + 2) = "{0}"
+         then
+            return True;
+         end if;
+      end loop;
+
+      return False;
+   end Has_Placeholder;
+
+   --  Did the caller supply this locale's per pattern at runtime? Such a row is
+   --  an explicit instruction to compose the rate from its parts, so it outranks
+   --  a compound name that only the generated data knows about.
+   function Has_Runtime_Per_Separator (Locale : String) return Boolean is
+      Found : Boolean;
+      Long_Value : constant String :=
+        I18N.Runtime_Data.Locale_Text (Locale, "per_unit_separator", Found);
+      Long_Found : constant Boolean := Found;
+      Short_Value : constant String :=
+        I18N.Runtime_Data.Locale_Text
+          (Locale, "unit_short_per_separator", Found);
+   begin
+      pragma Unreferenced (Long_Value, Short_Value);
+      return Long_Found or else Found;
+   end Has_Runtime_Per_Separator;
+
    function List_Final_Separator (Locale : String) return String is
       Found : Boolean;
       Value : constant String :=
@@ -2119,6 +2150,17 @@ package body I18N.Extra_Format is
          Pattern : constant String :=
            Runtime_Unit_Pattern
              (Locale, Base, Width, Category, Pattern_Found);
+
+         --  CLDR gives some rates a name of their own -- en short
+         --  kilometer-per-hour is "km/h", not "km" joined to "hr" by the per
+         --  pattern. Composing the parts is the fallback for the rates that
+         --  have no such name, not the rule.
+         Compound : constant String :=
+           (if Per_Unit = "" then ""
+            else Base & "-per-" & Option_Base (Per_Unit));
+         Compound_Name : constant String :=
+           (if Compound = "" or else Has_Runtime_Per_Separator (Locale) then ""
+            else Locale_Unit_Name (Locale, Compound, Width, Category));
       begin
          Name_Last := Text'Length;
          if Name_Last > Name'Length then
@@ -2126,7 +2168,21 @@ package body I18N.Extra_Format is
          end if;
          Name (1 .. Name_Last) := Text;
 
-         if Pattern_Found and then Per_Unit = "" then
+         if Compound_Name /= "" then
+            --  Some languages seat the value inside the rate's name rather than
+            --  in front of it -- Japanese "時速 {0} キロメートル". Such a row is
+            --  exported whole, so render it as the pattern it is.
+            if Has_Placeholder (Compound_Name) then
+               Put_Runtime_Unit_Pattern
+                 (Target, Last, Overflow, Locale, Compound_Name, Value);
+            else
+               Put_Decimal_Text (Target, Last, Overflow, Locale, Value);
+               Put
+                 (Target, Last, Overflow,
+                  Unit_Value_Separator (Locale));
+               Put (Target, Last, Overflow, Compound_Name);
+            end if;
+         elsif Pattern_Found and then Per_Unit = "" then
             Put_Runtime_Unit_Pattern
               (Target, Last, Overflow, Locale, Pattern, Value);
          else
@@ -2137,7 +2193,7 @@ package body I18N.Extra_Format is
             Put (Target, Last, Overflow, Name (1 .. Name_Last));
          end if;
 
-         if Per_Unit /= "" then
+         if Per_Unit /= "" and then Compound_Name = "" then
             if Width = "unit-width-short"
               or else Width = "short"
               or else Width = "unit-width-narrow"

@@ -2289,13 +2289,30 @@ procedure Generate_CLDR_Export is
                end if;
             end Separator_From_Pattern;
 
-            function Unit_Name_From_Pattern (Pattern : String) return String is
+            --  A unit name is its pattern with the value taken out, which works
+            --  as long as the value leads: "{0} km/h" names "km/h". It does not
+            --  work when the value sits inside the name -- Japanese writes
+            --  "時速 {0} キロメートル" and Chinese "每小时{0}公里", where cutting
+            --  the placeholder out both loses where the number goes and, in the
+            --  Japanese case, leaves the two spaces that surrounded it.
+            --
+            --  For those, keep the pattern whole. A value carrying "{0}" is a
+            --  pattern rather than a name, and the formatter renders it as one.
+            --  Only compound units are treated this way: a simple unit name is
+            --  read by callers that have no business substituting into it.
+            function Unit_Name_From_Pattern
+              (Pattern : String;
+               Base    : String)
+               return String
+            is
                Marker : constant Natural := First_Index (Pattern, "{0}");
             begin
                if Marker = 0 then
                   return Pattern;
                elsif Marker = Pattern'First then
                   return Trim_Spaces (Pattern (Marker + 3 .. Pattern'Last));
+               elsif Contains (Base, "-per-") then
+                  return Pattern;
                elsif Marker + 2 = Pattern'Last then
                   return Trim_Spaces (Pattern (Pattern'First .. Marker - 1));
                else
@@ -2409,7 +2426,8 @@ procedure Generate_CLDR_Export is
                      Pattern : constant String :=
                        Project_Tools.JSON.Object_Field_Value
                          (Value, "unitPattern-count-" & Category);
-                     Unit_Name : constant String := Unit_Name_From_Pattern (Pattern);
+                     Unit_Name : constant String :=
+                       Unit_Name_From_Pattern (Pattern, Base);
                   begin
                      if Unit_Name /= "" then
                         Emit_JSON

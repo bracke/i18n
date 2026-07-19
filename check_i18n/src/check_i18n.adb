@@ -336,7 +336,9 @@ procedure Check_I18N is
          & "domain short rate: Short rate: 1.5 km/h" & LF
          & "domain relative: When: 3 days ago" & LF
          & "domain relative de: Wann: vor 3 Tagen" & LF
-         & "domain list: List: red, green and blue" & LF
+         --  CLDR en listPattern standard "end" is "{0}, and {1}" -- the serial
+         --  comma is in the data, not a house style choice.
+         & "domain list: List: red, green, and blue" & LF
          & "domain list de: Liste: red, green und blue" & LF);
       Expect_Example
         ("locale_fallback",

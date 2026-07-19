@@ -163,7 +163,7 @@ domain rate: Rate: 1.5 kilometers per hour
 domain short rate: Short rate: 1.5 km/h
 domain relative: When: 3 days ago
 domain relative de: Wann: vor 3 Tagen
-domain list: List: red, green and blue
+domain list: List: red, green, and blue
 domain list de: Liste: red, green und blue
 ```
 

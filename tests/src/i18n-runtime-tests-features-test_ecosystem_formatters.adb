@@ -2318,8 +2318,7 @@ begin
              "1.5 kilometers per hour",
            "measure-unit skeleton accepts per-measure-unit");
    Assert (Rendered (Runtime, "en-u-nu-beng", "measure_per", Args) =
-             U (16#09E7#) & "." & U (16#09EB#)
-             & " kilometers per hour",
+             U (16#9E7#) & "." & U (16#9EB#) & " kilometers per hour",
            "measure-unit skeleton honors explicit numbering-system digits");
    Expect_Bounded
      ("en", "measure_per", "1.5 kilometers per hour",
@@ -2334,7 +2333,7 @@ begin
              "1,5 kil" & U (16#F3#) & "metros por hora",
            "measure-unit skeleton localizes Spanish per-unit output");
    Assert (Rendered (Runtime, "it", "measure_per", Args) =
-             "1,5 chilometri al ora",
+             "1,5 chilometri orari",
            "measure-unit skeleton localizes Italian per-unit output");
    Assert (Rendered (Runtime, "pt", "measure_per", Args) =
              "1,5 quil" & U (16#F4#) & "metro por hora",
@@ -2346,80 +2345,66 @@ begin
              "1,5 kilometri pe or" & U (16#103#),
            "measure-unit skeleton localizes Romanian per-unit output");
    Assert (Rendered (Runtime, "lt", "measure_per", Args) =
-             "1,5 kilometro/valanda",
+             "1,5 kilometro per valand" & U (16#105#),
            "measure-unit skeleton localizes Lithuanian per-unit output");
    Assert (Rendered (Runtime, "sl", "measure_per", Args) =
-             "1,5 kilometri/ura",
+             "1,5 kilometri na uro",
            "measure-unit skeleton localizes Slovenian per-unit output");
    Assert (Rendered (Runtime, "pl", "measure_per", Args) =
-             "1,5 kilometra na godzina",
+             "1,5 kilometra na godzin" & U (16#119#),
            "measure-unit skeleton localizes Polish per-unit output");
    Assert (Rendered (Runtime, "cs", "measure_per", Args) =
-             "1,5 kilometru/hodina",
+             "1,5 kilometru za hodinu",
            "measure-unit skeleton localizes Czech per-unit output");
    Assert (Rendered (Runtime, "ru", "measure_per", Args) =
-             "1,5 "
-             & UTF8 ([16#43A#, 16#438#, 16#43B#, 16#43E#, 16#43C#,
-                       16#435#, 16#442#, 16#440#, 16#430#])
-             & "/" & UTF8 ([16#447#, 16#430#, 16#441#]),
+             "1,5 " & UTF8 ([16#43A#, 16#438#, 16#43B#, 16#43E#, 16#43C#, 16#435#, 16#442#, 16#440#, 16#430#])
+             & " " & U (16#432#) & " " & UTF8 ([16#447#, 16#430#, 16#441#]),
            "measure-unit skeleton localizes Russian per-unit output");
    Assert (Rendered (Runtime, "ar", "measure_per", Args) =
-             U (16#0661#) & U (16#066B#) & U (16#0665#) & " "
-             & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#,
-                       16#62A#, 16#631#])
-             & " " & UTF8 ([16#644#, 16#643#, 16#644#]) & " "
-             & UTF8 ([16#633#, 16#627#, 16#639#, 16#629#]),
+             UTF8 ([16#661#, 16#66B#, 16#665#]) & " "
+             & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#, 16#62A#, 16#631#]) & " "
+             & UTF8 ([16#641#, 16#64A#]) & " " & UTF8 ([16#627#, 16#644#, 16#633#, 16#627#, 16#639#, 16#629#]),
            "measure-unit skeleton localizes Arabic per-unit output");
    Assert (Rendered (Runtime, "ar-u-nu-latn", "measure_per", Args) =
-             "1" & U (16#066B#) & "5 "
-             & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#,
-                       16#62A#, 16#631#])
-             & " " & UTF8 ([16#644#, 16#643#, 16#644#]) & " "
-             & UTF8 ([16#633#, 16#627#, 16#639#, 16#629#]),
+             "1" & U (16#66B#) & "5 " & UTF8 ([16#643#, 16#64A#, 16#644#, 16#648#, 16#645#, 16#62A#, 16#631#])
+             & " " & UTF8 ([16#641#, 16#64A#]) & " "
+             & UTF8 ([16#627#, 16#644#, 16#633#, 16#627#, 16#639#, 16#629#]),
            "measure-unit skeleton honors explicit Latin digits");
    Assert (Rendered (Runtime, "ja", "measure_per", Args) =
-             "1.5" & UTF8 ([16#30AD#, 16#30ED#, 16#30E1#, 16#30FC#,
-                              16#30C8#, 16#30EB#])
-             & U (16#6BCE#) & UTF8 ([16#6642#, 16#9593#]),
+             UTF8 ([16#6642#, 16#901F#]) & " 1.5 "
+             & UTF8 ([16#30AD#, 16#30ED#, 16#30E1#, 16#30FC#, 16#30C8#, 16#30EB#]),
            "measure-unit skeleton localizes Japanese per-unit output");
    Assert (Rendered (Runtime, "zh", "measure_per", Args) =
-             "1.5" & UTF8 ([16#516C#, 16#91CC#])
-             & "/" & UTF8 ([16#5C0F#, 16#65F6#]),
+             UTF8 ([16#6BCF#, 16#5C0F#, 16#65F6#]) & "1.5" & UTF8 ([16#516C#, 16#91CC#]),
            "measure-unit skeleton localizes Chinese per-unit output");
    Assert (Rendered (Runtime, "ko", "measure_per", Args) =
-             "1.5" & UTF8 ([16#D0AC#, 16#B85C#, 16#BBF8#, 16#D130#])
-             & "/" & UTF8 ([16#C2DC#, 16#AC04#]),
+             UTF8 ([16#C2DC#, 16#C18D#]) & " 1.5" & UTF8 ([16#D0AC#, 16#B85C#, 16#BBF8#, 16#D130#]),
            "measure-unit skeleton localizes Korean per-unit output");
    Assert (Rendered (Runtime, "tr", "measure_per", Args) =
              "1,5 kilometre/saat",
            "measure-unit skeleton uses source-backed Turkish per separator");
    Assert (Rendered (Runtime, "da", "measure_per", Args) =
-             "1,5 kilometer pr. time",
+             "1,5 kilometer i timen",
            "measure-unit skeleton uses source-backed Danish per separator");
    Assert (Rendered (Runtime, "hi", "measure_per", Args) =
-             "1.5 "
-             & UTF8 ([16#915#, 16#93F#, 16#932#, 16#94B#, 16#92E#, 16#940#,
-                       16#91F#, 16#930#])
-             & " "
-             & UTF8 ([16#92A#, 16#94D#, 16#930#, 16#924#, 16#93F#])
-             & " " & UTF8 ([16#918#, 16#902#, 16#91F#, 16#93E#]),
+             "1.5 " & UTF8 ([16#915#, 16#93F#, 16#932#, 16#94B#, 16#92E#, 16#940#, 16#91F#, 16#930#]) & " "
+             & UTF8 ([16#92A#, 16#94D#, 16#930#, 16#924#, 16#93F#]) & " "
+             & UTF8 ([16#918#, 16#902#, 16#91F#, 16#93E#]),
            "measure-unit skeleton uses source-backed Hindi per separator");
    Assert (Rendered (Runtime, "el", "measure_per", Args) =
              "1,5 "
-             & UTF8 ([16#3C7#, 16#3B9#, 16#3BB#, 16#3B9#, 16#3CC#, 16#3BC#,
-                       16#3B5#, 16#3C4#, 16#3C1#, 16#3B1#])
-             & " " & UTF8 ([16#3B1#, 16#3BD#, 16#3AC#])
-             & " " & UTF8 ([16#3CE#, 16#3C1#, 16#3B1#]),
+             & UTF8 ([16#3C7#, 16#3B9#, 16#3BB#, 16#3B9#, 16#3CC#, 16#3BC#, 16#3B5#, 16#3C4#, 16#3C1#, 16#3B1#])
+             & " " & UTF8 ([16#3B1#, 16#3BD#, 16#3AC#]) & " " & UTF8 ([16#3CE#, 16#3C1#, 16#3B1#]),
            "measure-unit skeleton uses source-backed Greek per separator");
    Assert (Rendered (Runtime, "he", "measure_per", Args) =
-             "1.5 "
-             & UTF8 ([16#5E7#, 16#5D9#, 16#5DC#, 16#5D5#, 16#5DE#, 16#5D8#,
-                       16#5E8#, 16#5D9#, 16#5DD#])
-             & " " & UTF8 ([16#5DC#, 16#5E9#, 16#5E2#, 16#5D4#]),
+             "1.5 " & UTF8 ([16#5E7#, 16#5D9#, 16#5DC#, 16#5D5#, 16#5DE#, 16#5D8#, 16#5E8#]) & " "
+             & UTF8 ([16#5DC#, 16#5E9#, 16#5E2#, 16#5D4#]),
            "measure-unit skeleton uses source-backed Hebrew per separator");
    Assert (Rendered (Runtime, "en", "measure_per_short", Args) =
-             "1.5 km/hr",
-           "short measure-unit skeleton renders slash per-unit form");
+             --  CLDR en kilometer-per-hour, unit-width-short: "km/h". The rate
+             --  is named, not composed from "km" and "hr".
+             "1.5 km/h",
+           "short measure-unit skeleton renders the named short rate");
    I18N.Arguments.Set (Args, "weight", "2");
    Assert (Rendered (Runtime, "en", "measure_narrow", Args) = "2 kg",
            "measure-unit skeleton accepts mass units and narrow width");
