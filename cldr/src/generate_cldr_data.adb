@@ -5208,6 +5208,105 @@ procedure Generate_CLDR_Data is
          L ("         return Search (True);");
          L ("      end if;");
          L ("   end Time_Zone_Exemplar_Location;");
+         --  Both zone functions read the same rows -- standard and daylight
+         --  in one pair of fields, generic in the next -- so one payload per
+         --  locale serves both rather than emitting the rows twice.
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "zone_short_family") then
+               declare
+                  Locale : constant String := S (Rules (Index).A);
+                  Seen : Boolean := False;
+                  Payload : US.Unbounded_String;
+               begin
+                  for Previous in 1 .. Index - 1 loop
+                     if Is_Kind (Previous, "zone_short_family")
+                       and then S (Rules (Previous).A) = Locale
+                     then
+                        Seen := True;
+                        exit;
+                     end if;
+                  end loop;
+
+                  if not Seen then
+                     for Candidate in Index .. Rule_Count loop
+                        if Is_Kind (Candidate, "zone_short_family")
+                          and then S (Rules (Candidate).A) = Locale
+                        then
+                           if US.Length (Payload) > 0 then
+                              US.Append (Payload, ";");
+                           end if;
+                           US.Append
+                             (Payload,
+                              S (Rules (Candidate).B) & ","
+                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).C))
+                              & ","
+                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).D))
+                              & ","
+                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).E)));
+                        end if;
+                     end loop;
+
+                     Add_Table_Entry (Locale, S (Payload));
+                  end if;
+               end;
+            end if;
+         end loop;
+         Emit_Locale_Table
+           ("Zone_Family_Row", """""", Raw => True, Walk_Parents => False);
+
+         L;
+         L ("   --  Which: 1 standard, 2 daylight, 3 generic.");
+         L ("   function Zone_Family_Value");
+         L ("     (Payload : String;");
+         L ("      Family  : String;");
+         L ("      Which   : Positive)");
+         L ("      return String");
+         L ("   is");
+         L ("      Start : Positive := Payload'First;");
+         L ("      Stop  : Natural;");
+         L ("      Last  : Natural;");
+         L ("   begin");
+         L ("      while Start <= Payload'Last loop");
+         L ("         Stop := Start;");
+         L ("         while Stop <= Payload'Last and then Payload (Stop) /= ';' loop");
+         L ("            Stop := Stop + 1;");
+         L ("         end loop;");
+         L ("         Last := Stop - 1;");
+         L;
+         L ("         declare");
+         L ("            Sep_1 : Natural := 0;");
+         L ("            Sep_2 : Natural := 0;");
+         L ("            Sep_3 : Natural := 0;");
+         L ("         begin");
+         L ("            for Index in Start .. Last loop");
+         L ("               if Payload (Index) = ',' then");
+         L ("                  if Sep_1 = 0 then");
+         L ("                     Sep_1 := Index;");
+         L ("                  elsif Sep_2 = 0 then");
+         L ("                     Sep_2 := Index;");
+         L ("                  else");
+         L ("                     Sep_3 := Index;");
+         L ("                     exit;");
+         L ("                  end if;");
+         L ("               end if;");
+         L ("            end loop;");
+         L;
+         L ("            if Sep_3 > 0");
+         L ("              and then Payload (Start .. Sep_1 - 1) = Family");
+         L ("            then");
+         L ("               case Which is");
+         L ("                  when 1 => return HB (Payload (Sep_1 + 1 .. Sep_2 - 1));");
+         L ("                  when 2 => return HB (Payload (Sep_2 + 1 .. Sep_3 - 1));");
+         L ("                  when others => return HB (Payload (Sep_3 + 1 .. Last));");
+         L ("               end case;");
+         L ("            end if;");
+         L ("         end;");
+         L ("         Start := Stop + 1;");
+         L ("      end loop;");
+         L;
+         L ("      return """";");
+         L ("   end Zone_Family_Value;");
          L;
          L ("   function Time_Zone_Short_Name");
          L ("     (Locale   : String;");
@@ -5215,59 +5314,39 @@ procedure Generate_CLDR_Data is
          L ("      Daylight : Boolean)");
          L ("      return String");
          L ("   is");
+         L ("      function Find (Cand : String) return String is");
+         L ("         Row : constant String := Zone_Family_Row (Cand);");
+         L ("      begin");
+         L ("         if Row = """" then");
+         L ("            return """";");
+         L ("         end if;");
+         L ("         return Zone_Family_Value (Row, Family, (if Daylight then 2 else 1));");
+         L ("      end Find;");
+         L;
+         L ("      Canon : constant String := Canonical_Locale (Locale);");
+         L ("      Exact : constant String := Find (Locale);");
+         L ("      Cut : Natural := Canon'Last;");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            declare
-               Opened : Boolean := False;
-            begin
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "zone_short_family") then
-                     L
-                       ("      "
-                        & (if Opened then "elsif " else "if ")
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A)
-                        & """) and then Family = """
-                        & S (Rules (Index).B) & """ then");
-                     L ("         return (if Daylight then "
-                        & S (Rules (Index).D) & " else "
-                        & S (Rules (Index).C) & ");");
-                     Opened := True;
-                  end if;
-               end loop;
-
-               if Opened then
-                  L ("      end if;");
-                  L;
-               end if;
-            end;
-         end loop;
-         declare
-            Opened : Boolean := False;
-         begin
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "zone_short_family")
-                 and then S (Rules (Index).A) = "en"
-               then
-                  L
-                    ("      "
-                     & (if Opened then "elsif " else "if ")
-                     & "Family = """ & S (Rules (Index).B) & """ then");
-                  L ("         return (if Daylight then "
-                     & S (Rules (Index).D) & " else "
-                     & S (Rules (Index).C) & ");");
-                  Opened := True;
-               end if;
-            end loop;
-
-            if Opened then
-               L ("      end if;");
-               L;
-            end if;
-         end;
-         L ("      return """";");
+         L ("      if Exact /= """" then");
+         L ("         return Exact;");
+         L ("      end if;");
+         L;
+         L ("      while Cut > Canon'First loop");
+         L ("         if Canon (Cut) = '-' then");
+         L ("            declare");
+         L ("               Hit : constant String :=");
+         L ("                 Find (Canon (Canon'First .. Cut - 1));");
+         L ("            begin");
+         L ("               if Hit /= """" then");
+         L ("                  return Hit;");
+         L ("               end if;");
+         L ("            end;");
+         L ("         end if;");
+         L ("         Cut := Cut - 1;");
+         L ("      end loop;");
+         L;
+         L ("      --  The chain ended on en's rows, which the table holds too.");
+         L ("      return Find (""en"");");
          L ("   end Time_Zone_Short_Name;");
          L;
          L ("   function Time_Zone_Generic_Short_Name");
@@ -5275,55 +5354,39 @@ procedure Generate_CLDR_Data is
          L ("      Family : String)");
          L ("      return String");
          L ("   is");
+         L ("      function Find (Cand : String) return String is");
+         L ("         Row : constant String := Zone_Family_Row (Cand);");
+         L ("      begin");
+         L ("         if Row = """" then");
+         L ("            return """";");
+         L ("         end if;");
+         L ("         return Zone_Family_Value (Row, Family, 3);");
+         L ("      end Find;");
+         L;
+         L ("      Canon : constant String := Canonical_Locale (Locale);");
+         L ("      Exact : constant String := Find (Locale);");
+         L ("      Cut : Natural := Canon'Last;");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            declare
-               Opened : Boolean := False;
-            begin
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "zone_short_family") then
-                     L
-                       ("      "
-                        & (if Opened then "elsif " else "if ")
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A)
-                        & """) and then Family = """
-                        & S (Rules (Index).B) & """ then");
-                     L ("         return " & S (Rules (Index).E) & ";");
-                     Opened := True;
-                  end if;
-               end loop;
-
-               if Opened then
-                  L ("      end if;");
-                  L;
-               end if;
-            end;
-         end loop;
-         declare
-            Opened : Boolean := False;
-         begin
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "zone_short_family")
-                 and then S (Rules (Index).A) = "en"
-               then
-                  L
-                    ("      "
-                     & (if Opened then "elsif " else "if ")
-                     & "Family = """ & S (Rules (Index).B) & """ then");
-                  L ("         return " & S (Rules (Index).E) & ";");
-                  Opened := True;
-               end if;
-            end loop;
-
-            if Opened then
-               L ("      end if;");
-               L;
-            end if;
-         end;
-         L ("      return """";");
+         L ("      if Exact /= """" then");
+         L ("         return Exact;");
+         L ("      end if;");
+         L;
+         L ("      while Cut > Canon'First loop");
+         L ("         if Canon (Cut) = '-' then");
+         L ("            declare");
+         L ("               Hit : constant String :=");
+         L ("                 Find (Canon (Canon'First .. Cut - 1));");
+         L ("            begin");
+         L ("               if Hit /= """" then");
+         L ("                  return Hit;");
+         L ("               end if;");
+         L ("            end;");
+         L ("         end if;");
+         L ("         Cut := Cut - 1;");
+         L ("      end loop;");
+         L;
+         L ("      --  The chain ended on en's rows, which the table holds too.");
+         L ("      return Find (""en"");");
          L ("   end Time_Zone_Generic_Short_Name;");
          L;
          Emit_Locale_Return_Table
