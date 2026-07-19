@@ -31,6 +31,17 @@ procedure Generate_CLDR_Data is
    Unit_Sub_Generated     : constant String :=
      "/tmp/i18n_cldr_data-unit_display_name.generated.adb";
 
+   --  Packed literals are wrapped one chunk to a line, and each line costs
+   --  about a dozen characters of "& """ around it. At 72 that framing was
+   --  2.6 MB across the generated sources -- 15% of those lines, and pure
+   --  syntax. Nothing reads them by eye, and they carry Style_Checks (Off).
+   --
+   --  GNAT rejects a source line over 32,766 characters, so this leaves an
+   --  eightfold margin; the file already holds hand-emitted lines of 2,703.
+   --  Past 4096 there is only about 35 KB left to win, which is not worth
+   --  spending the margin on.
+   Data_Chunk : constant := 4096;
+
    Max_Rules : constant := 2_000_000;
    Max_TZDB_Zones : constant := 600;
    Max_TZDB_Links : constant := 1000;
@@ -2269,7 +2280,7 @@ procedure Generate_CLDR_Data is
          Value  : String;
          Suffix : String := "")
       is
-         Chunk : constant := 72;
+         Chunk : constant := Data_Chunk;
          Start : Positive := Value'First;
          Stop  : Natural;
          Term  : Positive := 1;
@@ -2416,7 +2427,7 @@ procedure Generate_CLDR_Data is
             Value  : String;
             Suffix : String := "")
          is
-            Chunk : constant := 72;
+            Chunk : constant := Data_Chunk;
             Start : Positive := Value'First;
             Stop  : Natural;
             Term  : Positive := 1;
@@ -2960,7 +2971,7 @@ procedure Generate_CLDR_Data is
             Value  : String;
             Suffix : String := "")
          is
-            Chunk : constant := 72;
+            Chunk : constant := Data_Chunk;
             Start : Positive := Value'First;
             Stop  : Natural;
             Term  : Positive := 1;
@@ -4261,7 +4272,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
             Value  : String;
             Suffix : String := "")
          is
-            Chunk_Size : constant := 72;
+            Chunk_Size : constant := Data_Chunk;
             Start      : Positive := Value'First;
             Stop       : Natural;
             Term       : Positive := 1;
@@ -5621,7 +5632,7 @@ Emit_Locale_Table
            (Value  : String;
             Indent : String)
          is
-            Chunk_Size : constant := 72;
+            Chunk_Size : constant := Data_Chunk;
             First      : Positive := Value'First;
             Last       : Natural;
             Term       : Positive := 1;
@@ -7247,7 +7258,7 @@ Emit_Locale_Table
 
       procedure Emit_Unit_Display_Name is
          procedure Emit_String_Term (Value : String) is
-            Chunk_Size : constant := 72;
+            Chunk_Size : constant := Data_Chunk;
             Start      : Positive := Value'First;
             Stop       : Natural;
          begin
