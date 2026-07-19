@@ -2171,6 +2171,7 @@ procedure Generate_CLDR_Data is
 
       procedure Emit_Date_Style_Pattern is
          Style_Data : US.Unbounded_String;
+         Index_Data : US.Unbounded_String;
 
          procedure Emit_String_Expression
            (Indent : String;
@@ -2200,15 +2201,40 @@ procedure Generate_CLDR_Data is
             end loop;
          end Emit_String_Expression;
       begin
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "date_style_pattern") then
-               US.Append
-                 (Style_Data,
-                  S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
-                  & S (Rules (Index).C) & "|"
-                  & Ada_Expression_UTF8_Hex (S (Rules (Index).D)) & "~");
-            end if;
-         end loop;
+         --  Rows arrive grouped by locale, so each locale occupies one run of
+         --  the packed table. Record where each run starts and ends: a lookup
+         --  then reads the handful of rows for one locale instead of walking
+         --  all of them.
+         declare
+            Current : US.Unbounded_String;
+            Seg_First : Natural := 1;
+
+            procedure Close_Segment is
+            begin
+               if US.Length (Current) > 0 then
+                  US.Append
+                    (Index_Data,
+                     S (Current) & "|" & Trim (Seg_First'Image) & "|"
+                     & Trim (Natural'Image (US.Length (Style_Data))) & "~");
+               end if;
+            end Close_Segment;
+         begin
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "date_style_pattern") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     Close_Segment;
+                     Current := Rules (Index).A;
+                     Seg_First := US.Length (Style_Data) + 1;
+                  end if;
+                  US.Append
+                    (Style_Data,
+                     S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
+                     & S (Rules (Index).C) & "|"
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).D)) & "~");
+               end if;
+            end loop;
+            Close_Segment;
+         end;
 
          L;
          L ("   --  CLDR's own dateFormats, by locale and calendar. The heuristic");
@@ -2226,33 +2252,80 @@ procedure Generate_CLDR_Data is
          L ("      Style_Data : constant String :=");
          Emit_String_Expression ("        ", S (Style_Data), ";");
          L;
-         L ("      function Matches_Locale");
-         L ("        (Candidate : String;");
-         L ("         Fallback  : Boolean)");
-         L ("         return Boolean is");
-         L ("      begin");
-         L ("         if Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return Locale_Equals (Locale, Candidate);");
-         L ("         end if;");
-         L ("      end Matches_Locale;");
+         L ("      --  locale|first|last~ into Style_Data, one run per locale.");
+         L ("      Index_Data : constant String :=");
+         Emit_String_Expression ("        ", S (Index_Data), ";");
          L;
-         L ("      function Search");
-         L ("        (Fallback        : Boolean;");
+         --  Locale strings in the index come from CLDR and are already in
+         --  canonical form, so a plain comparison answers almost every call.
+         --  Canonical => True is the retry for a caller that spelled the
+         --  locale differently ("EN_gb"), which Locale_Equals still accepts.
+         L ("      procedure Segment");
+         L ("        (Cand      : String;");
+         L ("         Canonical : Boolean;");
+         L ("         First     : out Natural;");
+         L ("         Last      : out Natural)");
+         L ("      is");
+         L ("         Start : Positive := Index_Data'First;");
+         L ("      begin");
+         L ("         First := 0;");
+         L ("         Last := 0;");
+         L ("         while Start <= Index_Data'Last loop");
+         L ("            declare");
+         L ("               Sep1 : Natural := 0;");
+         L ("               Sep2 : Natural := 0;");
+         L ("               Stop : Natural := Index_Data'Last + 1;");
+         L ("            begin");
+         L ("               for Index in Start .. Index_Data'Last loop");
+         L ("                  if Index_Data (Index) = '|' then");
+         L ("                     if Sep1 = 0 then");
+         L ("                        Sep1 := Index;");
+         L ("                     elsif Sep2 = 0 then");
+         L ("                        Sep2 := Index;");
+         L ("                     end if;");
+         L ("                  elsif Index_Data (Index) = '~' then");
+         L ("                     Stop := Index;");
+         L ("                     exit;");
+         L ("                  end if;");
+         L ("               end loop;");
+         L ("               exit when Sep1 = 0 or else Sep2 = 0;");
+         L ("               if (if Canonical then");
+         L ("                     Locale_Equals (Cand, Index_Data (Start .. Sep1 - 1))");
+         L ("                   else Index_Data (Start .. Sep1 - 1) = Cand)");
+         L ("               then");
+         L ("                  First :=");
+         L ("                    Natural'Value (Index_Data (Sep1 + 1 .. Sep2 - 1));");
+         L ("                  Last :=");
+         L ("                    Natural'Value (Index_Data (Sep2 + 1 .. Stop - 1));");
+         L ("                  return;");
+         L ("               end if;");
+         L ("               Start := Stop + 1;");
+         L ("            end;");
+         L ("         end loop;");
+         L ("      end Segment;");
+         L;
+         --  Within one locale's run there are at most a few dozen rows, so the
+         --  calendar and style match is a short scan rather than a table walk.
+         L ("      function In_Segment");
+         L ("        (First, Last : Natural;");
          L ("         Wanted_Calendar : String)");
          L ("         return String");
          L ("      is");
-         L ("         Start : Positive := Style_Data'First;");
+         L ("         Start : Natural := First;");
+         L ("         Fallback_First : Natural := 0;");
+         L ("         Fallback_Last : Natural := 0;");
          L ("      begin");
-         L ("         while Start <= Style_Data'Last loop");
+         L ("         if First = 0 then");
+         L ("            return """";");
+         L ("         end if;");
+         L ("         while Start <= Last loop");
          L ("            declare");
          L ("               Sep1 : Natural := 0;");
          L ("               Sep2 : Natural := 0;");
          L ("               Sep3 : Natural := 0;");
-         L ("               Stop : Natural := Style_Data'Last + 1;");
+         L ("               Stop : Natural := Last + 1;");
          L ("            begin");
-         L ("               for Index in Start .. Style_Data'Last loop");
+         L ("               for Index in Start .. Last loop");
          L ("                  if Style_Data (Index) = '|' then");
          L ("                     if Sep1 = 0 then");
          L ("                        Sep1 := Index;");
@@ -2266,69 +2339,76 @@ procedure Generate_CLDR_Data is
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
-         L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep3 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Sep3 > Sep2 + 1");
-         L ("                 and then Stop > Sep3 + 1");
-         L ("                 and then Style_Data (Sep1 + 1 .. Sep2 - 1)");
-         L ("                   = Wanted_Calendar");
-         L ("                 and then Style_Data (Sep2 + 1 .. Sep3 - 1) = Style");
-         L ("                 and then Matches_Locale");
-         L ("                   (Style_Data (Start .. Sep1 - 1), Fallback)");
-         L ("               then");
-         L ("                  return HB (Style_Data (Sep3 + 1 .. Stop - 1));");
+         L ("               exit when Sep1 = 0 or else Sep2 = 0 or else Sep3 = 0;");
+         L ("               if Style_Data (Sep2 + 1 .. Sep3 - 1) = Style then");
+         L ("                  declare");
+         L ("                     Cal : constant String :=");
+         L ("                       Style_Data (Sep1 + 1 .. Sep2 - 1);");
+         L ("                  begin");
+         L ("                     if Cal = Wanted_Calendar then");
+         L ("                        return HB (Style_Data (Sep3 + 1 .. Stop - 1));");
+         L ("                     elsif Cal = ""gregorian"" then");
+         L ("                        Fallback_First := Sep3 + 1;");
+         L ("                        Fallback_Last := Stop - 1;");
+         L ("                     end if;");
+         L ("                  end;");
          L ("               end if;");
-         L;
          L ("               Start := Stop + 1;");
          L ("            end;");
          L ("         end loop;");
-         L;
+         L ("         if Fallback_First /= 0 then");
+         L ("            return HB (Style_Data (Fallback_First .. Fallback_Last));");
+         L ("         end if;");
          L ("         return """";");
+         L ("      end In_Segment;");
+         L;
+         --  Exact locale first, then each parent -- "en-GB" before "en" --
+         --  which is what the old fallback pass amounted to.
+         L ("      function Search (Wanted_Calendar : String) return String is");
+         L ("         First, Last : Natural;");
+         L ("         Cut : Natural := Locale'Last;");
+         L ("      begin");
+         L ("         Segment (Locale, False, First, Last);");
+         L ("         declare");
+         L ("            Hit : constant String :=");
+         L ("              In_Segment (First, Last, Wanted_Calendar);");
+         L ("         begin");
+         L ("            if Hit /= """" then");
+         L ("               return Hit;");
+         L ("            end if;");
+         L ("         end;");
+         L;
+         L ("         while Cut > Locale'First loop");
+         L ("            if Locale (Cut) = '-' then");
+         L ("               Segment");
+         L ("                 (Locale (Locale'First .. Cut - 1), False, First, Last);");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    In_Segment (First, Last, Wanted_Calendar);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         --  Nothing matched as spelled; retry accepting any");
+         L ("         --  spelling of the same locale.");
+         L ("         Segment (Locale, True, First, Last);");
+         L ("         return In_Segment (First, Last, Wanted_Calendar);");
          L ("      end Search;");
          L;
          L ("      Effective_Calendar : constant String :=");
          L ("        (if Calendar = """" then ""gregorian"" else Calendar);");
-         L ("      Exact : constant String :=");
-         L ("        Search (False, Effective_Calendar);");
+         L ("      Found : constant String := Search (Effective_Calendar);");
          L ("   begin");
-         L ("      if Exact /= """" then");
-         L ("         return Exact;");
+         L ("      if Found /= """" then");
+         L ("         return Found;");
          L ("      end if;");
          L;
-         L ("      --  A calendar that ships no pattern of its own follows the");
-         L ("      --  locale's gregorian one.");
-         L ("      if Effective_Calendar /= ""gregorian"" then");
-         L ("         declare");
-         L ("            Greg : constant String := Search (False, ""gregorian"");");
-         L ("         begin");
-         L ("            if Greg /= """" then");
-         L ("               return Greg;");
-         L ("            end if;");
-         L ("         end;");
-         L ("      end if;");
-         L;
-         L ("      declare");
-         L ("         Near : constant String :=");
-         L ("           Search (True, Effective_Calendar);");
-         L ("      begin");
-         L ("         if Near /= """" then");
-         L ("            return Near;");
-         L ("         end if;");
-         L ("      end;");
-         L;
-         L ("      declare");
-         L ("         Near_Greg : constant String :=");
-         L ("           Search (True, ""gregorian"");");
-         L ("      begin");
-         L ("         if Near_Greg /= """" then");
-         L ("            return Near_Greg;");
-         L ("         end if;");
-         L ("      end;");
-         L;
+         L ("      --  Outside the pinned subset, fall back to the old shape rule.");
          L ("      if In_List (Lang, ""ja,zh"") then");
          L ("         if Style = ""short"" then");
          L ("            return ""yy'/'M'/'d"";");
