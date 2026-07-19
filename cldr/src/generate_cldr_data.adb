@@ -2582,6 +2582,15 @@ procedure Generate_CLDR_Data is
                      Last  : constant String :=
                        Trim (Natural'Image (US.Length (Style_Data)));
                   begin
+                     --  Seven digits is enough for this one today, but the
+                     --  pad is a null range rather than an error once it is
+                     --  not, which widens the field and shifts every record
+                     --  after it. That went unnoticed in the packed tables
+                     --  until a differential check caught it, so say so.
+                     if First'Length > 7 or else Last'Length > 7 then
+                        Add_Error ("date style data outgrew the offset field");
+                     end if;
+
                      US.Append (Index_Data, Key);
                      US.Append (Index_Data, (1 .. 14 - Key'Length => ' '));
                      US.Append (Index_Data, (1 .. 7 - First'Length => '0'));
@@ -4727,24 +4736,72 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("      end if;");
          L ("   end Time_Zone_DST_Family;");
          L;
+         --  Two blobs, each walked whole on each of two passes. One
+         --  segment per locale for each, and the locale field drops out.
+         Reset_Table;
          declare
-            Zone_Family_Display_Data : US.Unbounded_String;
-            Zone_Display_Data        : US.Unbounded_String;
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
          begin
+            --  Grouped by locale, so a change of locale ends the segment.
             for Index in 1 .. Rule_Count loop
                if Is_Kind (Index, "zone_family_display") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
+                     end if;
+
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
+                  end if;
+
                   US.Append
-                    (Zone_Family_Display_Data,
-                     S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
-                     & Ada_Expression_UTF8_Hex (S (Rules (Index).C)) & "~");
-               elsif Is_Kind (Index, "zone_display") then
-                  US.Append
-                    (Zone_Display_Data,
-                     S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
+                    (Rows,
+                     S (Rules (Index).B) & "|"
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).C)) & "~");
                end if;
             end loop;
 
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
+            end if;
+         end;
+         Emit_Locale_Table
+           ("Zone_Family_Display_Row", """""", Raw => True,
+            Walk_Parents => False);
+
+         Reset_Table;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  Grouped by locale, so a change of locale ends the segment.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "zone_display") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
+                     end if;
+
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & "|"
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).C)) & "~");
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
+            end if;
+         end;
+         Emit_Locale_Table
+           ("Zone_Display_Row", """""", Raw => True, Walk_Parents => False);
+
+         L;
          L ("   function Time_Zone_Display_Name");
          L ("     (Locale : String;");
          L ("      Zone   : String)");
@@ -4752,84 +4809,31 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("   is");
          L ("      Lang   : constant String := Language (Locale);");
          L ("      Family : constant String := Time_Zone_DST_Family (Zone);");
-         L ("      Family_Data : constant String :=");
-         Emit_String_Expression ("        ", S (Zone_Family_Display_Data), ";");
-         L ("      Zone_Data : constant String :=");
-         Emit_String_Expression ("        ", S (Zone_Display_Data), ";");
          L;
-         L ("      function Hex_Value (C : Character) return Natural is");
-         L ("      begin");
-         L ("         if C in '0' .. '9' then");
-         L ("            return Character'Pos (C) - Character'Pos ('0');");
-         L ("         elsif C in 'A' .. 'F' then");
-         L ("            return 10 + Character'Pos (C) - Character'Pos ('A');");
-         L ("         elsif C in 'a' .. 'f' then");
-         L ("            return 10 + Character'Pos (C) - Character'Pos ('a');");
-         L ("         else");
-         L ("            return 0;");
-         L ("         end if;");
-         L ("      end Hex_Value;");
          L;
-         L ("      function Hex_To_String (Hex : String) return String is");
-         L ("         Result : String (1 .. Hex'Length / 2);");
-         L ("         Out_Index : Natural := 0;");
-         L ("         Index : Natural := Hex'First;");
+         L ("      function Search (Rows : String; Wanted : String) return String is");
+         L ("         Start : Positive := Rows'First;");
          L ("      begin");
-         L ("         while Index < Hex'Last loop");
-         L ("            Out_Index := Out_Index + 1;");
-         L ("            Result (Out_Index) := Character'Val");
-         L ("              (Hex_Value (Hex (Index)) * 16");
-         L ("               + Hex_Value (Hex (Index + 1)));");
-         L ("            Index := Index + 2;");
-         L ("         end loop;");
-         L ("         return Result;");
-         L ("      end Hex_To_String;");
-         L;
-         L ("      function Matches_Locale");
-         L ("        (Candidate : String;");
-         L ("         Fallback  : Boolean)");
-         L ("         return Boolean is");
-         L ("      begin");
-         L ("         if Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return Locale_Equals (Locale, Candidate);");
-         L ("         end if;");
-         L ("      end Matches_Locale;");
-         L;
-         L ("      function Search_Family (Fallback : Boolean) return String is");
-         L ("         Start : Positive := Family_Data'First;");
-         L ("      begin");
-         L ("         while Start <= Family_Data'Last loop");
+         L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
-         L ("               Stop : Natural := Family_Data'Last + 1;");
+         L ("               Sep : Natural := 0;");
+         L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
-         L ("               for Index in Start .. Family_Data'Last loop");
-         L ("                  if Family_Data (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Family_Data (Index) = '~' then");
+         L ("               for Index in Start .. Rows'Last loop");
+         L ("                  if Rows (Index) = '|' and then Sep = 0 then");
+         L ("                     Sep := Index;");
+         L ("                  elsif Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Stop > Sep2 + 1");
-         L ("                 and then Family_Data (Sep1 + 1 .. Sep2 - 1) = Family");
-         L ("                 and then Matches_Locale");
-         L ("                   (Family_Data (Start .. Sep1 - 1), Fallback)");
+         L ("               if Sep /= 0");
+         L ("                 and then Sep > Start");
+         L ("                 and then Stop > Sep + 1");
+         L ("                 and then Rows (Start .. Sep - 1) = Wanted");
          L ("               then");
-         L ("                  return Hex_To_String");
-         L ("                    (Family_Data (Sep2 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Sep + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -4837,75 +4841,75 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("         end loop;");
          L;
          L ("         return """";");
-         L ("      end Search_Family;");
+         L ("      end Search;");
          L;
-         L ("      function Search_Zone (Fallback : Boolean) return String is");
-         L ("         Start : Positive := Zone_Data'First;");
+         L ("      --  The locale, then each parent, longest first.");
+         L ("      function Family_Display return String is");
+         L ("         Exact : constant String := Search (Zone_Family_Display_Row (Locale), Family);");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
          L ("      begin");
-         L ("         while Start <= Zone_Data'Last loop");
-         L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
-         L ("               Stop : Natural := Zone_Data'Last + 1;");
-         L ("            begin");
-         L ("               for Index in Start .. Zone_Data'Last loop");
-         L ("                  if Zone_Data (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Zone_Data (Index) = '~' then");
-         L ("                     Stop := Index;");
-         L ("                     exit;");
+         L ("         if Exact /= """" then");
+         L ("            return Exact;");
+         L ("         end if;");
+         L;
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    Search");
+         L ("                      (Zone_Family_Display_Row (Canon (Canon'First .. Cut - 1)), Family);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
          L ("                  end if;");
-         L ("               end loop;");
-         L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Stop > Sep2 + 1");
-         L ("                 and then Zone_Data (Sep1 + 1 .. Sep2 - 1) = Zone");
-         L ("                 and then Matches_Locale");
-         L ("                   (Zone_Data (Start .. Sep1 - 1), Fallback)");
-         L ("               then");
-         L ("                  return Hex_To_String");
-         L ("                    (Zone_Data (Sep2 + 1 .. Stop - 1));");
-         L ("               end if;");
-         L;
-         L ("               Start := Stop + 1;");
-         L ("            end;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
          L ("         end loop;");
          L;
          L ("         return """";");
-         L ("      end Search_Zone;");
+         L ("      end Family_Display;");
          L;
-         L ("      Exact_Family_Display : constant String := Search_Family (False);");
+         L ("      --  The locale, then each parent, longest first.");
+         L ("      function Zone_Display return String is");
+         L ("         Exact : constant String := Search (Zone_Display_Row (Locale), Zone);");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
+         L ("      begin");
+         L ("         if Exact /= """" then");
+         L ("            return Exact;");
+         L ("         end if;");
+         L;
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    Search");
+         L ("                      (Zone_Display_Row (Canon (Canon'First .. Cut - 1)), Zone);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Zone_Display;");
+
+         L ("      Family_Value : constant String := Family_Display;");
          L ("   begin");
-         L ("      if Exact_Family_Display /= """" then");
-         L ("         return Exact_Family_Display;");
+         L ("      if Family_Value /= """" then");
+         L ("         return Family_Value;");
          L ("      end if;");
-         L ("      declare");
-         L ("         Fallback_Family_Display : constant String := Search_Family (True);");
-         L ("      begin");
-         L ("         if Fallback_Family_Display /= """" then");
-         L ("            return Fallback_Family_Display;");
-         L ("         end if;");
-         L ("      end;");
          L;
          L ("      declare");
-         L ("         Exact_Zone_Display : constant String := Search_Zone (False);");
+         L ("         Zone_Value : constant String := Zone_Display;");
          L ("      begin");
-         L ("         if Exact_Zone_Display /= """" then");
-         L ("            return Exact_Zone_Display;");
-         L ("         end if;");
-         L ("      end;");
-         L ("      declare");
-         L ("         Fallback_Zone_Display : constant String := Search_Zone (True);");
-         L ("      begin");
-         L ("         if Fallback_Zone_Display /= """" then");
-         L ("            return Fallback_Zone_Display;");
+         L ("         if Zone_Value /= """" then");
+         L ("            return Zone_Value;");
          L ("         end if;");
          L ("      end;");
          L;
@@ -5128,88 +5132,71 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("         return Zone;");
          L ("      end if;");
          L ("   end Time_Zone_Display_Name;");
+         L;
+         --  128,821 records over 6.7 MB, walked from the first character on
+         --  each of two passes. Grouped by locale, so each locale is a
+         --  segment and the locale field leaves the record.
+         Reset_Table;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  Grouped by locale, so a change of locale ends the segment.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "zone_exemplar_hex") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
+                     end if;
+
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & "|"
+                     & S (Rules (Index).C) & "~");
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
+            end if;
          end;
+         Emit_Locale_Table
+           ("Zone_Exemplar_Row", """""", Raw => True, Walk_Parents => False);
+
          L;
          L ("   function Time_Zone_Exemplar_Location");
          L ("     (Locale : String;");
          L ("      Zone   : String)");
          L ("      return String");
          L ("   is");
-         L ("      Data : constant String :=");
-         Emit_String_Expression ("        ", Zone_Exemplar_Data, ";");
          L;
-         L ("      function Hex_Value (C : Character) return Natural is");
+         L ("      function Search (Rows : String; Wanted : String) return String is");
+         L ("         Start : Positive := Rows'First;");
          L ("      begin");
-         L ("         if C in '0' .. '9' then");
-         L ("            return Character'Pos (C) - Character'Pos ('0');");
-         L ("         elsif C in 'A' .. 'F' then");
-         L ("            return 10 + Character'Pos (C) - Character'Pos ('A');");
-         L ("         elsif C in 'a' .. 'f' then");
-         L ("            return 10 + Character'Pos (C) - Character'Pos ('a');");
-         L ("         else");
-         L ("            return 0;");
-         L ("         end if;");
-         L ("      end Hex_Value;");
-         L;
-         L ("      function Hex_To_String (Hex : String) return String is");
-         L ("         Result : String (1 .. Hex'Length / 2);");
-         L ("         Out_Index : Natural := 0;");
-         L ("         Index : Natural := Hex'First;");
-         L ("      begin");
-         L ("         while Index < Hex'Last loop");
-         L ("            Out_Index := Out_Index + 1;");
-         L ("            Result (Out_Index) := Character'Val");
-         L ("              (Hex_Value (Hex (Index)) * 16");
-         L ("               + Hex_Value (Hex (Index + 1)));");
-         L ("            Index := Index + 2;");
-         L ("         end loop;");
-         L ("         return Result;");
-         L ("      end Hex_To_String;");
-         L;
-         L ("      function Matches_Locale");
-         L ("        (Candidate : String;");
-         L ("         Fallback  : Boolean)");
-         L ("         return Boolean is");
-         L ("      begin");
-         L ("         if Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return Locale_Equals (Locale, Candidate);");
-         L ("         end if;");
-         L ("      end Matches_Locale;");
-         L;
-         L ("      function Search (Fallback : Boolean) return String is");
-         L ("         Start : Positive := Data'First;");
-         L ("      begin");
-         L ("         while Start <= Data'Last loop");
+         L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
-         L ("               Stop : Natural := Data'Last + 1;");
+         L ("               Sep : Natural := 0;");
+         L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
-         L ("               for Index in Start .. Data'Last loop");
-         L ("                  if Data (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Data (Index) = '~' then");
+         L ("               for Index in Start .. Rows'Last loop");
+         L ("                  if Rows (Index) = '|' and then Sep = 0 then");
+         L ("                     Sep := Index;");
+         L ("                  elsif Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Stop > Sep2 + 1");
-         L ("                 and then Data (Sep1 + 1 .. Sep2 - 1) = Zone");
-         L ("                 and then Matches_Locale");
-         L ("                   (Data (Start .. Sep1 - 1), Fallback)");
+         L ("               if Sep /= 0");
+         L ("                 and then Sep > Start");
+         L ("                 and then Stop > Sep + 1");
+         L ("                 and then Rows (Start .. Sep - 1) = Wanted");
          L ("               then");
-         L ("                  return Hex_To_String (Data (Sep2 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Sep + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -5219,13 +5206,34 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("         return """";");
          L ("      end Search;");
          L;
-         L ("      Exact : constant String := Search (False);");
+         L ("      --  The locale, then each parent, longest first.");
+         L ("      function Resolve return String is");
+         L ("         Exact : constant String := Search (Zone_Exemplar_Row (Locale), Zone);");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
+         L ("      begin");
+         L ("         if Exact /= """" then");
+         L ("            return Exact;");
+         L ("         end if;");
+         L;
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    Search (Zone_Exemplar_Row (Canon (Canon'First .. Cut - 1)), Zone);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Resolve;");
          L ("   begin");
-         L ("      if Exact /= """" then");
-         L ("         return Exact;");
-         L ("      else");
-         L ("         return Search (True);");
-         L ("      end if;");
+         L ("      return Resolve;");
          L ("   end Time_Zone_Exemplar_Location;");
          --  Both zone functions read the same rows -- standard and daylight
          --  in one pair of fields, generic in the next -- so one payload per
