@@ -2067,6 +2067,11 @@ procedure Generate_CLDR_Data is
       --  than once per emitter.
       Max_Table_Entries : constant := 20_000;
 
+      --  A 14-character key and two 8-digit offsets. Eight, because the unit
+      --  names pack eleven million characters and a narrower field silently
+      --  widens rather than truncating, shifting every record after it.
+      Index_Record_Width : constant := 30;
+
       type Table_Entry is record
          Key   : US.Unbounded_String;
          --  Hex, as HB decodes it in the generated body.
@@ -2169,11 +2174,20 @@ procedure Generate_CLDR_Data is
                begin
                   --  Same fixed-width record and the same space-pad rule as
                   --  the date-pattern index: the pad must sort below '-'.
+                  --
+                  --  Eight digits, not seven: the unit names pack eleven
+                  --  million characters of values, and a seven-digit field
+                  --  silently widens to eight rather than truncating, which
+                  --  shifts every record after it.
+                  if First'Length > 8 or else Last'Length > 8 then
+                     Add_Error ("packed values outgrew the offset field");
+                  end if;
+
                   US.Append (Index_Data, Key);
                   US.Append (Index_Data, (1 .. 14 - Key'Length => ' '));
-                  US.Append (Index_Data, (1 .. 7 - First'Length => '0'));
+                  US.Append (Index_Data, (1 .. 8 - First'Length => '0'));
                   US.Append (Index_Data, First);
-                  US.Append (Index_Data, (1 .. 7 - Last'Length => '0'));
+                  US.Append (Index_Data, (1 .. 8 - Last'Length => '0'));
                   US.Append (Index_Data, Last);
                end;
             end;
@@ -2234,7 +2248,7 @@ procedure Generate_CLDR_Data is
          Emit_String_Expression ("        ", S (Values), ";");
          L ("      Index_Data : constant String :=");
          Emit_String_Expression ("        ", S (Index_Data), ";");
-         L ("      Width : constant := 28;");
+         L ("      Width : constant := " & Trim (Integer'Image (Index_Record_Width)) & ";");
          L ("      Count : constant Natural := Index_Data'Length / Width;");
          L;
          L ("      function Key (N : Positive) return String is");
@@ -2249,9 +2263,9 @@ procedure Generate_CLDR_Data is
          L ("         Base : constant Natural :=");
          L ("           Index_Data'First + (N - 1) * Width + 14;");
          L ("         F : constant Natural :=");
-         L ("           Natural'Value (Index_Data (Base .. Base + 6));");
+         L ("           Natural'Value (Index_Data (Base .. Base + 7));");
          L ("         T : constant Natural :=");
-         L ("           Natural'Value (Index_Data (Base + 7 .. Base + 13));");
+         L ("           Natural'Value (Index_Data (Base + 8 .. Base + 15));");
          L ("      begin");
          if Raw then
             L ("         return Values (F .. T);");
@@ -2945,8 +2959,10 @@ procedure Generate_CLDR_Data is
             then
                declare
                   Skeleton : constant String := S (Rules (Index).B);
+                  --  Row numbers, so this must track the index record
+                  --  width that Pack_Table writes.
                   First_Row : constant Natural :=
-                    US.Length (Locale_Index) / 28 + 1;
+                    US.Length (Locale_Index) / Index_Record_Width + 1;
                   Last_Row : Natural;
                begin
                   if Skeleton'Length > 8 then
@@ -2968,7 +2984,7 @@ procedure Generate_CLDR_Data is
                   --  so a pattern already packed for an earlier skeleton is
                   --  reused rather than stored again.
                   Pack_Table (Values, Locale_Index);
-                  Last_Row := US.Length (Locale_Index) / 28;
+                  Last_Row := US.Length (Locale_Index) / Index_Record_Width;
 
                   declare
                      F : constant String := Trim (Natural'Image (First_Row));
@@ -2998,7 +3014,7 @@ procedure Generate_CLDR_Data is
          Emit_String_Expression ("        ", S (Locale_Index), ";");
          L ("      Skeleton_Index : constant String :=");
          Emit_String_Expression ("        ", S (Skeleton_Index), ";");
-         L ("      Width : constant := 28;");
+         L ("      Width : constant := " & Trim (Integer'Image (Index_Record_Width)) & ";");
          L ("      Skeleton_Width : constant := 22;");
          L ("      Skeleton_Count : constant Natural :=");
          L ("        Skeleton_Index'Length / Skeleton_Width;");
@@ -3019,9 +3035,9 @@ procedure Generate_CLDR_Data is
          L ("         Base : constant Natural :=");
          L ("           Locale_Index'First + (N - 1) * Width + 14;");
          L ("         F : constant Natural :=");
-         L ("           Natural'Value (Locale_Index (Base .. Base + 6));");
+         L ("           Natural'Value (Locale_Index (Base .. Base + 7));");
          L ("         T : constant Natural :=");
-         L ("           Natural'Value (Locale_Index (Base + 7 .. Base + 13));");
+         L ("           Natural'Value (Locale_Index (Base + 8 .. Base + 15));");
          L ("      begin");
          L ("         return HB (Values (F .. T));");
          L ("      end Value_At;");
@@ -5460,28 +5476,54 @@ Emit_Locale_Table
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
          L ("      Singular : constant Boolean := Category = ""one"";");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "currency_name_payload") then
-                  L ("      if "
-                     & (if Pass = 1 then "Locale_Equals" else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("      then");
-                  L ("         declare");
-                  L ("            Name : constant String := Currency_Name_From_Payload");
-                  L ("              (");
-                  Emit_String_Argument (S (Rules (Index).B), "               ");
-                  L ("               Code, Category);");
-                  L ("         begin");
-                  L ("            if Name /= """" then");
-                  L ("               return Name;");
-                  L ("            end if;");
-                  L ("         end;");
-                  L ("      end if;");
-               end if;
-            end loop;
+
+         --  405 payloads, each written out twice -- once for the exact pass
+         --  and once for the fallback -- and most of them repeats: 808
+         --  literals, 258 of them distinct. As a table they are stored once
+         --  and the repeats collapse.
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "currency_name_payload") then
+               Add_Table_Entry (S (Rules (Index).A), S (Rules (Index).B));
+            end if;
          end loop;
+
+         --  Nested, as a subunit holds one subprogram.
+         Emit_Locale_Table
+           ("Currency_Payload_Row", """""", Raw => True, Walk_Parents => False);
+
+         L;
+         L ("      function Find (Cand : String) return String is");
+         L ("         Payload : constant String := Currency_Payload_Row (Cand);");
+         L ("      begin");
+         L ("         if Payload = """" then");
+         L ("            return """";");
+         L ("         end if;");
+         L ("         return Currency_Name_From_Payload (Payload, Code, Category);");
+         L ("      end Find;");
+         L;
+         L ("      Exact : constant String := Find (Locale);");
+         L ("      Canon : constant String := Canonical_Locale (Locale);");
+         L ("      Cut : Natural := Canon'Last;");
+         L ("   begin");
+         L ("      if Exact /= """" then");
+         L ("         return Exact;");
+         L ("      end if;");
+         L;
+         L ("      --  Then each parent, longest first.");
+         L ("      while Cut > Canon'First loop");
+         L ("         if Canon (Cut) = '-' then");
+         L ("            declare");
+         L ("               Hit : constant String :=");
+         L ("                 Find (Canon (Canon'First .. Cut - 1));");
+         L ("            begin");
+         L ("               if Hit /= """" then");
+         L ("                  return Hit;");
+         L ("               end if;");
+         L ("            end;");
+         L ("         end if;");
+         L ("         Cut := Cut - 1;");
+         L ("      end loop;");
          L;
          L ("      if Lang = ""de"" then");
          L ("         if Code = ""USD"" then");
@@ -6972,88 +7014,86 @@ Emit_Locale_Table
          L ("      Lang     : constant String := Language (Locale);");
          L ("      Singular : constant Boolean := Category = ""one"";");
          L ("      Plural   : constant Boolean := not Singular;");
-         L ("      Unit_Name_Data : constant String :=");
-         L ("        """"");
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "unit_name") then
-               Emit_String_Term
-                 (S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
-                  & S (Rules (Index).C) & "|" & S (Rules (Index).D)
-                  & "|" & Ada_Expression_UTF8_Hex (S (Rules (Index).E))
-                  & "~");
+         --  847,585 records, and Search walked all of them from the first
+         --  character on every pass -- as many as nine passes to a lookup,
+         --  so some seven million record parses to answer one call. Grouped
+         --  by locale, so each locale becomes a segment of about eleven
+         --  hundred records and the locale field leaves the record.
+         Reset_Table;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "unit_name") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
+                     end if;
+
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & "|" & S (Rules (Index).C) & "|"
+                     & S (Rules (Index).D) & "|"
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).E)) & "~");
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
             end if;
-         end loop;
-         L ("        ;");
+         end;
+
+         --  Nested in the function, as the packed data already was: a
+         --  subunit holds one subprogram, so the table cannot be a sibling.
+         Emit_Locale_Table
+           ("Unit_Name_Row", """""", Raw => True, Walk_Parents => False);
+
          L;
          L ("      function Extended_Unit_Name return String is");
          L ("      begin");
          L ("         return """";");
          L ("      end Extended_Unit_Name;");
          L;
-         L ("      function Matches_Locale");
-         L ("        (Candidate : String;");
-         L ("         Fallback  : Boolean;");
-         L ("         Root      : Boolean)");
-         L ("         return Boolean is");
+         L ("      function Search (Rows : String; Want : String) return String is");
+         L ("         Start : Positive := Rows'First;");
          L ("      begin");
-         L ("         if Root then");
-         L ("            return Candidate = ""und"" or else Candidate = ""root"";");
-         L ("         elsif Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return Locale_Equals (Locale, Candidate);");
-         L ("         end if;");
-         L ("      end Matches_Locale;");
-         L;
-         L ("      function Search_Unit_Name");
-         L ("        (Fallback : Boolean;");
-         L ("         Root     : Boolean;");
-         L ("         Want     : String)");
-         L ("         return String");
-         L ("      is");
-         L ("         Start : Positive := Unit_Name_Data'First;");
-         L ("      begin");
-         L ("         while Start <= Unit_Name_Data'Last loop");
+         L ("         while Start <= Rows'Last loop");
          L ("            declare");
          L ("               Sep1 : Natural := 0;");
          L ("               Sep2 : Natural := 0;");
          L ("               Sep3 : Natural := 0;");
-         L ("               Sep4 : Natural := 0;");
-         L ("               Stop : Natural := Unit_Name_Data'Last + 1;");
+         L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
-         L ("               for Index in Start .. Unit_Name_Data'Last loop");
-         L ("                  if Unit_Name_Data (Index) = '|' then");
+         L ("               for Index in Start .. Rows'Last loop");
+         L ("                  if Rows (Index) = '|' then");
          L ("                     if Sep1 = 0 then");
          L ("                        Sep1 := Index;");
          L ("                     elsif Sep2 = 0 then");
          L ("                        Sep2 := Index;");
          L ("                     elsif Sep3 = 0 then");
          L ("                        Sep3 := Index;");
-         L ("                     elsif Sep4 = 0 then");
-         L ("                        Sep4 := Index;");
          L ("                     end if;");
-         L ("                  elsif Unit_Name_Data (Index) = '~' then");
+         L ("                  elsif Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep3 /= 0");
-         L ("                 and then Sep4 /= 0");
+         L ("               if Sep3 /= 0");
          L ("                 and then Sep1 > Start");
          L ("                 and then Sep2 > Sep1 + 1");
          L ("                 and then Sep3 > Sep2 + 1");
-         L ("                 and then Sep4 > Sep3 + 1");
-         L ("                 and then Stop > Sep4 + 1");
-         L ("                 and then Unit_Name_Data (Sep1 + 1 .. Sep2 - 1) = Base");
-         L ("                 and then Unit_Name_Data (Sep2 + 1 .. Sep3 - 1) = Width");
-         L ("                 and then Unit_Name_Data (Sep3 + 1 .. Sep4 - 1) = Want");
-         L ("                 and then Matches_Locale");
-         L ("                   (Unit_Name_Data (Start .. Sep1 - 1), Fallback, Root)");
+         L ("                 and then Stop > Sep3 + 1");
+         L ("                 and then Rows (Start .. Sep1 - 1) = Base");
+         L ("                 and then Rows (Sep1 + 1 .. Sep2 - 1) = Width");
+         L ("                 and then Rows (Sep2 + 1 .. Sep3 - 1) = Want");
          L ("               then");
-         L ("                  return HB (Unit_Name_Data (Sep4 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Sep3 + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -7061,15 +7101,36 @@ Emit_Locale_Table
          L ("         end loop;");
          L;
          L ("         return """";");
-         L ("      end Search_Unit_Name;");
+         L ("      end Search;");
          L;
          L ("      function Category_Row (Want : String) return String is");
-         L ("         Exact : constant String := Search_Unit_Name (False, False, Want);");
+         L ("         Exact : constant String :=");
+         L ("           Search (Unit_Name_Row (Locale), Want);");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
          L ("      begin");
          L ("         if Exact /= """" then");
          L ("            return Exact;");
          L ("         end if;");
-         L ("         return Search_Unit_Name (True, False, Want);");
+         L;
+         L ("         --  Then each parent, longest first.");
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    Search");
+         L ("                      (Unit_Name_Row (Canon (Canon'First .. Cut - 1)),");
+         L ("                       Want);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
          L ("      end Category_Row;");
          L;
          L ("      --  Root (und) rows carry the CLDR abbreviated forms used by any");
@@ -7077,9 +7138,15 @@ Emit_Locale_Table
          L ("      --  resort before the built-in English defaults, and only the");
          L ("      --  abbreviated (short/narrow) widths consult them -- full names");
          L ("      --  keep falling through to the English word forms.");
+         L ("      --");
+         L ("      --  root before und, the order the records were in.");
          L ("      function Root_Category_Row (Want : String) return String is");
+         L ("         Rooted : constant String := Search (Unit_Name_Row (""root""), Want);");
          L ("      begin");
-         L ("         return Search_Unit_Name (False, True, Want);");
+         L ("         if Rooted /= """" then");
+         L ("            return Rooted;");
+         L ("         end if;");
+         L ("         return Search (Unit_Name_Row (""und""), Want);");
          L ("      end Root_Category_Row;");
          L;
          L ("      function Root_Row return String is");
