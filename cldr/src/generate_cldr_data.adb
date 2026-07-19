@@ -2141,8 +2141,13 @@ procedure Generate_CLDR_Data is
                --  Values repeat heavily -- a rule family has a handful of
                --  distinct names across hundreds of locales -- so point a
                --  repeat at the copy already packed.
+               --  Compared unbounded, not as String: converting each prior
+               --  value to compare it copies the whole thing, and a segment
+               --  of relative patterns runs to several kilobytes.
                for Prior in 1 .. N - 1 loop
-                  if S (Table_Entries (Prior).Value) = Hex then
+                  if US."=" (Table_Entries (Prior).Value,
+                             Table_Entries (N).Value)
+                  then
                      Table_Entries (N).First := Table_Entries (Prior).First;
                      Table_Entries (N).Last := Table_Entries (Prior).Last;
                      exit;
@@ -3844,44 +3849,42 @@ procedure Generate_CLDR_Data is
          --  every row that locale has, which Day_Period_Payload_Value picks
          --  apart. Collected here rather than rebuilt per branch.
          Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "day_period_hex") then
-               declare
-                  Locale : constant String := S (Rules (Index).A);
-                  Seen : Boolean := False;
-                  Payload : US.Unbounded_String;
-               begin
-                  for Previous in 1 .. Index - 1 loop
-                     if Is_Kind (Previous, "day_period_hex")
-                       and then S (Rules (Previous).A) = Locale
-                     then
-                        Seen := True;
-                        exit;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  Grouped by locale, so a change of locale ends the segment.
+            --  Scanning back for a locale already seen walks the whole rule
+            --  array per row, which is quadratic over a hundred thousand
+            --  rules.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "day_period_hex") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
                      end if;
-                  end loop;
 
-                  if not Seen then
-                     for Candidate in Index .. Rule_Count loop
-                        if Is_Kind (Candidate, "day_period_hex")
-                          and then S (Rules (Candidate).A) = Locale
-                        then
-                           if US.Length (Payload) > 0 then
-                              US.Append (Payload, ";");
-                           end if;
-                           US.Append
-                             (Payload,
-                              S (Rules (Candidate).B) & ","
-                              & S (Rules (Candidate).C) & ","
-                              & S (Rules (Candidate).D));
-                        end if;
-                     end loop;
-
-                     Add_Table_Entry (Locale, S (Payload));
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
                   end if;
-               end;
+
+                  if US.Length (Rows) > 0 then
+                     US.Append (Rows, ";");
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & ","
+                     & S (Rules (Index).C) & ","
+                     & S (Rules (Index).D));
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
             end if;
-         end loop;
-         Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
+         end;
+Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
 
          L;
          L ("   function Day_Period_Name");
@@ -5212,47 +5215,43 @@ procedure Generate_CLDR_Data is
          --  in one pair of fields, generic in the next -- so one payload per
          --  locale serves both rather than emitting the rows twice.
          Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "zone_short_family") then
-               declare
-                  Locale : constant String := S (Rules (Index).A);
-                  Seen : Boolean := False;
-                  Payload : US.Unbounded_String;
-               begin
-                  for Previous in 1 .. Index - 1 loop
-                     if Is_Kind (Previous, "zone_short_family")
-                       and then S (Rules (Previous).A) = Locale
-                     then
-                        Seen := True;
-                        exit;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  Grouped by locale, so a change of locale ends the segment.
+            --  Scanning back for a locale already seen walks the whole rule
+            --  array per row, which is quadratic over a hundred thousand
+            --  rules.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "zone_short_family") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
                      end if;
-                  end loop;
 
-                  if not Seen then
-                     for Candidate in Index .. Rule_Count loop
-                        if Is_Kind (Candidate, "zone_short_family")
-                          and then S (Rules (Candidate).A) = Locale
-                        then
-                           if US.Length (Payload) > 0 then
-                              US.Append (Payload, ";");
-                           end if;
-                           US.Append
-                             (Payload,
-                              S (Rules (Candidate).B) & ","
-                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).C))
-                              & ","
-                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).D))
-                              & ","
-                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).E)));
-                        end if;
-                     end loop;
-
-                     Add_Table_Entry (Locale, S (Payload));
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
                   end if;
-               end;
+
+                  if US.Length (Rows) > 0 then
+                     US.Append (Rows, ";");
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & ","
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).C)) & ","
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).D)) & ","
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).E)));
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
             end if;
-         end loop;
-         Emit_Locale_Table
+         end;
+Emit_Locale_Table
            ("Zone_Family_Row", """""", Raw => True, Walk_Parents => False);
 
          L;
@@ -9182,46 +9181,45 @@ procedure Generate_CLDR_Data is
          L ("   end Spellout_Scale_Name;");
       end Emit_Number_Spellout_Words;
 
+      --  18,385 records, scanned whole on each of up to four passes. Same
+      --  remedy as the relative time patterns: one segment per locale, and
+      --  the locale field drops out of the record.
       procedure Emit_Relative_Current_Name is
-         Current_Data : US.Unbounded_String;
-
-         procedure Emit_String_Expression
-           (Indent : String;
-            Value  : String;
-            Suffix : String := "")
-         is
-            Chunk_Size : constant := 72;
-            Start      : Positive := Value'First;
-            Stop       : Natural;
-            Term       : Positive := 1;
-         begin
-            if Value'Length = 0 then
-               L (Indent & """""" & Suffix);
-               return;
-            elsif Value'Length <= Chunk_Size then
-               L (Indent & """" & Value & """" & Suffix);
-               return;
-            end if;
-
-            while Start <= Value'Last loop
-               Stop := Natural'Min (Start + Chunk_Size - 1, Value'Last);
-               L (Indent & (if Term = 1 then "" else "& ")
-                  & """" & Value (Start .. Stop) & """"
-                  & (if Stop = Value'Last then Suffix else ""));
-               Start := Stop + 1;
-               Term := Term + 1;
-            end loop;
-         end Emit_String_Expression;
       begin
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "relative_current") then
-               US.Append
-                 (Current_Data,
-                  S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
-                  & S (Rules (Index).C) & "|"
-                  & Ada_Expression_UTF8_Hex (S (Rules (Index).D)) & "~");
+         Reset_Table;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  The rows arrive grouped by locale, so a change of locale ends
+            --  the segment. Scanning back for a locale already seen would be
+            --  quadratic, and this kind has tens of thousands of rows.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "relative_current") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
+                     end if;
+
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & "|"
+                     & S (Rules (Index).C) & "|"
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).D))
+                     & "~");
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
             end if;
-         end loop;
+         end;
+         Emit_Locale_Table
+           ("Relative_Current_Row", """""", Raw => True, Walk_Parents => False);
 
          L;
          L ("   function Relative_Current_Name");
@@ -9231,64 +9229,37 @@ procedure Generate_CLDR_Data is
          L ("      return String");
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
-         L ("      Current_Data : constant String :=");
-         Emit_String_Expression ("        ", S (Current_Data), ";");
          L;
-         L ("      function Matches_Locale");
-         L ("        (Candidate : String;");
-         L ("         Fallback  : Boolean)");
-         L ("         return Boolean is");
+         L ("      function Search (Rows : String; Wanted : String) return String is");
+         L ("         Start : Positive := Rows'First;");
          L ("      begin");
-         L ("         if Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return Locale_Equals (Locale, Candidate);");
-         L ("         end if;");
-         L ("      end Matches_Locale;");
-         L;
-         L ("      function Search");
-         L ("        (Fallback     : Boolean;");
-         L ("         Wanted_Width : String)");
-         L ("         return String");
-         L ("      is");
-         L ("         Start : Positive := Current_Data'First;");
-         L ("      begin");
-         L ("         while Start <= Current_Data'Last loop");
+         L ("         while Start <= Rows'Last loop");
          L ("            declare");
          L ("               Sep1 : Natural := 0;");
          L ("               Sep2 : Natural := 0;");
-         L ("               Sep3 : Natural := 0;");
-         L ("               Stop : Natural := Current_Data'Last + 1;");
+         L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
-         L ("               for Index in Start .. Current_Data'Last loop");
-         L ("                  if Current_Data (Index) = '|' then");
+         L ("               for Index in Start .. Rows'Last loop");
+         L ("                  if Rows (Index) = '|' then");
          L ("                     if Sep1 = 0 then");
          L ("                        Sep1 := Index;");
          L ("                     elsif Sep2 = 0 then");
          L ("                        Sep2 := Index;");
-         L ("                     elsif Sep3 = 0 then");
-         L ("                        Sep3 := Index;");
          L ("                     end if;");
-         L ("                  elsif Current_Data (Index) = '~' then");
+         L ("                  elsif Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep3 /= 0");
+         L ("               if Sep2 /= 0");
          L ("                 and then Sep1 > Start");
          L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Sep3 > Sep2 + 1");
-         L ("                 and then Stop > Sep3 + 1");
-         L ("                 and then Current_Data (Sep1 + 1 .. Sep2 - 1) = Base");
-         L ("                 and then Current_Data (Sep2 + 1 .. Sep3 - 1)");
-         L ("                   = Wanted_Width");
-         L ("                 and then Matches_Locale");
-         L ("                   (Current_Data (Start .. Sep1 - 1), Fallback)");
+         L ("                 and then Stop > Sep2 + 1");
+         L ("                 and then Rows (Start .. Sep1 - 1) = Base");
+         L ("                 and then Rows (Sep1 + 1 .. Sep2 - 1) = Wanted");
          L ("               then");
-         L ("                  return HB (Current_Data (Sep3 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Sep2 + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -9298,32 +9269,61 @@ procedure Generate_CLDR_Data is
          L ("         return """";");
          L ("      end Search;");
          L;
-         L ("      Exact : constant String := Search (False, Width);");
+         L ("      --  Each parent in turn, longest first.");
+         L ("      function Walk (Wanted : String) return String is");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
+         L ("      begin");
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Rows : constant String :=");
+         L ("                    Relative_Current_Row (Canon (Canon'First .. Cut - 1));");
+         L ("                  Hit : constant String := Search (Rows, Wanted);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Walk;");
+         L;
+         L ("      Rows : constant String := Relative_Current_Row (Locale);");
+         L ("      Exact : constant String := Search (Rows, Width);");
          L ("   begin");
          L ("      if Exact /= """" then");
          L ("         return Exact;");
          L ("      end if;");
+         L;
+         L ("      --  The wanted width over the locale, then the full name,");
+         L ("      --  and only then the same two over its parents.");
          L ("      if Width /= ""unit-width-full-name"" then");
          L ("         declare");
          L ("            Full_Exact : constant String :=");
-         L ("              Search (False, ""unit-width-full-name"");");
+         L ("              Search (Rows, ""unit-width-full-name"");");
          L ("         begin");
          L ("            if Full_Exact /= """" then");
          L ("               return Full_Exact;");
          L ("            end if;");
          L ("         end;");
          L ("      end if;");
+         L;
          L ("      declare");
-         L ("         Fallback_Result : constant String := Search (True, Width);");
+         L ("         Fallback_Result : constant String := Walk (Width);");
          L ("      begin");
          L ("         if Fallback_Result /= """" then");
          L ("            return Fallback_Result;");
          L ("         end if;");
          L ("      end;");
+         L;
          L ("      if Width /= ""unit-width-full-name"" then");
          L ("         declare");
          L ("            Full_Fallback : constant String :=");
-         L ("              Search (True, ""unit-width-full-name"");");
+         L ("              Walk (""unit-width-full-name"");");
          L ("         begin");
          L ("            if Full_Fallback /= """" then");
          L ("               return Full_Fallback;");
@@ -9909,45 +9909,42 @@ procedure Generate_CLDR_Data is
       procedure Emit_Relative_Unit_Category_Name is
       begin
          Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "relative_unit_category") then
-               declare
-                  Locale : constant String := S (Rules (Index).A);
-                  Seen : Boolean := False;
-                  Payload : US.Unbounded_String;
-               begin
-                  for Previous in 1 .. Index - 1 loop
-                     if Is_Kind (Previous, "relative_unit_category")
-                       and then S (Rules (Previous).A) = Locale
-                     then
-                        Seen := True;
-                        exit;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  Grouped by locale, so a change of locale ends the segment.
+            --  Scanning back for a locale already seen walks the whole rule
+            --  array per row, which is quadratic over a hundred thousand
+            --  rules.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "relative_unit_category") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
                      end if;
-                  end loop;
 
-                  if not Seen then
-                     for Candidate in Index .. Rule_Count loop
-                        if Is_Kind (Candidate, "relative_unit_category")
-                          and then S (Rules (Candidate).A) = Locale
-                        then
-                           if US.Length (Payload) > 0 then
-                              US.Append (Payload, ";");
-                           end if;
-                           --  The text is hex, so it cannot hold a separator.
-                           US.Append
-                             (Payload,
-                              S (Rules (Candidate).B) & ","
-                              & S (Rules (Candidate).C) & ","
-                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).D)));
-                        end if;
-                     end loop;
-
-                     Add_Table_Entry (Locale, S (Payload));
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
                   end if;
-               end;
+
+                  if US.Length (Rows) > 0 then
+                     US.Append (Rows, ";");
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & ","
+                     & S (Rules (Index).C) & ","
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).D)));
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
             end if;
-         end loop;
-         Emit_Locale_Table
+         end;
+Emit_Locale_Table
            ("Relative_Unit_Row", """""", Raw => True, Walk_Parents => False);
 
          L;
@@ -10048,47 +10045,50 @@ procedure Generate_CLDR_Data is
          L ("   end Relative_Unit_Category_Name;");
       end Emit_Relative_Unit_Category_Name;
 
+      --  63,970 records, scanned from the first character on every pass and
+      --  up to four passes to a lookup, which came to a quarter of a million
+      --  record parses to answer one call. The records arrive grouped by
+      --  locale, so each locale becomes one segment of the table and a
+      --  lookup scans its eighty-odd records instead of all of them. The
+      --  locale field goes with it: the segment already says which it is.
       procedure Emit_Relative_Time_Pattern is
-         Pattern_Data : US.Unbounded_String;
-
-         procedure Emit_String_Expression
-           (Indent : String;
-            Value  : String;
-            Suffix : String := "")
-         is
-            Chunk_Size : constant := 72;
-            Start      : Positive := Value'First;
-            Stop       : Natural;
-            Term       : Positive := 1;
-         begin
-            if Value'Length = 0 then
-               L (Indent & """""" & Suffix);
-               return;
-            elsif Value'Length <= Chunk_Size then
-               L (Indent & """" & Value & """" & Suffix);
-               return;
-            end if;
-
-            while Start <= Value'Last loop
-               Stop := Natural'Min (Start + Chunk_Size - 1, Value'Last);
-               L (Indent & (if Term = 1 then "" else "& ")
-                  & """" & Value (Start .. Stop) & """"
-                  & (if Stop = Value'Last then Suffix else ""));
-               Start := Stop + 1;
-               Term := Term + 1;
-            end loop;
-         end Emit_String_Expression;
       begin
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "relative_time_pattern") then
-               US.Append
-                 (Pattern_Data,
-                  S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
-                  & S (Rules (Index).C) & "|" & S (Rules (Index).D) & "|"
-                  & S (Rules (Index).E) & "|"
-                  & Ada_Expression_UTF8_Hex (S (Rules (Index).F)) & "~");
+         Reset_Table;
+         declare
+            Current : US.Unbounded_String;
+            Rows : US.Unbounded_String;
+         begin
+            --  The rows arrive grouped by locale, so a change of locale ends
+            --  the segment. Scanning back for a locale already seen would be
+            --  quadratic, and this kind has tens of thousands of rows.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "relative_time_pattern") then
+                  if S (Rules (Index).A) /= S (Current) then
+                     if US.Length (Rows) > 0 then
+                        Add_Table_Entry (S (Current), S (Rows));
+                     end if;
+
+                     Current := Rules (Index).A;
+                     Rows := US.Null_Unbounded_String;
+                  end if;
+
+                  US.Append
+                    (Rows,
+                     S (Rules (Index).B) & "|"
+                     & S (Rules (Index).C) & "|"
+                     & S (Rules (Index).D) & "|"
+                     & S (Rules (Index).E) & "|"
+                     & Ada_Expression_UTF8_Hex (S (Rules (Index).F))
+                     & "~");
+               end if;
+            end loop;
+
+            if US.Length (Rows) > 0 then
+               Add_Table_Entry (S (Current), S (Rows));
             end if;
-         end loop;
+         end;
+         Emit_Locale_Table
+           ("Relative_Pattern_Row", """""", Raw => True, Walk_Parents => False);
 
          L;
          L ("   function Relative_Time_Pattern");
@@ -10101,39 +10101,20 @@ procedure Generate_CLDR_Data is
          L ("   is");
          L ("      Direction : constant String :=");
          L ("        (if Future then ""future"" else ""past"");");
-         L ("      Pattern_Data : constant String :=");
-         Emit_String_Expression ("        ", S (Pattern_Data), ";");
          L;
-         L ("      function Matches_Locale");
-         L ("        (Candidate : String;");
-         L ("         Fallback  : Boolean)");
-         L ("         return Boolean is");
+         L ("      function Search (Rows : String; Wanted : String) return String is");
+         L ("         Start : Positive := Rows'First;");
          L ("      begin");
-         L ("         if Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return Locale_Equals (Locale, Candidate);");
-         L ("         end if;");
-         L ("      end Matches_Locale;");
-         L;
-         L ("      function Search");
-         L ("        (Fallback        : Boolean;");
-         L ("         Wanted_Category : String)");
-         L ("         return String");
-         L ("      is");
-         L ("         Start : Positive := Pattern_Data'First;");
-         L ("      begin");
-         L ("         while Start <= Pattern_Data'Last loop");
+         L ("         while Start <= Rows'Last loop");
          L ("            declare");
          L ("               Sep1 : Natural := 0;");
          L ("               Sep2 : Natural := 0;");
          L ("               Sep3 : Natural := 0;");
          L ("               Sep4 : Natural := 0;");
-         L ("               Sep5 : Natural := 0;");
-         L ("               Stop : Natural := Pattern_Data'Last + 1;");
+         L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
-         L ("               for Index in Start .. Pattern_Data'Last loop");
-         L ("                  if Pattern_Data (Index) = '|' then");
+         L ("               for Index in Start .. Rows'Last loop");
+         L ("                  if Rows (Index) = '|' then");
          L ("                     if Sep1 = 0 then");
          L ("                        Sep1 := Index;");
          L ("                     elsif Sep2 = 0 then");
@@ -10142,35 +10123,25 @@ procedure Generate_CLDR_Data is
          L ("                        Sep3 := Index;");
          L ("                     elsif Sep4 = 0 then");
          L ("                        Sep4 := Index;");
-         L ("                     elsif Sep5 = 0 then");
-         L ("                        Sep5 := Index;");
          L ("                     end if;");
-         L ("                  elsif Pattern_Data (Index) = '~' then");
+         L ("                  elsif Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep1 /= 0");
-         L ("                 and then Sep2 /= 0");
-         L ("                 and then Sep3 /= 0");
-         L ("                 and then Sep4 /= 0");
-         L ("                 and then Sep5 /= 0");
+         L ("               if Sep4 /= 0");
          L ("                 and then Sep1 > Start");
          L ("                 and then Sep2 > Sep1 + 1");
          L ("                 and then Sep3 > Sep2 + 1");
          L ("                 and then Sep4 > Sep3 + 1");
-         L ("                 and then Sep5 > Sep4 + 1");
-         L ("                 and then Stop > Sep5 + 1");
-         L ("                 and then Pattern_Data (Sep1 + 1 .. Sep2 - 1) = Base");
-         L ("                 and then Pattern_Data (Sep2 + 1 .. Sep3 - 1) = Width");
-         L ("                 and then Pattern_Data (Sep3 + 1 .. Sep4 - 1) = Direction");
-         L ("                 and then Pattern_Data (Sep4 + 1 .. Sep5 - 1)");
-         L ("                   = Wanted_Category");
-         L ("                 and then Matches_Locale");
-         L ("                   (Pattern_Data (Start .. Sep1 - 1), Fallback)");
+         L ("                 and then Stop > Sep4 + 1");
+         L ("                 and then Rows (Start .. Sep1 - 1) = Base");
+         L ("                 and then Rows (Sep1 + 1 .. Sep2 - 1) = Width");
+         L ("                 and then Rows (Sep2 + 1 .. Sep3 - 1) = Direction");
+         L ("                 and then Rows (Sep3 + 1 .. Sep4 - 1) = Wanted");
          L ("               then");
-         L ("                  return HB (Pattern_Data (Sep5 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Sep4 + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -10180,30 +10151,60 @@ procedure Generate_CLDR_Data is
          L ("         return """";");
          L ("      end Search;");
          L;
-         L ("      Exact : constant String := Search (False, Category);");
+         L ("      --  Each parent in turn, longest first.");
+         L ("      function Walk (Wanted : String) return String is");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
+         L ("      begin");
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Rows : constant String :=");
+         L ("                    Relative_Pattern_Row (Canon (Canon'First .. Cut - 1));");
+         L ("                  Hit : constant String := Search (Rows, Wanted);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Walk;");
+         L;
+         L ("      Rows : constant String := Relative_Pattern_Row (Locale);");
+         L ("      Exact : constant String := Search (Rows, Category);");
          L ("   begin");
          L ("      if Exact /= """" then");
          L ("         return Exact;");
          L ("      end if;");
+         L;
+         L ("      --  The wanted category over the locale, then the wider");
+         L ("      --  ""other"", and only then the same two over its parents.");
          L ("      if Category /= ""other"" then");
          L ("         declare");
-         L ("            Other_Exact : constant String := Search (False, ""other"");");
+         L ("            Other_Exact : constant String := Search (Rows, ""other"");");
          L ("         begin");
          L ("            if Other_Exact /= """" then");
          L ("               return Other_Exact;");
          L ("            end if;");
          L ("         end;");
          L ("      end if;");
+         L;
          L ("      declare");
-         L ("         Fallback_Result : constant String := Search (True, Category);");
+         L ("         Fallback_Result : constant String := Walk (Category);");
          L ("      begin");
          L ("         if Fallback_Result /= """" then");
          L ("            return Fallback_Result;");
          L ("         end if;");
          L ("      end;");
+         L;
          L ("      if Category /= ""other"" then");
-         L ("         return Search (True, ""other"");");
+         L ("         return Walk (""other"");");
          L ("      end if;");
+         L;
          L ("      return """";");
          L ("   end Relative_Time_Pattern;");
       end Emit_Relative_Time_Pattern;
