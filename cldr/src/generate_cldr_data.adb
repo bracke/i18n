@@ -2087,6 +2087,29 @@ procedure Generate_CLDR_Data is
         new Table_Entry_Array (1 .. Max_Table_Entries);
       Table_Entry_Count : Natural := 0;
 
+      --  The same rule as Canonical_Locale in the generated body. Keys are
+      --  stored this way so that a lookup canonicalises its argument once
+      --  and bisects, rather than bisecting the spelling as written and
+      --  walking the whole table when that misses -- which it does for
+      --  every locale a table does not hold, and Digit_Text asks once per
+      --  digit of every number it formats.
+      function Canonical_Key (Value : String) return String is
+         Result : String (Value'Range);
+      begin
+         for Index in Value'Range loop
+            if Value (Index) = '_' then
+               Result (Index) := '-';
+            elsif Value (Index) in 'A' .. 'Z' then
+               Result (Index) :=
+                 Character'Val (Character'Pos (Value (Index)) + 32);
+            else
+               Result (Index) := Value (Index);
+            end if;
+         end loop;
+
+         return Result;
+      end Canonical_Key;
+
       function Padded_Key (Value : String) return String is
         (if Value'Length >= 14 then Value (Value'First .. Value'First + 13)
          else Value & (1 .. 14 - Value'Length => ' '));
@@ -2117,7 +2140,7 @@ procedure Generate_CLDR_Data is
 
          Table_Entry_Count := Table_Entry_Count + 1;
          Table_Entries (Table_Entry_Count) :=
-           (Key   => US.To_Unbounded_String (Key),
+           (Key   => US.To_Unbounded_String (Canonical_Key (Key)),
             Value => US.To_Unbounded_String (Value),
             First => 0,
             Last  => 0);
@@ -2274,7 +2297,10 @@ procedure Generate_CLDR_Data is
          end if;
          L ("      end Value_At;");
          L;
-         L ("      function Lookup (Cand : String; Canonical : Boolean) return String is");
+         L ("      --  Keys are stored canonical, so canonicalise once and");
+         L ("      --  bisect. Nothing walks: a locale the table does not hold");
+         L ("      --  costs the same handful of comparisons as one it does.");
+         L ("      function Lookup (Cand : String) return String is");
          L ("         Low : Natural := 1;");
          L ("         High : Natural := Count;");
          L ("         Mid : Natural;");
@@ -2283,27 +2309,9 @@ procedure Generate_CLDR_Data is
          L ("            return """";");
          L ("         end if;");
          L;
-         L ("         if Canonical then");
-         L ("            --  A locale spelled some other way does not sort where");
-         L ("            --  its canonical form would, so this one is a walk.");
-         L ("            for N in 1 .. Count loop");
-         L ("               declare");
-         L ("                  K : constant String := Key (N);");
-         L ("                  Stop : Natural := K'Last;");
-         L ("               begin");
-         L ("                  while Stop >= K'First and then K (Stop) = ' ' loop");
-         L ("                     Stop := Stop - 1;");
-         L ("                  end loop;");
-         L ("                  if Locale_Equals (Cand, K (K'First .. Stop)) then");
-         L ("                     return Value_At (N);");
-         L ("                  end if;");
-         L ("               end;");
-         L ("            end loop;");
-         L ("            return """";");
-         L ("         end if;");
-         L;
          L ("         declare");
-         L ("            Wanted : constant String := Padded (Cand);");
+         L ("            Wanted : constant String :=");
+         L ("              Padded (Canonical_Locale (Cand));");
          L ("         begin");
          L ("            while Low <= High loop");
          L ("               Mid := (Low + High) / 2;");
@@ -2318,21 +2326,10 @@ procedure Generate_CLDR_Data is
          L ("         end;");
          L ("         return """";");
          L ("      end Lookup;");
-         L;
-         L ("      --  Bisect on the spelling as written, which answers almost");
-         L ("      --  every call; only a caller who spelled it some other way");
-         L ("      --  (""DE_at"") pays for the walk.");
-         L ("      function Resolve (Cand : String) return String is");
-         L ("         Hit : constant String := Lookup (Cand, False);");
-         L ("      begin");
-         L ("         if Hit /= """" then");
-         L ("            return Hit;");
-         L ("         end if;");
-         L ("         return Lookup (Cand, True);");
-         L ("      end Resolve;");
+
          L;
          if not Walk_Parents then
-            L ("      Exact : constant String := Resolve (Locale);");
+            L ("      Exact : constant String := Lookup (Locale);");
             L ("   begin");
             L ("      if Exact /= """" then");
             L ("         return Exact;");
@@ -2346,7 +2343,7 @@ procedure Generate_CLDR_Data is
          L ("      --  Parents are cut from the canonical spelling: ""de_AT"" has");
          L ("      --  no '-' to cut, and would otherwise lose its fallback.");
          L ("      Canon : constant String := Canonical_Locale (Locale);");
-         L ("      Exact : constant String := Resolve (Locale);");
+         L ("      Exact : constant String := Lookup (Locale);");
          L ("      Cut : Natural := Canon'Last;");
          L ("   begin");
          L ("      if Exact /= """" then");
@@ -2358,7 +2355,7 @@ procedure Generate_CLDR_Data is
          L ("         if Canon (Cut) = '-' then");
          L ("            declare");
          L ("               Hit : constant String :=");
-         L ("                 Resolve (Canon (Canon'First .. Cut - 1));");
+         L ("                 Lookup (Canon (Canon'First .. Cut - 1));");
          L ("            begin");
          L ("               if Hit /= """" then");
          L ("                  return Hit;");
@@ -3051,7 +3048,7 @@ procedure Generate_CLDR_Data is
          L ("         return HB (Values (F .. T));");
          L ("      end Value_At;");
          L;
-         L ("      function Lookup (Cand : String; Canonical : Boolean) return String is");
+         L ("      function Lookup (Cand : String) return String is");
          L ("         Low : Natural := Segment_First;");
          L ("         High : Natural := Segment_Last;");
          L ("         Mid : Natural;");
@@ -3060,27 +3057,9 @@ procedure Generate_CLDR_Data is
          L ("            return """";");
          L ("         end if;");
          L;
-         L ("         if Canonical then");
-         L ("            --  A locale spelled some other way does not sort where");
-         L ("            --  its canonical form would, so this one is a walk.");
-         L ("            for N in Segment_First .. Segment_Last loop");
-         L ("               declare");
-         L ("                  K : constant String := Key (N);");
-         L ("                  Stop : Natural := K'Last;");
-         L ("               begin");
-         L ("                  while Stop >= K'First and then K (Stop) = ' ' loop");
-         L ("                     Stop := Stop - 1;");
-         L ("                  end loop;");
-         L ("                  if Locale_Equals (Cand, K (K'First .. Stop)) then");
-         L ("                     return Value_At (N);");
-         L ("                  end if;");
-         L ("               end;");
-         L ("            end loop;");
-         L ("            return """";");
-         L ("         end if;");
-         L;
          L ("         declare");
-         L ("            Wanted : constant String := Padded (Cand);");
+         L ("            Wanted : constant String :=");
+         L ("              Padded (Canonical_Locale (Cand));");
          L ("         begin");
          L ("            while Low <= High loop");
          L ("               Mid := (Low + High) / 2;");
@@ -3095,15 +3074,7 @@ procedure Generate_CLDR_Data is
          L ("         end;");
          L ("         return """";");
          L ("      end Lookup;");
-         L;
-         L ("      function Resolve (Cand : String) return String is");
-         L ("         Hit : constant String := Lookup (Cand, False);");
-         L ("      begin");
-         L ("         if Hit /= """" then");
-         L ("            return Hit;");
-         L ("         end if;");
-         L ("         return Lookup (Cand, True);");
-         L ("      end Resolve;");
+
          L ("   begin");
          L ("      --  A couple of dozen skeletons: a scan costs less than the");
          L ("      --  arithmetic to bisect them.");
@@ -3135,7 +3106,7 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L;
          L ("      declare");
-         L ("         Exact : constant String := Resolve (Locale);");
+         L ("         Exact : constant String := Lookup (Locale);");
          L ("      begin");
          L ("         if Exact /= """" then");
          L ("            return Exact;");
@@ -3152,7 +3123,7 @@ procedure Generate_CLDR_Data is
          L ("            if Canon (Cut) = '-' then");
          L ("               declare");
          L ("                  Hit : constant String :=");
-         L ("                    Resolve (Canon (Canon'First .. Cut - 1));");
+         L ("                    Lookup (Canon (Canon'First .. Cut - 1));");
          L ("               begin");
          L ("                  if Hit /= """" then");
          L ("                     return Hit;");
