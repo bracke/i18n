@@ -3590,7 +3590,37 @@ procedure Generate_CLDR_Data is
       end Emit_Currency_Field;
 
       procedure Emit_Quarter_Name is
+         Quarter_Start : Integer := -1;
+         Quarter_Short_Start : Integer := -1;
+
+         --  The start index is the same for every locale of a kind, as it is
+         --  for the month and weekday rows.
+         procedure Collect_Quarter_Rows (Kind : String; Start : in out Integer)
+         is
+         begin
+            Reset_Table;
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, "name_set_hex")
+                 and then S (Rules (Index).A) = Kind
+               then
+                  if Start < 0 then
+                     Start := Decimal_Value (S (Rules (Index).C));
+                  elsif Decimal_Value (S (Rules (Index).C)) /= Start then
+                     Add_Error ("start index varies by locale for " & Kind);
+                  end if;
+
+                  Add_Table_Entry (S (Rules (Index).B), S (Rules (Index).D));
+               end if;
+            end loop;
+
+            if Start < 0 then
+               Start := 1;
+            end if;
+         end Collect_Quarter_Rows;
       begin
+         Collect_Quarter_Rows ("quarter", Quarter_Start);
+         Emit_Locale_Table ("Quarter_Name_Row", """""", Raw => True);
+
          L;
          L ("   function Quarter_Name");
          L ("     (Locale       : String;");
@@ -3599,34 +3629,23 @@ procedure Generate_CLDR_Data is
          L ("      return String");
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
+         L ("      Row : constant String := Quarter_Name_Row (Locale);");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "name_set_hex")
-                 and then S (Rules (Index).A) = "quarter"
-               then
-                  declare
-                     Start : constant Natural := Decimal_Value (S (Rules (Index).C));
-                     Count : constant Natural := Expr_Item_Count (S (Rules (Index).D));
-                  begin
-                     L ("      "
-                        & (if Pass = 1 then "if Locale_Equals" else "if Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).B) & """)");
-                     L ("        and then Quarter >= "
-                        & Natural'Image (Start) (2 .. Natural'Image (Start)'Last));
-                     L ("        and then Quarter <= "
-                        & Natural'Image (Start + Count - 1)
-                          (2 .. Natural'Image (Start + Count - 1)'Last));
-                     L ("      then");
-                     L ("         return Hex_List_Item (""" & S (Rules (Index).D)
-                        & """, Quarter - "
-                        & Natural'Image (Start) (2 .. Natural'Image (Start)'Last)
-                        & " + 1);");
-                     L ("      end if;");
-                  end;
-               end if;
-            end loop;
-         end loop;
+         --  A row with no entry for this quarter answers "", and the chains
+         --  below still get their turn -- which is what the range test in the
+         --  old branch condition did.
+         L ("      if Row /= """" and then Quarter >= "
+            & Trim (Integer'Image (Quarter_Start)) & " then");
+         L ("         declare");
+         L ("            Value : constant String :=");
+         L ("              Hex_List_Item (Row, Quarter - "
+            & Trim (Integer'Image (Quarter_Start)) & " + 1);");
+         L ("         begin");
+         L ("            if Value /= """" then");
+         L ("               return Value;");
+         L ("            end if;");
+         L ("         end;");
+         L ("      end if;");
          for Pass in 1 .. 2 loop
             for Index in 1 .. Rule_Count loop
                if Is_Kind (Index, "quarter") then
@@ -3684,6 +3703,9 @@ procedure Generate_CLDR_Data is
          L ("         return ""Quarter "" & Quarter_Text;");
          L ("      end if;");
          L ("   end Quarter_Name;");
+         Collect_Quarter_Rows ("quarter_short", Quarter_Short_Start);
+         Emit_Locale_Table ("Quarter_Name_Short_Row", """""", Raw => True);
+
          L;
          L ("   function Quarter_Name_Short");
          L ("     (Locale       : String;");
@@ -3692,34 +3714,20 @@ procedure Generate_CLDR_Data is
          L ("      return String");
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
+         L ("      Row : constant String := Quarter_Name_Short_Row (Locale);");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "name_set_hex")
-                 and then S (Rules (Index).A) = "quarter_short"
-               then
-                  declare
-                     Start : constant Natural := Decimal_Value (S (Rules (Index).C));
-                     Count : constant Natural := Expr_Item_Count (S (Rules (Index).D));
-                  begin
-                     L ("      "
-                        & (if Pass = 1 then "if Locale_Equals" else "if Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).B) & """)");
-                     L ("        and then Quarter >= "
-                        & Natural'Image (Start) (2 .. Natural'Image (Start)'Last));
-                     L ("        and then Quarter <= "
-                        & Natural'Image (Start + Count - 1)
-                          (2 .. Natural'Image (Start + Count - 1)'Last));
-                     L ("      then");
-                     L ("         return Hex_List_Item (""" & S (Rules (Index).D)
-                        & """, Quarter - "
-                        & Natural'Image (Start) (2 .. Natural'Image (Start)'Last)
-                        & " + 1);");
-                     L ("      end if;");
-                  end;
-               end if;
-            end loop;
-         end loop;
+         L ("      if Row /= """" and then Quarter >= "
+            & Trim (Integer'Image (Quarter_Short_Start)) & " then");
+         L ("         declare");
+         L ("            Value : constant String :=");
+         L ("              Hex_List_Item (Row, Quarter - "
+            & Trim (Integer'Image (Quarter_Short_Start)) & " + 1);");
+         L ("         begin");
+         L ("            if Value /= """" then");
+         L ("               return Value;");
+         L ("            end if;");
+         L ("         end;");
+         L ("      end if;");
          for Pass in 1 .. 2 loop
             for Index in 1 .. Rule_Count loop
                if Is_Kind (Index, "quarter_short") then
@@ -3809,6 +3817,49 @@ procedure Generate_CLDR_Data is
          L ("      end loop;");
          L ("      return """";");
          L ("   end Day_Period_Payload_Value;");
+         --  One payload per locale: the period, the width and the text of
+         --  every row that locale has, which Day_Period_Payload_Value picks
+         --  apart. Collected here rather than rebuilt per branch.
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "day_period_hex") then
+               declare
+                  Locale : constant String := S (Rules (Index).A);
+                  Seen : Boolean := False;
+                  Payload : US.Unbounded_String;
+               begin
+                  for Previous in 1 .. Index - 1 loop
+                     if Is_Kind (Previous, "day_period_hex")
+                       and then S (Rules (Previous).A) = Locale
+                     then
+                        Seen := True;
+                        exit;
+                     end if;
+                  end loop;
+
+                  if not Seen then
+                     for Candidate in Index .. Rule_Count loop
+                        if Is_Kind (Candidate, "day_period_hex")
+                          and then S (Rules (Candidate).A) = Locale
+                        then
+                           if US.Length (Payload) > 0 then
+                              US.Append (Payload, ";");
+                           end if;
+                           US.Append
+                             (Payload,
+                              S (Rules (Candidate).B) & ","
+                              & S (Rules (Candidate).C) & ","
+                              & S (Rules (Candidate).D));
+                        end if;
+                     end loop;
+
+                     Add_Table_Entry (Locale, S (Payload));
+                  end if;
+               end;
+            end if;
+         end loop;
+         Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
+
          L;
          L ("   function Day_Period_Name");
          L ("     (Locale : String;");
@@ -3817,61 +3868,22 @@ procedure Generate_CLDR_Data is
          L ("      return String");
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
+         L ("      Row : constant String := Day_Period_Row (Locale);");
          L ("   begin");
+         L ("      if Row /= """" then");
+         L ("         declare");
+         L ("            Value : constant String :=");
+         L ("              Day_Period_Payload_Value");
+         L ("                (Row, Period, (if Wide then ""wide"" else ""abbreviated""));");
+         L ("         begin");
+         L ("            if Value /= """" then");
+         L ("               return Value;");
+         L ("            end if;");
+         L ("         end;");
+         L ("      end if;");
          for Pass in 1 .. 2 loop
             for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "day_period_hex") then
-                  declare
-                     Locale : constant String := S (Rules (Index).A);
-                     Seen   : Boolean := False;
-                     Payload : US.Unbounded_String;
-                  begin
-                     for Previous in 1 .. Index - 1 loop
-                        if Is_Kind (Previous, "day_period_hex")
-                          and then S (Rules (Previous).A) = Locale
-                        then
-                           Seen := True;
-                           exit;
-                        end if;
-                     end loop;
-
-                     if not Seen then
-                        for Candidate in Index .. Rule_Count loop
-                           if Is_Kind (Candidate, "day_period_hex")
-                             and then S (Rules (Candidate).A) = Locale
-                           then
-                              if US.Length (Payload) > 0 then
-                                 US.Append (Payload, ";");
-                              end if;
-                              US.Append
-                                (Payload,
-                                 S (Rules (Candidate).B) & ","
-                                 & S (Rules (Candidate).C) & ","
-                                 & S (Rules (Candidate).D));
-                           end if;
-                        end loop;
-
-                        L
-                          ("      if "
-                           & (if Pass = 1
-                              then "Locale_Equals"
-                              else "Locale_Fallback_Matches")
-                           & " (Locale, """ & Locale & """)");
-                        L ("      then");
-                        L ("         declare");
-                        L ("            Value : constant String :=");
-                        L ("              Day_Period_Payload_Value");
-                        L ("                (""" & S (Payload)
-                           & """, Period, (if Wide then ""wide"" else ""abbreviated""));");
-                        L ("         begin");
-                        L ("            if Value /= """" then");
-                        L ("               return Value;");
-                        L ("            end if;");
-                        L ("         end;");
-                        L ("      end if;");
-                     end if;
-                  end;
-               elsif Is_Kind (Index, "day_period") then
+               if Is_Kind (Index, "day_period") then
                   L
                     ("      if "
                      & (if Pass = 1
