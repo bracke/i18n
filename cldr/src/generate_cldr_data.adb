@@ -228,7 +228,114 @@ procedure Generate_CLDR_Data is
       return Result;
    end Hex_Value;
 
-   function Ada_Expression_UTF8_Hex (Expr : String) return String is
+   --  Values were held as hex: two characters a byte. Base64 spends 1.33,
+   --  is pure ASCII so -gnatW8 never sees a wide character, and its
+   --  alphabet holds none of the separators the packed records use -- so a
+   --  value cannot collide with a delimiter by construction rather than by
+   --  audit. No padding: the index offsets already say where a value ends.
+   Base64_Alphabet : constant String :=
+     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+   function To_Base64 (Bytes : String) return String is
+      Result : US.Unbounded_String;
+      Index  : Natural := Bytes'First;
+
+      function Symbol (Value : Natural) return Character is
+        (Base64_Alphabet (Base64_Alphabet'First + Value));
+   begin
+      while Index <= Bytes'Last loop
+         declare
+            Left : constant Natural := Bytes'Last - Index + 1;
+            B0 : constant Natural := Character'Pos (Bytes (Index));
+            B1 : constant Natural :=
+              (if Left >= 2 then Character'Pos (Bytes (Index + 1)) else 0);
+            B2 : constant Natural :=
+              (if Left >= 3 then Character'Pos (Bytes (Index + 2)) else 0);
+         begin
+            US.Append (Result, Symbol (B0 / 4));
+            US.Append (Result, Symbol ((B0 mod 4) * 16 + B1 / 16));
+            if Left >= 2 then
+               US.Append (Result, Symbol ((B1 mod 16) * 4 + B2 / 64));
+            end if;
+            if Left >= 3 then
+               US.Append (Result, Symbol (B2 mod 64));
+            end if;
+            Index := Index + 3;
+         end;
+      end loop;
+
+      return S (Result);
+   end To_Base64;
+
+   --  Rows that arrive already hex-encoded, a byte to two characters.
+   function Hex_Bytes_To_Base64 (Hex : String) return String is
+      Bytes : String (1 .. Hex'Length / 2);
+      Source : Natural;
+   begin
+      for Index in Bytes'Range loop
+         Source := Hex'First + (Index - 1) * 2;
+         Bytes (Index) :=
+           Character'Val
+             (Hex_Value (Hex (Source .. Source)) * 16
+              + Hex_Value (Hex (Source + 1 .. Source + 1)));
+      end loop;
+
+      return To_Base64 (Bytes);
+   end Hex_Bytes_To_Base64;
+
+   --  Rows that arrive as four hex digits a code point.
+   function Hex_Points_To_Base64 (Hex : String) return String is
+      Bytes : US.Unbounded_String;
+      Index : Natural := Hex'First;
+   begin
+      while Index + 3 <= Hex'Last loop
+         declare
+            Point : constant Natural := Hex_Value (Hex (Index .. Index + 3));
+         begin
+            if Point <= 16#7F# then
+               US.Append (Bytes, Character'Val (Point));
+            elsif Point <= 16#7FF# then
+               US.Append (Bytes, Character'Val (16#C0# + Point / 64));
+               US.Append (Bytes, Character'Val (16#80# + Point mod 64));
+            else
+               US.Append (Bytes, Character'Val (16#E0# + Point / 4096));
+               US.Append
+                 (Bytes, Character'Val (16#80# + (Point / 64) mod 64));
+               US.Append (Bytes, Character'Val (16#80# + Point mod 64));
+            end if;
+         end;
+         Index := Index + 4;
+      end loop;
+
+      return To_Base64 (S (Bytes));
+   end Hex_Points_To_Base64;
+
+   --  A "~"-separated list of four-hex-digit code points, recoded item by
+   --  item so Hex_List_Item still finds its boundaries.
+   function Recoded_Point_List (Items : String) return String is
+      Result : US.Unbounded_String;
+      Start : Positive := Items'First;
+   begin
+      while Start <= Items'Last loop
+         declare
+            Stop : Natural := Start;
+         begin
+            while Stop <= Items'Last and then Items (Stop) /= '~' loop
+               Stop := Stop + 1;
+            end loop;
+            if US.Length (Result) > 0 then
+               US.Append (Result, "~");
+            end if;
+            US.Append
+              (Result, Hex_Points_To_Base64 (Items (Start .. Stop - 1)));
+            Start := Stop + 1;
+         end;
+      end loop;
+
+      return S (Result);
+   end Recoded_Point_List;
+
+   function Ada_Expression_UTF8_Hex_Digits (Expr : String) return String is
       Output : US.Unbounded_String;
       Index  : Natural := Expr'First;
    begin
@@ -280,7 +387,27 @@ procedure Generate_CLDR_Data is
       end loop;
 
       return S (Output);
-   end Ada_Expression_UTF8_Hex;
+   end Ada_Expression_UTF8_Hex_Digits;
+
+   function Ada_Expression_UTF8_Hex (Expr : String) return String is
+     (Hex_Bytes_To_Base64 (Ada_Expression_UTF8_Hex_Digits (Expr)));
+
+   --  The same, stopping at the bytes.
+   function Ada_Expression_UTF8_Bytes (Expr : String) return String is
+      Hex : constant String := Ada_Expression_UTF8_Hex_Digits (Expr);
+      Bytes : String (1 .. Hex'Length / 2);
+      Source : Natural;
+   begin
+      for Index in Bytes'Range loop
+         Source := Hex'First + (Index - 1) * 2;
+         Bytes (Index) :=
+           Character'Val
+             (Hex_Value (Hex (Source .. Source)) * 16
+              + Hex_Value (Hex (Source + 1 .. Source + 1)));
+      end loop;
+
+      return Bytes;
+   end Ada_Expression_UTF8_Bytes;
 
    procedure Add_Error (Message : String) is
    begin
@@ -1786,6 +1913,53 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L ("   end Hex_Value;");
          L;
+         L ("   --  Values are base64 of UTF-8 bytes, without padding: the");
+         L ("   --  offsets and the separators already say where one ends.");
+         L ("   function B64_Value (C : Character) return Natural is");
+         L ("     (if C in 'A' .. 'Z' then Character'Pos (C) - Character'Pos ('A')");
+         L ("      elsif C in 'a' .. 'z'");
+         L ("      then 26 + Character'Pos (C) - Character'Pos ('a')");
+         L ("      elsif C in '0' .. '9'");
+         L ("      then 52 + Character'Pos (C) - Character'Pos ('0')");
+         L ("      elsif C = '+' then 62");
+         L ("      else 63);");
+         L;
+         L ("   function VB (Text : String) return String is");
+         L ("      Result : String (1 .. Text'Length * 3 / 4);");
+         L ("      Filled : Natural := 0;");
+         L ("      Index : Natural := Text'First;");
+         L ("   begin");
+         L ("      while Index <= Text'Last loop");
+         L ("         declare");
+         L ("            Left : constant Natural := Text'Last - Index + 1;");
+         L ("            C0 : constant Natural := B64_Value (Text (Index));");
+         L ("            C1 : constant Natural :=");
+         L ("              (if Left >= 2 then B64_Value (Text (Index + 1)) else 0);");
+         L ("            C2 : constant Natural :=");
+         L ("              (if Left >= 3 then B64_Value (Text (Index + 2)) else 0);");
+         L ("            C3 : constant Natural :=");
+         L ("              (if Left >= 4 then B64_Value (Text (Index + 3)) else 0);");
+         L ("         begin");
+         L ("            exit when Left < 2;");
+         L ("            Filled := Filled + 1;");
+         L ("            Result (Filled) := Character'Val (C0 * 4 + C1 / 16);");
+         L ("            if Left >= 3 then");
+         L ("               Filled := Filled + 1;");
+         L ("               Result (Filled) :=");
+         L ("                 Character'Val ((C1 mod 16) * 16 + C2 / 4);");
+         L ("            end if;");
+         L ("            if Left >= 4 then");
+         L ("               Filled := Filled + 1;");
+         L ("               Result (Filled) :=");
+         L ("                 Character'Val ((C2 mod 4) * 64 + C3);");
+         L ("            end if;");
+         L ("            Index := Index + 4;");
+         L ("         end;");
+         L ("      end loop;");
+         L;
+         L ("      return Result (1 .. Filled);");
+         L ("   end VB;");
+         L;
          L ("   function H (Hex : String) return String is");
          L ("      First : constant Positive := Hex'First;");
          L ("   begin");
@@ -1877,7 +2051,7 @@ procedure Generate_CLDR_Data is
          L;
          L ("               if Current = Slot then");
          L ("                  if Slot_End >= Slot_Start then");
-         L ("                     return HB (Payload (Slot_Start .. Slot_End));");
+         L ("                     return VB (Payload (Slot_Start .. Slot_End));");
          L ("                  end if;");
          L ("                  return """";");
          L ("               end if;");
@@ -1887,7 +2061,7 @@ procedure Generate_CLDR_Data is
          L ("               --  every category past the end.");
          L ("               if Slot_End = Last then");
          L ("                  if Slot_End >= Slot_Start then");
-         L ("                     return HB (Payload (Slot_Start .. Slot_End));");
+         L ("                     return VB (Payload (Slot_Start .. Slot_End));");
          L ("                  end if;");
          L ("                  return """";");
          L ("               end if;");
@@ -1911,7 +2085,7 @@ procedure Generate_CLDR_Data is
          L ("               if Index = Start then");
          L ("                  return """";");
          L ("               else");
-         L ("                  return H (Items (Start .. Index - 1));");
+         L ("                  return VB (Items (Start .. Index - 1));");
          L ("               end if;");
          L ("            end if;");
          L;
@@ -1925,7 +2099,7 @@ procedure Generate_CLDR_Data is
          L ("      end loop;");
          L;
          L ("      if Count = Number and then Start <= Items'Last then");
-         L ("         return H (Items (Start .. Items'Last));");
+         L ("         return VB (Items (Start .. Items'Last));");
          L ("      else");
          L ("         return """";");
          L ("      end if;");
@@ -2476,7 +2650,7 @@ procedure Generate_CLDR_Data is
          if Raw then
             L ("         return Values (F .. T);");
          else
-            L ("         return HB (Values (F .. T));");
+            L ("         return VB (Values (F .. T));");
          end if;
          L ("      end Value_At;");
          L;
@@ -2811,7 +2985,7 @@ procedure Generate_CLDR_Data is
          L ("                     Cal : constant String := Rows (Start .. Start);");
          L ("                  begin");
          L ("                     if Cal = Wanted then");
-         L ("                        return HB (Rows (Start + 2 .. Stop - 1));");
+         L ("                        return VB (Rows (Start + 2 .. Stop - 1));");
          L ("                     elsif Cal = Gregorian_Code then");
          L ("                        Fallback_First := Start + 2;");
          L ("                        Fallback_Last := Stop - 1;");
@@ -2824,7 +2998,7 @@ procedure Generate_CLDR_Data is
          L ("         end loop;");
          L;
          L ("         if Fallback_First /= 0 then");
-         L ("            return HB (Rows (Fallback_First .. Fallback_Last));");
+         L ("            return VB (Rows (Fallback_First .. Fallback_Last));");
          L ("         end if;");
          L ("         return """";");
          L ("      end In_Rows;");
@@ -3089,7 +3263,7 @@ procedure Generate_CLDR_Data is
          L ("         T : constant Natural :=");
          L ("           Natural'Value (Locale_Index (Base + 8 .. Base + 15));");
          L ("      begin");
-         L ("         return HB (Values (F .. T));");
+         L ("         return VB (Values (F .. T));");
          L ("      end Value_At;");
          L;
          L ("      function Lookup (Cand : String) return String is");
@@ -3248,17 +3422,31 @@ procedure Generate_CLDR_Data is
          function Digit_Row_Hex (Index : Positive) return String is
             Row : US.Unbounded_String;
          begin
-            for Digit in 0 .. 9 loop
-               declare
-                  Hex : constant String :=
-                    Ada_Expression_UTF8_Hex
-                      ("U (" & Field (S (Rules (Index).B), Digit + 1, ',')
-                       & ")");
-               begin
-                  US.Append (Row, Hex);
-                  US.Append (Row, (1 .. 8 - Hex'Length => '0'));
-               end;
-            end loop;
+            --  Ten digits of four NUL-padded bytes each. The row is one
+            --  value, so Value_At decodes it once and the reader below
+            --  slices bytes, as it always did.
+            declare
+               Bytes : US.Unbounded_String;
+            begin
+               for Digit in 0 .. 9 loop
+                  declare
+                     Text : constant String :=
+                       Ada_Expression_UTF8_Bytes
+                         ("U (" & Field (S (Rules (Index).B), Digit + 1, ',')
+                          & ")");
+                     Padded : String (1 .. 4) := [others => Character'Val (0)];
+                  begin
+                     if Text'Length > 4 then
+                        Add_Error ("digit does not fit four bytes");
+                     else
+                        Padded (1 .. Text'Length) := Text;
+                     end if;
+                     US.Append (Bytes, Padded);
+                  end;
+               end loop;
+
+               US.Append (Row, To_Base64 (S (Bytes)));
+            end;
 
             return S (Row);
          end Digit_Row_Hex;
@@ -3338,6 +3526,8 @@ procedure Generate_CLDR_Data is
          L ("      declare");
          L ("         Row : constant String := Digit_Row (Locale);");
          L ("      begin");
+         L ("         --  Digit_Row is decoded by its own Value_At, so Row is");
+         L ("         --  already the forty bytes: ten digits of four.");
          L ("         if Row'Length = 40 and then Digit in '0' .. '9' then");
          L ("            declare");
          L ("               Base : constant Natural :=");
@@ -3519,7 +3709,9 @@ procedure Generate_CLDR_Data is
 
                --  Raw: the row is already a hex blob that Hex_List_Item
                --  parses, so it is stored as it stands.
-               Add_Table_Entry (S (Rules (Index).B), S (Rules (Index).D));
+               Add_Table_Entry
+                 (S (Rules (Index).B),
+                  Recoded_Point_List (S (Rules (Index).D)));
             end if;
          end loop;
 
@@ -3687,7 +3879,9 @@ procedure Generate_CLDR_Data is
                      Add_Error ("start index varies by locale for " & Kind);
                   end if;
 
-                  Add_Table_Entry (S (Rules (Index).B), S (Rules (Index).D));
+                  Add_Table_Entry
+                    (S (Rules (Index).B),
+                     Recoded_Point_List (S (Rules (Index).D)));
                end if;
             end loop;
 
@@ -3889,7 +4083,7 @@ procedure Generate_CLDR_Data is
          L ("           and then Payload (Start .. Sep_1 - 1) = Period");
          L ("           and then Payload (Sep_1 + 1 .. Sep_2 - 1) = Width");
          L ("         then");
-         L ("            return HB (Payload (Sep_2 + 1 .. Last));");
+         L ("            return VB (Payload (Sep_2 + 1 .. Last));");
          L ("         end if;");
          L ("         Start := Stop + 1;");
          L ("      end loop;");
@@ -3926,7 +4120,7 @@ procedure Generate_CLDR_Data is
                     (Rows,
                      S (Rules (Index).B) & ","
                      & S (Rules (Index).C) & ","
-                     & S (Rules (Index).D));
+                     & Hex_Bytes_To_Base64 (S (Rules (Index).D)));
                end if;
             end loop;
 
@@ -4880,7 +5074,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("               if Stop > Start + 1");
          L ("                 and then Rows (Start .. Start) = Wanted");
          L ("               then");
-         L ("                  return HB (Rows (Start + 1 .. Stop - 1));");
+         L ("                  return VB (Rows (Start + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -5209,7 +5403,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
                     (Rows,
                      Label_Code (Zone_Names, Zone_Count,
                                  S (Rules (Index).B), 2)
-                     & S (Rules (Index).C) & "~");
+                     & Hex_Bytes_To_Base64 (S (Rules (Index).C)) & "~");
                end if;
             end loop;
 
@@ -5284,7 +5478,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("               if Stop > Start + 2");
          L ("                 and then Rows (Start .. Start + 1) = Wanted");
          L ("               then");
-         L ("                  return HB (Rows (Start + 2 .. Stop - 1));");
+         L ("                  return VB (Rows (Start + 2 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -5411,9 +5605,9 @@ Emit_Locale_Table
          L ("              and then Payload (Start .. Sep_1 - 1) = Family");
          L ("            then");
          L ("               case Which is");
-         L ("                  when 1 => return HB (Payload (Sep_1 + 1 .. Sep_2 - 1));");
-         L ("                  when 2 => return HB (Payload (Sep_2 + 1 .. Sep_3 - 1));");
-         L ("                  when others => return HB (Payload (Sep_3 + 1 .. Last));");
+         L ("                  when 1 => return VB (Payload (Sep_1 + 1 .. Sep_2 - 1));");
+         L ("                  when 2 => return VB (Payload (Sep_2 + 1 .. Sep_3 - 1));");
+         L ("                  when others => return VB (Payload (Sep_3 + 1 .. Last));");
          L ("               end case;");
          L ("            end if;");
          L ("         end;");
@@ -5597,7 +5791,8 @@ Emit_Locale_Table
                                  Count := Count + 1;
                                  Forms (Count) :=
                                    US.To_Unbounded_String
-                                     (Item (From .. Index - 1));
+                                     (Hex_Bytes_To_Base64
+                                        (Item (From .. Index - 1)));
                               end if;
                               From := Index + 1;
                            end if;
@@ -7428,7 +7623,7 @@ Emit_Locale_Table
          L ("               if Stop > Start + 4");
          L ("                 and then Rows (Start .. Start + 3) = Key");
          L ("               then");
-         L ("                  return HB (Rows (Start + 4 .. Stop - 1));");
+         L ("                  return VB (Rows (Start + 4 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -9676,7 +9871,7 @@ Emit_Locale_Table
          L ("               if Stop > Start + 2");
          L ("                 and then Rows (Start .. Start + 1) = Key");
          L ("               then");
-         L ("                  return HB (Rows (Start + 2 .. Stop - 1));");
+         L ("                  return VB (Rows (Start + 2 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -10400,7 +10595,7 @@ Emit_Locale_Table
          L ("           and then Payload (Start .. Sep_1 - 1) = Base");
          L ("           and then Payload (Sep_1 + 1 .. Sep_2 - 1) = Category");
          L ("         then");
-         L ("            return HB (Payload (Sep_2 + 1 .. Last));");
+         L ("            return VB (Payload (Sep_2 + 1 .. Last));");
          L ("         end if;");
          L ("         Start := Stop + 1;");
          L ("      end loop;");
@@ -10583,7 +10778,7 @@ Emit_Locale_Table
          L ("               if Stop > Start + 4");
          L ("                 and then Rows (Start .. Start + 3) = Key");
          L ("               then");
-         L ("                  return HB (Rows (Start + 4 .. Stop - 1));");
+         L ("                  return VB (Rows (Start + 4 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
