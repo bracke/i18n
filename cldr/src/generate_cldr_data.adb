@@ -2184,10 +2184,15 @@ procedure Generate_CLDR_Data is
       --  value that is already an encoded blob, as the date-name rows are,
       --  would otherwise be hex-encoded a second time and stored at twice
       --  the size for nothing.
+      --  Walk_Parents off stops at an exact match. A caller whose rows are
+      --  keyed on more than the locale needs the walk itself, so that it can
+      --  retest the row's contents at each parent rather than settle for the
+      --  nearest locale that has any row at all.
       procedure Emit_Locale_Table
         (Name         : String;
          Default_Expr : String;
-         Raw          : Boolean := False)
+         Raw          : Boolean := False;
+         Walk_Parents : Boolean := True)
       is
          Values : US.Unbounded_String;
          Index_Data : US.Unbounded_String;
@@ -2307,6 +2312,18 @@ procedure Generate_CLDR_Data is
          L ("         return Lookup (Cand, True);");
          L ("      end Resolve;");
          L;
+         if not Walk_Parents then
+            L ("      Exact : constant String := Resolve (Locale);");
+            L ("   begin");
+            L ("      if Exact /= """" then");
+            L ("         return Exact;");
+            L ("      end if;");
+            L;
+            L ("      return " & Default_Expr & ";");
+            L ("   end " & Name & ";");
+            return;
+         end if;
+
          L ("      --  Parents are cut from the canonical spelling: ""de_AT"" has");
          L ("      --  no '-' to cut, and would otherwise lose its fallback.");
          L ("      Canon : constant String := Canonical_Locale (Locale);");
@@ -9811,8 +9828,102 @@ procedure Generate_CLDR_Data is
          L ("   end Relative_Offset_Suffix;");
       end Emit_Relative_Offset_Affixes;
 
+      --  5,579 rows keyed on locale, base and category. One payload per
+      --  locale holds that locale's rows, which is about seven of them, so a
+      --  short scan inside the payload replaces a second index.
+      --
+      --  The order the chain resolved in has to survive: every wanted
+      --  category, over the locale and then its parents, before any "other"
+      --  row -- so a category found on a parent beats "other" on the locale
+      --  itself. That is why the walk is here rather than in the table: the
+      --  payload has to be retested at each parent, not just found.
       procedure Emit_Relative_Unit_Category_Name is
       begin
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "relative_unit_category") then
+               declare
+                  Locale : constant String := S (Rules (Index).A);
+                  Seen : Boolean := False;
+                  Payload : US.Unbounded_String;
+               begin
+                  for Previous in 1 .. Index - 1 loop
+                     if Is_Kind (Previous, "relative_unit_category")
+                       and then S (Rules (Previous).A) = Locale
+                     then
+                        Seen := True;
+                        exit;
+                     end if;
+                  end loop;
+
+                  if not Seen then
+                     for Candidate in Index .. Rule_Count loop
+                        if Is_Kind (Candidate, "relative_unit_category")
+                          and then S (Rules (Candidate).A) = Locale
+                        then
+                           if US.Length (Payload) > 0 then
+                              US.Append (Payload, ";");
+                           end if;
+                           --  The text is hex, so it cannot hold a separator.
+                           US.Append
+                             (Payload,
+                              S (Rules (Candidate).B) & ","
+                              & S (Rules (Candidate).C) & ","
+                              & Ada_Expression_UTF8_Hex (S (Rules (Candidate).D)));
+                        end if;
+                     end loop;
+
+                     Add_Table_Entry (Locale, S (Payload));
+                  end if;
+               end;
+            end if;
+         end loop;
+         Emit_Locale_Table
+           ("Relative_Unit_Row", """""", Raw => True, Walk_Parents => False);
+
+         L;
+         L ("   function Relative_Unit_Payload_Value");
+         L ("     (Payload  : String;");
+         L ("      Base     : String;");
+         L ("      Category : String)");
+         L ("      return String");
+         L ("   is");
+         L ("      Start : Positive := Payload'First;");
+         L ("      Stop  : Natural;");
+         L ("      Last  : Natural;");
+         L ("      Sep_1 : Natural;");
+         L ("      Sep_2 : Natural;");
+         L ("   begin");
+         L ("      while Start <= Payload'Last loop");
+         L ("         Stop := Start;");
+         L ("         while Stop <= Payload'Last and then Payload (Stop) /= ';' loop");
+         L ("            Stop := Stop + 1;");
+         L ("         end loop;");
+         L ("         Last := Stop - 1;");
+         L ("         Sep_1 := 0;");
+         L ("         Sep_2 := 0;");
+         L ("         for Index in Start .. Last loop");
+         L ("            if Payload (Index) = ',' then");
+         L ("               if Sep_1 = 0 then");
+         L ("                  Sep_1 := Index;");
+         L ("               else");
+         L ("                  Sep_2 := Index;");
+         L ("                  exit;");
+         L ("               end if;");
+         L ("            end if;");
+         L ("         end loop;");
+         L;
+         L ("         if Sep_1 > 0 and then Sep_2 > 0");
+         L ("           and then Payload (Start .. Sep_1 - 1) = Base");
+         L ("           and then Payload (Sep_1 + 1 .. Sep_2 - 1) = Category");
+         L ("         then");
+         L ("            return HB (Payload (Sep_2 + 1 .. Last));");
+         L ("         end if;");
+         L ("         Start := Stop + 1;");
+         L ("      end loop;");
+         L;
+         L ("      return """";");
+         L ("   end Relative_Unit_Payload_Value;");
          L;
          L ("   function Relative_Unit_Category_Name");
          L ("     (Locale   : String;");
@@ -9820,37 +9931,51 @@ procedure Generate_CLDR_Data is
          L ("      Category : String)");
          L ("      return String");
          L ("   is");
-         L ("   begin");
-         for Wanted in 1 .. 2 loop
-            for Pass in 1 .. 2 loop
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "relative_unit_category")
-                    and then
-                      ((Wanted = 1 and then S (Rules (Index).C) /= "other")
-                       or else
-                       (Wanted = 2 and then S (Rules (Index).C) = "other"))
-                  then
-                     L
-                       ("      if "
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A) & """)");
-                     L ("        and then Base = """ & S (Rules (Index).B) & """");
-                     if Wanted = 1 then
-                        L
-                          ("        and then Category = """
-                           & S (Rules (Index).C) & """");
-                     end if;
-                     L ("      then");
-                     L ("         return " & S (Rules (Index).D) & ";");
-                     L ("      end if;");
-                  end if;
-               end loop;
-            end loop;
-         end loop;
+         L ("      function Find (Cand : String; Wanted : String) return String is");
+         L ("         Row : constant String := Relative_Unit_Row (Cand);");
+         L ("      begin");
+         L ("         if Row = """" then");
+         L ("            return """";");
+         L ("         end if;");
+         L ("         return Relative_Unit_Payload_Value (Row, Base, Wanted);");
+         L ("      end Find;");
          L;
-         L ("      return """";");
+         L ("      --  The locale, then each parent, longest first.");
+         L ("      function Resolve (Wanted : String) return String is");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Exact : constant String := Find (Locale, Wanted);");
+         L ("         Cut : Natural := Canon'Last;");
+         L ("      begin");
+         L ("         if Exact /= """" then");
+         L ("            return Exact;");
+         L ("         end if;");
+         L;
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    Find (Canon (Canon'First .. Cut - 1), Wanted);");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Resolve;");
+         L;
+         L ("      Wanted : constant String := Resolve (Category);");
+         L ("   begin");
+         L ("      if Wanted /= """" then");
+         L ("         return Wanted;");
+         L ("      end if;");
+         L;
+         L ("      --  Only once no locale has the category does ""other"" answer,");
+         L ("      --  and an ""other"" row answers whatever category was asked.");
+         L ("      return Resolve (""other"");");
          L ("   end Relative_Unit_Category_Name;");
       end Emit_Relative_Unit_Category_Name;
 
