@@ -2327,6 +2327,52 @@ procedure Generate_CLDR_Data is
          L ("   end " & Name & ";");
       end Emit_Locale_Table;
 
+      --  The same table for rows that need more than the kind to select them
+      --  and keep their value in a later field: a list separator is picked by
+      --  family and part, and several families share one kind.
+      procedure Emit_Selected_Locale_Table
+        (Name         : String;
+         Kind         : String;
+         Family       : String;
+         Part         : String;
+         Default_Expr : String)
+      is
+      begin
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, Kind)
+              and then S (Rules (Index).B) = Family
+              and then S (Rules (Index).C) = Part
+            then
+               Add_Table_Entry
+                 (S (Rules (Index).A),
+                  Ada_Expression_UTF8_Hex (S (Rules (Index).D)));
+            end if;
+         end loop;
+         Emit_Locale_Table (Name, Default_Expr);
+      end Emit_Selected_Locale_Table;
+
+      --  Rows selected by family alone, with the value in the next field.
+      procedure Emit_Family_Locale_Table
+        (Name         : String;
+         Kind         : String;
+         Family       : String;
+         Default_Expr : String)
+      is
+      begin
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, Kind)
+              and then S (Rules (Index).B) = Family
+            then
+               Add_Table_Entry
+                 (S (Rules (Index).A),
+                  Ada_Expression_UTF8_Hex (S (Rules (Index).C)));
+            end if;
+         end loop;
+         Emit_Locale_Table (Name, Default_Expr);
+      end Emit_Family_Locale_Table;
+
       --  One row per locale: the key is the locale, the value the row's text.
       procedure Emit_Locale_Return_Table
         (Name         : String;
@@ -5241,65 +5287,11 @@ procedure Generate_CLDR_Data is
          L ("      return """";");
          L ("   end Time_Zone_Generic_Short_Name;");
          L;
-         L ("   function Time_Zone_Location_Pattern (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            declare
-               Opened : Boolean := False;
-            begin
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "zone_location_pattern") then
-                     L
-                       ("      "
-                        & (if Opened then "elsif " else "if ")
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A)
-                        & """) then");
-                     L ("         return " & S (Rules (Index).B) & ";");
-                     Opened := True;
-                  end if;
-               end loop;
-
-               if Opened then
-                  L ("      end if;");
-                  L;
-               end if;
-            end;
-         end loop;
-         L ("      return ""{0} Time"";");
-         L ("   end Time_Zone_Location_Pattern;");
-         L;
-         L ("   function GMT_Offset_Prefix (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            declare
-               Opened : Boolean := False;
-            begin
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "zone_gmt_prefix") then
-                     L
-                       ("      "
-                        & (if Opened then "elsif " else "if ")
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A)
-                        & """) then");
-                     L ("         return " & S (Rules (Index).B) & ";");
-                     Opened := True;
-                  end if;
-               end loop;
-
-               if Opened then
-                  L ("      end if;");
-                  L;
-               end if;
-            end;
-         end loop;
-         L ("      return ""GMT"";");
-         L ("   end GMT_Offset_Prefix;");
+         Emit_Locale_Return_Table
+           ("Time_Zone_Location_Pattern", "zone_location_pattern",
+            """{0} Time""");
+         Emit_Locale_Return_Table
+           ("GMT_Offset_Prefix", "zone_gmt_prefix", """GMT""");
          L;
          L ("   function Time_Zone_UTC_Designator (Locale : String) return String is");
          L ("      pragma Unreferenced (Locale);");
@@ -6751,58 +6743,16 @@ procedure Generate_CLDR_Data is
 
       procedure Emit_List_Final_Separator is
       begin
-         L;
-         L ("   function List_Final_Separator (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "list_separator")
-                 and then S (Rules (Index).B) = "standard"
-                 and then S (Rules (Index).C) = "final"
-               then
-                  L
-                    ("      if "
-                     & (if Pass = 1
-                        then "Locale_Equals"
-                        else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).D) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
-         L;
-         L ("      return "" and "";");
-         L ("   end List_Final_Separator;");
+         Emit_Selected_Locale_Table
+           ("List_Final_Separator", "list_separator", "standard", "final",
+            """ and """);
       end Emit_List_Final_Separator;
 
       procedure Emit_List_Item_Separator is
       begin
-         L;
-         L ("   function List_Item_Separator (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "list_separator")
-                 and then S (Rules (Index).B) = "standard"
-                 and then S (Rules (Index).C) = "item"
-               then
-                  L
-                    ("      if "
-                     & (if Pass = 1
-                        then "Locale_Equals"
-                        else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).D) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
-         L;
-         L ("      return "", "";");
-         L ("   end List_Item_Separator;");
+         Emit_Selected_Locale_Table
+           ("List_Item_Separator", "list_separator", "standard", "item",
+            """, """);
       end Emit_List_Item_Separator;
 
       procedure Emit_List_Pattern_Separators is
@@ -6813,29 +6763,8 @@ procedure Generate_CLDR_Data is
             Fallback_Call : String)
          is
          begin
-            L ("   function " & Function_Name & " (Locale : String) return String is");
-            L ("   begin");
-            for Pass in 1 .. 2 loop
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "list_separator")
-                    and then S (Rules (Index).B) = Family
-                    and then S (Rules (Index).C) = Part
-                  then
-                     L
-                       ("      if "
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A) & """)");
-                     L ("      then");
-                     L ("         return " & S (Rules (Index).D) & ";");
-                     L ("      end if;");
-                  end if;
-               end loop;
-            end loop;
-            L;
-            L ("      return " & Fallback_Call & ";");
-            L ("   end " & Function_Name & ";");
+            Emit_Selected_Locale_Table
+              (Function_Name, "list_separator", Family, Part, Fallback_Call);
          end Emit_List_Pattern_Function;
       begin
          L;
@@ -6881,32 +6810,11 @@ procedure Generate_CLDR_Data is
 
       procedure Emit_Per_Unit_Separator is
       begin
-         L;
-         L ("   function Per_Unit_Separator (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "unit_separator")
-                 and then S (Rules (Index).B) = "per"
-               then
-                  L
-                    ("      if "
-                     & (if Pass = 1
-                        then "Locale_Equals"
-                        else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).C) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
-         L;
          --  CLDR root (und) per-unit separator is "/", not English " per ". Only
          --  locales without their own unit_separator rule reach this fallback (en has
          --  an explicit " per " entry), so they must fall back to und, not en.
-         L ("      return ""/"";");
-         L ("   end Per_Unit_Separator;");
+         Emit_Family_Locale_Table
+           ("Per_Unit_Separator", "unit_separator", "per", """/""");
       end Emit_Per_Unit_Separator;
 
       procedure Emit_Unit_Separators is
