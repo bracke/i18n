@@ -1871,7 +1871,15 @@ procedure Generate_CLDR_Data is
          L ("                  return """";");
          L ("               end if;");
          L;
-         L ("               exit when Slot_End = Last;");
+         L ("               --  Fewer forms than categories means the trailing");
+         L ("               --  ones repeated the last, so the last answers for");
+         L ("               --  every category past the end.");
+         L ("               if Slot_End = Last then");
+         L ("                  if Slot_End >= Slot_Start then");
+         L ("                     return HB (Payload (Slot_Start .. Slot_End));");
+         L ("                  end if;");
+         L ("                  return """";");
+         L ("               end if;");
          L ("               Slot_Start := Slot_End + 2;");
          L ("            end loop;");
          L ("         end if;");
@@ -5274,6 +5282,86 @@ Emit_Locale_Table
          L ("   end Time_Zone_Offset_Separator;");
       end Emit_Time_Zone_Data;
 
+      --  Every entry carries one form per plural category, and for most
+      --  currencies that is the same word repeated six times: 54% of the
+      --  entries are all-identical, and the forms across the whole table
+      --  fall from 13.5 million characters to 3.5 million once the repeats
+      --  go. Trailing repeats are dropped here; the reader takes the last
+      --  form for any category past the end.
+      function Trimmed_Currency_Payload (Payload : String) return String is
+         Max_Forms : constant := 64;
+         Result : US.Unbounded_String;
+         Start : Positive := Payload'First;
+      begin
+         while Start <= Payload'Last loop
+            declare
+               Stop : Natural := Start;
+            begin
+               while Stop <= Payload'Last and then Payload (Stop) /= ';' loop
+                  Stop := Stop + 1;
+               end loop;
+
+               declare
+                  Item : constant String := Payload (Start .. Stop - 1);
+                  Colon : Natural := 0;
+               begin
+                  for Index in Item'Range loop
+                     if Item (Index) = ':' then
+                        Colon := Index;
+                        exit;
+                     end if;
+                  end loop;
+
+                  if US.Length (Result) > 0 then
+                     US.Append (Result, ";");
+                  end if;
+
+                  if Colon = 0 or else Item'Length = 0 then
+                     US.Append (Result, Item);
+                  else
+                     declare
+                        Forms : array (1 .. Max_Forms) of US.Unbounded_String;
+                        Count : Natural := 0;
+                        From  : Positive := Colon + 1;
+                     begin
+                        for Index in Colon + 1 .. Item'Last + 1 loop
+                           if Index > Item'Last
+                             or else Item (Index) = ','
+                           then
+                              if Count < Max_Forms then
+                                 Count := Count + 1;
+                                 Forms (Count) :=
+                                   US.To_Unbounded_String
+                                     (Item (From .. Index - 1));
+                              end if;
+                              From := Index + 1;
+                           end if;
+                        end loop;
+
+                        while Count > 1
+                          and then US."=" (Forms (Count), Forms (Count - 1))
+                        loop
+                           Count := Count - 1;
+                        end loop;
+
+                        US.Append (Result, Item (Item'First .. Colon));
+                        for Index in 1 .. Count loop
+                           if Index > 1 then
+                              US.Append (Result, ",");
+                           end if;
+                           US.Append (Result, Forms (Index));
+                        end loop;
+                     end;
+                  end if;
+               end;
+
+               Start := Stop + 1;
+            end;
+         end loop;
+
+         return S (Result);
+      end Trimmed_Currency_Payload;
+
       procedure Emit_Localized_Currency_Display_Name is
          procedure Emit_String_Argument
            (Value  : String;
@@ -5311,7 +5399,9 @@ Emit_Locale_Table
          Reset_Table;
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, "currency_name_payload") then
-               Add_Table_Entry (S (Rules (Index).A), S (Rules (Index).B));
+               Add_Table_Entry
+                 (S (Rules (Index).A),
+                  Trimmed_Currency_Payload (S (Rules (Index).B)));
             end if;
          end loop;
 
@@ -6813,6 +6903,122 @@ Emit_Locale_Table
          L ("   end Duration_Field_Separator;");
       end Emit_Unit_Separators;
 
+      --  A unit record used to spell out its base, width and category:
+      --  "unit-width-full-name" alone accounted for 3.8 million characters
+      --  of the table, for three distinct values. Each field becomes a code
+      --  instead -- two characters for the base, one each for the width and
+      --  the category -- which the generated body maps its arguments to
+      --  once per call rather than comparing per record.
+      Max_Unit_Bases : constant := 512;
+      Unit_Base_Names : array (1 .. Max_Unit_Bases) of US.Unbounded_String;
+      Unit_Base_Count : Natural := 0;
+
+      Code_Alphabet : constant String :=
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+      procedure Collect_Unit_Bases is
+      begin
+         --  Sorted, so the generated body can bisect them.
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "unit_name") then
+               declare
+                  Name : constant String := S (Rules (Index).B);
+                  Slot : Natural := 0;
+               begin
+                  for Position in 1 .. Unit_Base_Count loop
+                     if S (Unit_Base_Names (Position)) = Name then
+                        Slot := Position;
+                        exit;
+                     end if;
+                  end loop;
+
+                  if Slot = 0 then
+                     if Name'Length > 33 then
+                        Add_Error ("unit base does not fit the index: " & Name);
+                     elsif Unit_Base_Count = Max_Unit_Bases then
+                        Add_Error ("too many unit bases");
+                     else
+                        Unit_Base_Count := Unit_Base_Count + 1;
+                        Unit_Base_Names (Unit_Base_Count) :=
+                          US.To_Unbounded_String (Name);
+                     end if;
+                  end if;
+               end;
+            end if;
+         end loop;
+
+         for Outer in 2 .. Unit_Base_Count loop
+            declare
+               Current : constant US.Unbounded_String :=
+                 Unit_Base_Names (Outer);
+               Probe : Natural := Outer - 1;
+            begin
+               while Probe >= 1
+                 and then S (Unit_Base_Names (Probe)) > S (Current)
+               loop
+                  Unit_Base_Names (Probe + 1) := Unit_Base_Names (Probe);
+                  Probe := Probe - 1;
+               end loop;
+               Unit_Base_Names (Probe + 1) := Current;
+            end;
+         end loop;
+      end Collect_Unit_Bases;
+
+      function Unit_Base_Code (Name : String) return String is
+      begin
+         for Position in 1 .. Unit_Base_Count loop
+            if S (Unit_Base_Names (Position)) = Name then
+               return
+                 [1 => Code_Alphabet
+                         (Code_Alphabet'First + (Position - 1) / 62),
+                  2 => Code_Alphabet
+                         (Code_Alphabet'First + (Position - 1) mod 62)];
+            end if;
+         end loop;
+
+         return "  ";
+      end Unit_Base_Code;
+
+      function Unit_Width_Code (Value : String) return String is
+        (if Value = "unit-width-full-name" then "f"
+         elsif Value = "unit-width-short" then "s"
+         elsif Value = "unit-width-narrow" then "n"
+         else " ");
+
+      function Unit_Category_Code (Value : String) return String is
+        (if Value = "other" then "o"
+         elsif Value = "one" then "1"
+         elsif Value = "zero" then "z"
+         elsif Value = "two" then "2"
+         elsif Value = "few" then "w"
+         elsif Value = "many" then "m"
+         else " ");
+
+      procedure Emit_Unit_String_Expression
+        (Indent : String;
+         Value  : String;
+         Suffix : String := "")
+      is
+         Chunk : constant := 72;
+         Start : Positive := Value'First;
+         Stop  : Natural;
+         Term  : Positive := 1;
+      begin
+         if Value'Length = 0 then
+            L (Indent & """""" & Suffix);
+            return;
+         end if;
+
+         while Start <= Value'Last loop
+            Stop := Natural'Min (Start + Chunk - 1, Value'Last);
+            L (Indent & (if Term = 1 then "" else "& ")
+               & """" & Value (Start .. Stop) & """"
+               & (if Stop = Value'Last then Suffix else ""));
+            Start := Stop + 1;
+            Term := Term + 1;
+         end loop;
+      end Emit_Unit_String_Expression;
+
       procedure Emit_Unit_Display_Name is
          procedure Emit_String_Term (Value : String) is
             Chunk_Size : constant := 72;
@@ -6830,6 +7036,7 @@ Emit_Locale_Table
             end loop;
          end Emit_String_Term;
       begin
+         Collect_Unit_Bases;
          L;
          L ("   function Unit_Display_Name");
          L ("     (Locale   : String;");
@@ -6864,8 +7071,9 @@ Emit_Locale_Table
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|" & S (Rules (Index).C) & "|"
-                     & S (Rules (Index).D) & "|"
+                     Unit_Base_Code (S (Rules (Index).B))
+                     & Unit_Width_Code (S (Rules (Index).C))
+                     & Unit_Category_Code (S (Rules (Index).D))
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).E)) & "~");
                end if;
             end loop;
@@ -6880,47 +7088,110 @@ Emit_Locale_Table
          Emit_Locale_Table
            ("Unit_Name_Row", """""", Raw => True, Walk_Parents => False);
 
+         --  The base names, so a record can carry a two-character code
+         --  instead of the name. Bisected on a 33-character padded key.
+         L;
+         L ("      Base_Index : constant String :=");
+         declare
+            Index_Text : US.Unbounded_String;
+         begin
+            for Position in 1 .. Unit_Base_Count loop
+               declare
+                  Name : constant String := S (Unit_Base_Names (Position));
+               begin
+                  US.Append (Index_Text, Name);
+                  US.Append (Index_Text, (1 .. 33 - Name'Length => ' '));
+                  US.Append (Index_Text, Unit_Base_Code (Name));
+               end;
+            end loop;
+            Emit_Unit_String_Expression ("        ", S (Index_Text), ";");
+         end;
+         L ("      Base_Width : constant := 35;");
+         L ("      Base_Count : constant Natural :=");
+         L ("        Base_Index'Length / Base_Width;");
+         L;
+         L ("      --  "" "" is not a code, so an unknown base matches nothing --");
+         L ("      --  which is what comparing an unknown name did before.");
+         L ("      function Base_Code return String is");
+         L ("         Low : Natural := 1;");
+         L ("         High : Natural := Base_Count;");
+         L ("         Mid : Natural;");
+         L ("         Wanted : constant String :=");
+         L ("           (if Base'Length >= 33 then Base (Base'First .. Base'First + 32)");
+         L ("            else Base & (1 .. 33 - Base'Length => ' '));");
+         L ("      begin");
+         L ("         while Low <= High loop");
+         L ("            Mid := (Low + High) / 2;");
+         L ("            declare");
+         L ("               At_Key : constant Natural :=");
+         L ("                 Base_Index'First + (Mid - 1) * Base_Width;");
+         L ("               Key : constant String :=");
+         L ("                 Base_Index (At_Key .. At_Key + 32);");
+         L ("            begin");
+         L ("               if Key = Wanted then");
+         L ("                  return Base_Index (At_Key + 33 .. At_Key + 34);");
+         L ("               elsif Key < Wanted then");
+         L ("                  Low := Mid + 1;");
+         L ("               else");
+         L ("                  High := Mid - 1;");
+         L ("               end if;");
+         L ("            end;");
+         L ("         end loop;");
+         L;
+         L ("         return ""  "";");
+         L ("      end Base_Code;");
+         L;
+         L ("      function Width_Code return String is");
+         L ("        (if Width = ""unit-width-full-name"" then ""f""");
+         L ("         elsif Width = ""unit-width-short"" then ""s""");
+         L ("         elsif Width = ""unit-width-narrow"" then ""n""");
+         L ("         else "" "");");
+         L;
+         L ("      function Category_Code (Want : String) return String is");
+         L ("        (if Want = ""other"" then ""o""");
+         L ("         elsif Want = ""one"" then ""1""");
+         L ("         elsif Want = ""zero"" then ""z""");
+         L ("         elsif Want = ""two"" then ""2""");
+         L ("         elsif Want = ""few"" then ""w""");
+         L ("         elsif Want = ""many"" then ""m""");
+         L ("         else "" "");");
+         L;
+         L ("      Wanted_Base : constant String := Base_Code;");
+         L ("      Wanted_Width : constant String := Width_Code;");
+
          L;
          L ("      function Extended_Unit_Name return String is");
          L ("      begin");
          L ("         return """";");
          L ("      end Extended_Unit_Name;");
          L;
+         L ("      --  Records are a four-character key -- two for the base,");
+         L ("      --  one for the width, one for the category -- then the hex.");
+         L ("      --  The labels themselves were four fifths of this table.");
          L ("      function Search (Rows : String; Want : String) return String is");
          L ("         Start : Positive := Rows'First;");
+         L ("         Key : constant String :=");
+         L ("           Wanted_Base & Wanted_Width & Category_Code (Want);");
          L ("      begin");
+         L ("         if Key (Key'First) = ' ' or else Key (Key'Last) = ' ' then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
          L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
-         L ("               Sep3 : Natural := 0;");
          L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
          L ("               for Index in Start .. Rows'Last loop");
-         L ("                  if Rows (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     elsif Sep3 = 0 then");
-         L ("                        Sep3 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Rows (Index) = '~' then");
+         L ("                  if Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep3 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Sep3 > Sep2 + 1");
-         L ("                 and then Stop > Sep3 + 1");
-         L ("                 and then Rows (Start .. Sep1 - 1) = Base");
-         L ("                 and then Rows (Sep1 + 1 .. Sep2 - 1) = Width");
-         L ("                 and then Rows (Sep2 + 1 .. Sep3 - 1) = Want");
+         L ("               if Stop > Start + 4");
+         L ("                 and then Rows (Start .. Start + 3) = Key");
          L ("               then");
-         L ("                  return HB (Rows (Sep3 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Start + 4 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");

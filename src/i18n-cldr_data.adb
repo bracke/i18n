@@ -151,7 +151,15 @@ package body I18N.CLDR_Data is
                   return "";
                end if;
 
-               exit when Slot_End = Last;
+               --  Fewer forms than categories means the trailing
+               --  ones repeated the last, so the last answers for
+               --  every category past the end.
+               if Slot_End = Last then
+                  if Slot_End >= Slot_Start then
+                     return HB (Payload (Slot_Start .. Slot_End));
+                  end if;
+                  return "";
+               end if;
                Slot_Start := Slot_End + 2;
             end loop;
          end if;
