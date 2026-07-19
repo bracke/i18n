@@ -2378,12 +2378,15 @@ procedure Generate_CLDR_Data is
          Emit_Locale_Table (Name, Default_Expr);
       end Emit_Selected_Locale_Table;
 
-      --  Rows selected by family alone, with the value in the next field.
+      --  Rows selected by family alone, with the value in one of the two
+      --  fields after it: a relative offset keeps its prefix in one and its
+      --  suffix in the other, and each becomes its own table.
       procedure Emit_Family_Locale_Table
         (Name         : String;
          Kind         : String;
          Family       : String;
-         Default_Expr : String)
+         Default_Expr : String;
+         Value_Field  : Character := 'C')
       is
       begin
          Reset_Table;
@@ -2393,7 +2396,10 @@ procedure Generate_CLDR_Data is
             then
                Add_Table_Entry
                  (S (Rules (Index).A),
-                  Ada_Expression_UTF8_Hex (S (Rules (Index).C)));
+                  Ada_Expression_UTF8_Hex
+                    (if Value_Field = 'D'
+                     then S (Rules (Index).D)
+                     else S (Rules (Index).C)));
             end if;
          end loop;
          Emit_Locale_Table (Name, Default_Expr);
@@ -9624,6 +9630,14 @@ procedure Generate_CLDR_Data is
 
       procedure Emit_Relative_Offset_Affixes is
       begin
+         --  "" is a real prefix for 387 of these locales, so absence has to
+         --  be something a value cannot be: no CLDR text holds a NUL.
+         Emit_Family_Locale_Table
+           ("Relative_Offset_Prefix_Future_Row", "relative_offset", "future",
+            "[1 => Character'Val (0)]", Value_Field => 'C');
+         Emit_Family_Locale_Table
+           ("Relative_Offset_Prefix_Past_Row", "relative_offset", "past",
+            "[1 => Character'Val (0)]", Value_Field => 'C');
          L;
          L ("   function Relative_Offset_Prefix");
          L ("     (Locale : String;");
@@ -9632,24 +9646,16 @@ procedure Generate_CLDR_Data is
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "relative_offset") then
-                  L
-                    ("      if "
-                     & (if Pass = 1
-                        then "Locale_Equals"
-                        else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L
-                    ("        and then Future = "
-                     & (if S (Rules (Index).B) = "future" then "True" else "False"));
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).C) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
+         L ("      declare");
+         L ("         Absent : constant String := [1 => Character'Val (0)];");
+         L ("         Row : constant String :=");
+         L ("           (if Future then Relative_Offset_Prefix_Future_Row (Locale)");
+         L ("            else Relative_Offset_Prefix_Past_Row (Locale));");
+         L ("      begin");
+         L ("         if Row /= Absent then");
+         L ("            return Row;");
+         L ("         end if;");
+         L ("      end;");
          L;
          L ("      if Future then");
          L ("         if Lang = ""fr"" then");
@@ -9734,6 +9740,14 @@ procedure Generate_CLDR_Data is
          L ("         return """";");
          L ("      end if;");
          L ("   end Relative_Offset_Prefix;");
+         --  "" is a real prefix for 387 of these locales, so absence has to
+         --  be something a value cannot be: no CLDR text holds a NUL.
+         Emit_Family_Locale_Table
+           ("Relative_Offset_Suffix_Future_Row", "relative_offset", "future",
+            "[1 => Character'Val (0)]", Value_Field => 'D');
+         Emit_Family_Locale_Table
+           ("Relative_Offset_Suffix_Past_Row", "relative_offset", "past",
+            "[1 => Character'Val (0)]", Value_Field => 'D');
          L;
          L ("   function Relative_Offset_Suffix");
          L ("     (Locale : String;");
@@ -9742,24 +9756,16 @@ procedure Generate_CLDR_Data is
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
          L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "relative_offset") then
-                  L
-                    ("      if "
-                     & (if Pass = 1
-                        then "Locale_Equals"
-                        else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L
-                    ("        and then Future = "
-                     & (if S (Rules (Index).B) = "future" then "True" else "False"));
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).D) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
+         L ("      declare");
+         L ("         Absent : constant String := [1 => Character'Val (0)];");
+         L ("         Row : constant String :=");
+         L ("           (if Future then Relative_Offset_Suffix_Future_Row (Locale)");
+         L ("            else Relative_Offset_Suffix_Past_Row (Locale));");
+         L ("      begin");
+         L ("         if Row /= Absent then");
+         L ("            return Row;");
+         L ("         end if;");
+         L ("      end;");
          L;
          L ("      if Future then");
          L ("         if Lang = ""ja"" then");
