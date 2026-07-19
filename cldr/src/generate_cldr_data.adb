@@ -2154,6 +2154,170 @@ procedure Generate_CLDR_Data is
             Last  => 0);
       end Add_Table_Entry;
 
+      Code_Alphabet : constant String :=
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+      --  Labels repeat far more than the text they describe:
+      --  "unit-width-full-name" is twenty characters for one of three
+      --  values, and a zone name thirty for one of 419. Each becomes a code
+      --  in the record, which the body maps its argument to once per call.
+      Max_Labels : constant := 1024;
+      type Label_Array is array (1 .. Max_Labels) of US.Unbounded_String;
+
+      procedure Collect_Labels
+        (Kind  : String;
+         Field : Positive;
+         Names : out Label_Array;
+         Count : out Natural)
+      is
+      begin
+         Count := 0;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, Kind) then
+               declare
+                  Value : constant String :=
+                    (case Field is
+                        when 2 => S (Rules (Index).B),
+                        when 3 => S (Rules (Index).C),
+                        when 4 => S (Rules (Index).D),
+                        when 5 => S (Rules (Index).E),
+                        when others => S (Rules (Index).F));
+                  Seen : Boolean := False;
+               begin
+                  for Position in 1 .. Count loop
+                     if S (Names (Position)) = Value then
+                        Seen := True;
+                        exit;
+                     end if;
+                  end loop;
+
+                  if not Seen then
+                     if Count = Max_Labels then
+                        Add_Error ("too many labels for " & Kind);
+                     else
+                        Count := Count + 1;
+                        Names (Count) := US.To_Unbounded_String (Value);
+                     end if;
+                  end if;
+               end;
+            end if;
+         end loop;
+
+         --  Sorted, so a bisected index over them is possible.
+         for Outer in 2 .. Count loop
+            declare
+               Current : constant US.Unbounded_String := Names (Outer);
+               Probe : Natural := Outer - 1;
+            begin
+               while Probe >= 1 and then S (Names (Probe)) > S (Current) loop
+                  Names (Probe + 1) := Names (Probe);
+                  Probe := Probe - 1;
+               end loop;
+               Names (Probe + 1) := Current;
+            end;
+         end loop;
+      end Collect_Labels;
+
+      function Label_Code
+        (Names : Label_Array;
+         Count : Natural;
+         Value : String;
+         Width : Positive)
+         return String
+      is
+      begin
+         for Position in 1 .. Count loop
+            if S (Names (Position)) = Value then
+               if Width = 1 then
+                  return [1 => Code_Alphabet
+                                 (Code_Alphabet'First + Position - 1)];
+               else
+                  return
+                    [1 => Code_Alphabet
+                            (Code_Alphabet'First + (Position - 1) / 62),
+                     2 => Code_Alphabet
+                            (Code_Alphabet'First + (Position - 1) mod 62)];
+               end if;
+            end if;
+         end loop;
+
+         return (1 .. Width => ' ');
+      end Label_Code;
+
+      --  A chain, for a handful of labels. Anything unmatched codes as
+      --  blanks and so matches no record, which is what comparing an
+      --  unrecognised name did before.
+      procedure Emit_Label_Chain
+        (Function_Name : String;
+         Argument      : String;
+         Names         : Label_Array;
+         Count         : Natural;
+         Width         : Positive)
+      is
+      begin
+         L ("      function " & Function_Name & " return String is");
+         for Position in 1 .. Count loop
+            L ("        " & (if Position = 1 then "(if" else " elsif")
+               & " " & Argument & " = """ & S (Names (Position)) & """ then """
+               & Label_Code (Names, Count, S (Names (Position)), Width) & """");
+         end loop;
+         L ("         else """ & (1 .. Width => ' ') & """);");
+      end Emit_Label_Chain;
+
+      procedure Emit_Unit_String_Expression
+        (Indent : String;
+         Value  : String;
+         Suffix : String := "")
+      is
+         Chunk : constant := 72;
+         Start : Positive := Value'First;
+         Stop  : Natural;
+         Term  : Positive := 1;
+      begin
+         if Value'Length = 0 then
+            L (Indent & """""" & Suffix);
+            return;
+         end if;
+
+         while Start <= Value'Last loop
+            Stop := Natural'Min (Start + Chunk - 1, Value'Last);
+            L (Indent & (if Term = 1 then "" else "& ")
+               & """" & Value (Start .. Stop) & """"
+               & (if Stop = Value'Last then Suffix else ""));
+            Start := Stop + 1;
+            Term := Term + 1;
+         end loop;
+      end Emit_Unit_String_Expression;
+
+      --  419 zone names, too many for a chain, so a bisected index of
+      --  padded name to code -- the same shape the unit bases use.
+      procedure Emit_Label_Index
+        (Literal_Name : String;
+         Names        : Label_Array;
+         Count        : Natural;
+         Key_Width    : Positive;
+         Code_Width   : Positive)
+      is
+         Index_Text : US.Unbounded_String;
+      begin
+         for Position in 1 .. Count loop
+            declare
+               Name : constant String := S (Names (Position));
+            begin
+               if Name'Length > Key_Width then
+                  Add_Error ("label does not fit the index: " & Name);
+               end if;
+               US.Append (Index_Text, Name);
+               US.Append (Index_Text, (1 .. Key_Width - Name'Length => ' '));
+               US.Append
+                 (Index_Text, Label_Code (Names, Count, Name, Code_Width));
+            end;
+         end loop;
+
+         L ("      " & Literal_Name & " : constant String :=");
+         Emit_Unit_String_Expression ("        ", S (Index_Text), ";");
+      end Emit_Label_Index;
+
       --  Sort the collected entries and append them to a packed value string
       --  and a fixed-width index. Both are in out, so a table built in
       --  several passes -- one per skeleton, say -- shares one value string
@@ -2532,7 +2696,13 @@ procedure Generate_CLDR_Data is
       --  the wider offset field. The locale leaves the record, since the
       --  segment says which it is.
       procedure Emit_Date_Style_Pattern is
+         Cal_Names : Label_Array;
+         Cal_Count : Natural;
+         Style_Names : Label_Array;
+         Style_Count : Natural;
       begin
+         Collect_Labels ("date_style_pattern", 2, Cal_Names, Cal_Count);
+         Collect_Labels ("date_style_pattern", 3, Style_Names, Style_Count);
          Reset_Table;
          declare
             Current : US.Unbounded_String;
@@ -2552,7 +2722,9 @@ procedure Generate_CLDR_Data is
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|" & S (Rules (Index).C) & "|"
+                     Label_Code (Cal_Names, Cal_Count, S (Rules (Index).B), 1)
+                     & Label_Code (Style_Names, Style_Count,
+                                   S (Rules (Index).C), 1)
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).D)) & "~");
                end if;
             end loop;
@@ -2581,41 +2753,56 @@ procedure Generate_CLDR_Data is
          L ("      --  calendar|style|pattern, one run per locale. A calendar");
          L ("      --  the locale does not carry falls back to gregorian, which");
          L ("      --  is why the scan finishes the segment before answering.");
+         L ("      function Cal_Code (Want : String) return String is");
+         for Position in 1 .. Cal_Count loop
+            L ("        " & (if Position = 1 then "(if" else " elsif")
+               & " Want = """ & S (Cal_Names (Position)) & """ then """
+               & Label_Code (Cal_Names, Cal_Count,
+                             S (Cal_Names (Position)), 1) & """");
+         end loop;
+         L ("         else "" "");");
+         L;
+         Emit_Label_Chain ("Style_Code", "Style", Style_Names, Style_Count, 1);
+         L;
+         L ("      Gregorian_Code : constant String := """
+            & Label_Code (Cal_Names, Cal_Count, "gregorian", 1) & """;");
+         L;
+         L ("      --  calendar and style as one coded character each, then the");
+         L ("      --  hex. A calendar the locale does not carry falls back to");
+         L ("      --  gregorian, so the scan finishes before answering.");
          L ("      function In_Rows (Rows : String; Wanted_Calendar : String)");
          L ("         return String");
          L ("      is");
          L ("         Start : Positive := Rows'First;");
          L ("         Fallback_First : Natural := 0;");
          L ("         Fallback_Last : Natural := 0;");
+         L ("         Wanted : constant String := Cal_Code (Wanted_Calendar);");
+         L ("         Styled : constant String := Style_Code;");
          L ("      begin");
+         L ("         if Styled = "" "" then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
          L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
          L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
          L ("               for Index in Start .. Rows'Last loop");
-         L ("                  if Rows (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Rows (Index) = '~' then");
+         L ("                  if Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               exit when Sep1 = 0 or else Sep2 = 0;");
-         L ("               if Rows (Sep1 + 1 .. Sep2 - 1) = Style then");
+         L ("               exit when Stop <= Start + 2;");
+         L ("               if Rows (Start + 1) = Styled (Styled'First) then");
          L ("                  declare");
-         L ("                     Cal : constant String := Rows (Start .. Sep1 - 1);");
+         L ("                     Cal : constant String := Rows (Start .. Start);");
          L ("                  begin");
-         L ("                     if Cal = Wanted_Calendar then");
-         L ("                        return HB (Rows (Sep2 + 1 .. Stop - 1));");
-         L ("                     elsif Cal = ""gregorian"" then");
-         L ("                        Fallback_First := Sep2 + 1;");
+         L ("                     if Cal = Wanted then");
+         L ("                        return HB (Rows (Start + 2 .. Stop - 1));");
+         L ("                     elsif Cal = Gregorian_Code then");
+         L ("                        Fallback_First := Start + 2;");
          L ("                        Fallback_Last := Stop - 1;");
          L ("                     end if;");
          L ("                  end;");
@@ -4062,6 +4249,9 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
       end Emit_Era_Name;
 
       procedure Emit_Time_Zone_Data is
+         Zone_Names : Label_Array;
+         Zone_Count : Natural;
+
          procedure Emit_String_Expression
            (Indent : String;
             Value  : String;
@@ -4963,6 +5153,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          --  128,821 records over 6.7 MB, walked from the first character on
          --  each of two passes. Grouped by locale, so each locale is a
          --  segment and the locale field leaves the record.
+         Collect_Labels ("zone_exemplar_hex", 2, Zone_Names, Zone_Count);
          Reset_Table;
          declare
             Current : US.Unbounded_String;
@@ -4982,7 +5173,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|"
+                     Label_Code (Zone_Names, Zone_Count,
+                                 S (Rules (Index).B), 2)
                      & S (Rules (Index).C) & "~");
                end if;
             end loop;
@@ -5000,30 +5192,65 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("      Zone   : String)");
          L ("      return String");
          L ("   is");
+         Emit_Label_Index ("Zone_Index", Zone_Names, Zone_Count, 32, 2);
+         L ("      Zone_Key_Width : constant := 34;");
+         L ("      Zone_Key_Count : constant Natural :=");
+         L ("        Zone_Index'Length / Zone_Key_Width;");
+         L;
+         L ("      --  A zone name is thirty characters for one of 419, so the");
+         L ("      --  record carries a two-character code and the name is");
+         L ("      --  mapped once per call rather than compared per record.");
+         L ("      function Zone_Code return String is");
+         L ("         Low : Natural := 1;");
+         L ("         High : Natural := Zone_Key_Count;");
+         L ("         Mid : Natural;");
+         L ("         Wanted : constant String :=");
+         L ("           (if Zone'Length >= 32 then Zone (Zone'First .. Zone'First + 31)");
+         L ("            else Zone & (1 .. 32 - Zone'Length => ' '));");
+         L ("      begin");
+         L ("         while Low <= High loop");
+         L ("            Mid := (Low + High) / 2;");
+         L ("            declare");
+         L ("               At_Key : constant Natural :=");
+         L ("                 Zone_Index'First + (Mid - 1) * Zone_Key_Width;");
+         L ("               Key : constant String :=");
+         L ("                 Zone_Index (At_Key .. At_Key + 31);");
+         L ("            begin");
+         L ("               if Key = Wanted then");
+         L ("                  return Zone_Index (At_Key + 32 .. At_Key + 33);");
+         L ("               elsif Key < Wanted then");
+         L ("                  Low := Mid + 1;");
+         L ("               else");
+         L ("                  High := Mid - 1;");
+         L ("               end if;");
+         L ("            end;");
+         L ("         end loop;");
+         L;
+         L ("         return ""  "";");
+         L ("      end Zone_Code;");
          L;
          L ("      function Search (Rows : String; Wanted : String) return String is");
          L ("         Start : Positive := Rows'First;");
          L ("      begin");
+         L ("         if Wanted = ""  "" then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
          L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep : Natural := 0;");
          L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
          L ("               for Index in Start .. Rows'Last loop");
-         L ("                  if Rows (Index) = '|' and then Sep = 0 then");
-         L ("                     Sep := Index;");
-         L ("                  elsif Rows (Index) = '~' then");
+         L ("                  if Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep /= 0");
-         L ("                 and then Sep > Start");
-         L ("                 and then Stop > Sep + 1");
-         L ("                 and then Rows (Start .. Sep - 1) = Wanted");
+         L ("               if Stop > Start + 2");
+         L ("                 and then Rows (Start .. Start + 1) = Wanted");
          L ("               then");
-         L ("                  return HB (Rows (Sep + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Start + 2 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -5035,7 +5262,9 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L;
          L ("      --  The locale, then each parent, longest first.");
          L ("      function Resolve return String is");
-         L ("         Exact : constant String := Search (Zone_Exemplar_Row (Locale), Zone);");
+         L ("         Wanted_Zone : constant String := Zone_Code;");
+         L ("         Exact : constant String :=");
+         L ("           Search (Zone_Exemplar_Row (Locale), Wanted_Zone);");
          L ("         Canon : constant String := Canonical_Locale (Locale);");
          L ("         Cut : Natural := Canon'Last;");
          L ("      begin");
@@ -5047,7 +5276,9 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("            if Canon (Cut) = '-' then");
          L ("               declare");
          L ("                  Hit : constant String :=");
-         L ("                    Search (Zone_Exemplar_Row (Canon (Canon'First .. Cut - 1)), Zone);");
+         L ("                    Search");
+         L ("                      (Zone_Exemplar_Row (Canon (Canon'First .. Cut - 1)),");
+         L ("                       Wanted_Zone);");
          L ("               begin");
          L ("                  if Hit /= """" then");
          L ("                     return Hit;");
@@ -6913,9 +7144,6 @@ Emit_Locale_Table
       Unit_Base_Names : array (1 .. Max_Unit_Bases) of US.Unbounded_String;
       Unit_Base_Count : Natural := 0;
 
-      Code_Alphabet : constant String :=
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
       procedure Collect_Unit_Bases is
       begin
          --  Sorted, so the generated body can bisect them.
@@ -6993,31 +7221,6 @@ Emit_Locale_Table
          elsif Value = "few" then "w"
          elsif Value = "many" then "m"
          else " ");
-
-      procedure Emit_Unit_String_Expression
-        (Indent : String;
-         Value  : String;
-         Suffix : String := "")
-      is
-         Chunk : constant := 72;
-         Start : Positive := Value'First;
-         Stop  : Natural;
-         Term  : Positive := 1;
-      begin
-         if Value'Length = 0 then
-            L (Indent & """""" & Suffix);
-            return;
-         end if;
-
-         while Start <= Value'Last loop
-            Stop := Natural'Min (Start + Chunk - 1, Value'Last);
-            L (Indent & (if Term = 1 then "" else "& ")
-               & """" & Value (Start .. Stop) & """"
-               & (if Stop = Value'Last then Suffix else ""));
-            Start := Stop + 1;
-            Term := Term + 1;
-         end loop;
-      end Emit_Unit_String_Expression;
 
       procedure Emit_Unit_Display_Name is
          procedure Emit_String_Term (Value : String) is
@@ -9350,7 +9553,15 @@ Emit_Locale_Table
       --  remedy as the relative time patterns: one segment per locale, and
       --  the locale field drops out of the record.
       procedure Emit_Relative_Current_Name is
+         Current_Base : Label_Array;
+         Current_Base_Count : Natural;
+         Current_Width : Label_Array;
+         Current_Width_Count : Natural;
       begin
+         Collect_Labels ("relative_current", 2,
+                         Current_Base, Current_Base_Count);
+         Collect_Labels ("relative_current", 3,
+                         Current_Width, Current_Width_Count);
          Reset_Table;
          declare
             Current : US.Unbounded_String;
@@ -9372,8 +9583,10 @@ Emit_Locale_Table
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|"
-                     & S (Rules (Index).C) & "|"
+                     Label_Code (Current_Base, Current_Base_Count,
+                                 S (Rules (Index).B), 1)
+                     & Label_Code (Current_Width, Current_Width_Count,
+                                   S (Rules (Index).C), 1)
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).D))
                      & "~");
                end if;
@@ -9395,36 +9608,41 @@ Emit_Locale_Table
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
          L;
+         Emit_Label_Chain ("Base_Code", "Base",
+                           Current_Base, Current_Base_Count, 1);
+         L;
+         L ("      function Width_Code (Want : String) return String is");
+         for Position in 1 .. Current_Width_Count loop
+            L ("        " & (if Position = 1 then "(if" else " elsif")
+               & " Want = """ & S (Current_Width (Position)) & """ then """
+               & Label_Code (Current_Width, Current_Width_Count,
+                             S (Current_Width (Position)), 1) & """");
+         end loop;
+         L ("         else "" "");");
+         L;
          L ("      function Search (Rows : String; Wanted : String) return String is");
          L ("         Start : Positive := Rows'First;");
+         L ("         Key : constant String := Base_Code & Width_Code (Wanted);");
          L ("      begin");
+         L ("         if Key (Key'First) = ' ' or else Key (Key'Last) = ' ' then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
          L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
          L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
          L ("               for Index in Start .. Rows'Last loop");
-         L ("                  if Rows (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Rows (Index) = '~' then");
+         L ("                  if Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep2 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Stop > Sep2 + 1");
-         L ("                 and then Rows (Start .. Sep1 - 1) = Base");
-         L ("                 and then Rows (Sep1 + 1 .. Sep2 - 1) = Wanted");
+         L ("               if Stop > Start + 2");
+         L ("                 and then Rows (Start .. Start + 1) = Key");
          L ("               then");
-         L ("                  return HB (Rows (Sep2 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Start + 2 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -10217,7 +10435,23 @@ Emit_Locale_Table
       --  lookup scans its eighty-odd records instead of all of them. The
       --  locale field goes with it: the segment already says which it is.
       procedure Emit_Relative_Time_Pattern is
+         Pattern_Base : Label_Array;
+         Pattern_Base_Count : Natural;
+         Pattern_Width : Label_Array;
+         Pattern_Width_Count : Natural;
+         Pattern_Dir : Label_Array;
+         Pattern_Dir_Count : Natural;
+         Pattern_Cat : Label_Array;
+         Pattern_Cat_Count : Natural;
       begin
+         Collect_Labels ("relative_time_pattern", 2,
+                         Pattern_Base, Pattern_Base_Count);
+         Collect_Labels ("relative_time_pattern", 3,
+                         Pattern_Width, Pattern_Width_Count);
+         Collect_Labels ("relative_time_pattern", 4,
+                         Pattern_Dir, Pattern_Dir_Count);
+         Collect_Labels ("relative_time_pattern", 5,
+                         Pattern_Cat, Pattern_Cat_Count);
          Reset_Table;
          declare
             Current : US.Unbounded_String;
@@ -10239,10 +10473,14 @@ Emit_Locale_Table
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|"
-                     & S (Rules (Index).C) & "|"
-                     & S (Rules (Index).D) & "|"
-                     & S (Rules (Index).E) & "|"
+                     Label_Code (Pattern_Base, Pattern_Base_Count,
+                                 S (Rules (Index).B), 1)
+                     & Label_Code (Pattern_Width, Pattern_Width_Count,
+                                   S (Rules (Index).C), 1)
+                     & Label_Code (Pattern_Dir, Pattern_Dir_Count,
+                                   S (Rules (Index).D), 1)
+                     & Label_Code (Pattern_Cat, Pattern_Cat_Count,
+                                   S (Rules (Index).E), 1)
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).F))
                      & "~");
                end if;
@@ -10267,46 +10505,51 @@ Emit_Locale_Table
          L ("      Direction : constant String :=");
          L ("        (if Future then ""future"" else ""past"");");
          L;
+         Emit_Label_Chain ("Base_Code", "Base",
+                           Pattern_Base, Pattern_Base_Count, 1);
+         Emit_Label_Chain ("Width_Code", "Width",
+                           Pattern_Width, Pattern_Width_Count, 1);
+         Emit_Label_Chain ("Dir_Code", "Direction",
+                           Pattern_Dir, Pattern_Dir_Count, 1);
+         L;
+         L ("      function Cat_Code (Want : String) return String is");
+         for Position in 1 .. Pattern_Cat_Count loop
+            L ("        " & (if Position = 1 then "(if" else " elsif")
+               & " Want = """ & S (Pattern_Cat (Position)) & """ then """
+               & Label_Code (Pattern_Cat, Pattern_Cat_Count,
+                             S (Pattern_Cat (Position)), 1) & """");
+         end loop;
+         L ("         else "" "");");
+         L;
+         L ("      Fixed : constant String := Base_Code & Width_Code & Dir_Code;");
+         L;
+         L ("      --  Four coded characters, then the hex. The labels they");
+         L ("      --  replace were nearly half of this table.");
          L ("      function Search (Rows : String; Wanted : String) return String is");
          L ("         Start : Positive := Rows'First;");
+         L ("         Key : constant String := Fixed & Cat_Code (Wanted);");
          L ("      begin");
+         L ("         for Index in Key'Range loop");
+         L ("            if Key (Index) = ' ' then");
+         L ("               return """";");
+         L ("            end if;");
+         L ("         end loop;");
+         L;
          L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
-         L ("               Sep3 : Natural := 0;");
-         L ("               Sep4 : Natural := 0;");
          L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
          L ("               for Index in Start .. Rows'Last loop");
-         L ("                  if Rows (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     elsif Sep3 = 0 then");
-         L ("                        Sep3 := Index;");
-         L ("                     elsif Sep4 = 0 then");
-         L ("                        Sep4 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Rows (Index) = '~' then");
+         L ("                  if Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep4 /= 0");
-         L ("                 and then Sep1 > Start");
-         L ("                 and then Sep2 > Sep1 + 1");
-         L ("                 and then Sep3 > Sep2 + 1");
-         L ("                 and then Sep4 > Sep3 + 1");
-         L ("                 and then Stop > Sep4 + 1");
-         L ("                 and then Rows (Start .. Sep1 - 1) = Base");
-         L ("                 and then Rows (Sep1 + 1 .. Sep2 - 1) = Width");
-         L ("                 and then Rows (Sep2 + 1 .. Sep3 - 1) = Direction");
-         L ("                 and then Rows (Sep3 + 1 .. Sep4 - 1) = Wanted");
+         L ("               if Stop > Start + 4");
+         L ("                 and then Rows (Start .. Start + 3) = Key");
          L ("               then");
-         L ("                  return HB (Rows (Sep4 + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Start + 4 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
