@@ -310,6 +310,29 @@ procedure Generate_CLDR_Data is
       return To_Base64 (S (Bytes));
    end Hex_Points_To_Base64;
 
+   --  Codes and base-62 offsets share one alphabet.
+   Code_Alphabet : constant String :=
+     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+   --  Offsets as base 62 rather than eight decimal digits: five characters
+   --  reach 916 million, and the alphabet is the one the labels already use.
+   function To_Base62 (Value : Natural; Width : Positive) return String is
+      Result : String (1 .. Width);
+      Left   : Natural := Value;
+   begin
+      for Index in reverse Result'Range loop
+         Result (Index) :=
+           Code_Alphabet (Code_Alphabet'First + Left mod 62);
+         Left := Left / 62;
+      end loop;
+
+      if Left /= 0 then
+         Add_Error ("offset outgrew the index field");
+      end if;
+
+      return Result;
+   end To_Base62;
+
    --  A "~"-separated list of four-hex-digit code points, recoded item by
    --  item so Hex_List_Item still finds its boundaries.
    function Recoded_Point_List (Items : String) return String is
@@ -1913,6 +1936,22 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L ("   end Hex_Value;");
          L;
+         L ("   function B62_Value (C : Character) return Natural is");
+         L ("     (if C in 'a' .. 'z' then Character'Pos (C) - Character'Pos ('a')");
+         L ("      elsif C in 'A' .. 'Z'");
+         L ("      then 26 + Character'Pos (C) - Character'Pos ('A')");
+         L ("      else 52 + Character'Pos (C) - Character'Pos ('0'));");
+         L;
+         L ("   function N62 (Text : String) return Natural is");
+         L ("      Value : Natural := 0;");
+         L ("   begin");
+         L ("      for C of Text loop");
+         L ("         Value := Value * 62 + B62_Value (C);");
+         L ("      end loop;");
+         L;
+         L ("      return Value;");
+         L ("   end N62;");
+         L;
          L ("   --  Values are base64 of UTF-8 bytes, without padding: the");
          L ("   --  offsets and the separators already say where one ends.");
          L ("   function B64_Value (C : Character) return Natural is");
@@ -2260,10 +2299,9 @@ procedure Generate_CLDR_Data is
       --  than once per emitter.
       Max_Table_Entries : constant := 20_000;
 
-      --  A 14-character key and two 8-digit offsets. Eight, because the unit
-      --  names pack eleven million characters and a narrower field silently
-      --  widens rather than truncating, shifting every record after it.
-      Index_Record_Width : constant := 30;
+      --  A 14-character key and two 5-character base-62 offsets, which
+      --  reach 916 million; To_Base62 says so if that is ever not enough.
+      Index_Record_Width : constant := 24;
 
       type Table_Entry is record
          Key   : US.Unbounded_String;
@@ -2338,9 +2376,6 @@ procedure Generate_CLDR_Data is
             First => 0,
             Last  => 0);
       end Add_Table_Entry;
-
-      Code_Alphabet : constant String :=
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
       --  Labels repeat far more than the text they describe:
       --  "unit-width-full-name" is twenty characters for one of three
@@ -2548,9 +2583,9 @@ procedure Generate_CLDR_Data is
 
                declare
                   First : constant String :=
-                    Trim (Natural'Image (Table_Entries (N).First));
+                    To_Base62 (Table_Entries (N).First, 5);
                   Last : constant String :=
-                    Trim (Natural'Image (Table_Entries (N).Last));
+                    To_Base62 (Table_Entries (N).Last, 5);
                begin
                   --  Same fixed-width record and the same space-pad rule as
                   --  the date-pattern index: the pad must sort below '-'.
@@ -2559,15 +2594,9 @@ procedure Generate_CLDR_Data is
                   --  million characters of values, and a seven-digit field
                   --  silently widens to eight rather than truncating, which
                   --  shifts every record after it.
-                  if First'Length > 8 or else Last'Length > 8 then
-                     Add_Error ("packed values outgrew the offset field");
-                  end if;
-
                   US.Append (Index_Data, Key);
                   US.Append (Index_Data, (1 .. 14 - Key'Length => ' '));
-                  US.Append (Index_Data, (1 .. 8 - First'Length => '0'));
                   US.Append (Index_Data, First);
-                  US.Append (Index_Data, (1 .. 8 - Last'Length => '0'));
                   US.Append (Index_Data, Last);
                end;
             end;
@@ -2643,9 +2672,9 @@ procedure Generate_CLDR_Data is
          L ("         Base : constant Natural :=");
          L ("           Index_Data'First + (N - 1) * Width + 14;");
          L ("         F : constant Natural :=");
-         L ("           Natural'Value (Index_Data (Base .. Base + 7));");
+         L ("           N62 (Index_Data (Base .. Base + 4));");
          L ("         T : constant Natural :=");
-         L ("           Natural'Value (Index_Data (Base + 8 .. Base + 15));");
+         L ("           N62 (Index_Data (Base + 5 .. Base + 9));");
          L ("      begin");
          if Raw then
             L ("         return Values (F .. T);");
@@ -3259,9 +3288,9 @@ procedure Generate_CLDR_Data is
          L ("         Base : constant Natural :=");
          L ("           Locale_Index'First + (N - 1) * Width + 14;");
          L ("         F : constant Natural :=");
-         L ("           Natural'Value (Locale_Index (Base .. Base + 7));");
+         L ("           N62 (Locale_Index (Base .. Base + 4));");
          L ("         T : constant Natural :=");
-         L ("           Natural'Value (Locale_Index (Base + 8 .. Base + 15));");
+         L ("           N62 (Locale_Index (Base + 5 .. Base + 9));");
          L ("      begin");
          L ("         return VB (Values (F .. T));");
          L ("      end Value_At;");
