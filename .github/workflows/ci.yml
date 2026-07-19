@@ -67,6 +67,9 @@ jobs:
         # `alr exec` inherits it, so the next step resolves gnatdoc.
         run: |
           alr install gnatdoc_bin
+          # The release checker also runs GNATprove, which is an Alire crate
+          # rather than a toolchain component, so it installs the same way.
+          alr install gnatprove
           echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
 
       - name: Generate GNATdoc

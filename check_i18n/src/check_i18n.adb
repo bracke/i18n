@@ -412,41 +412,51 @@ procedure Check_I18N is
       Check_Example_Output;
       Run_Check ("build i18n benchmarks", Root, Alr_Path, Build_Benchmarks_Args);
       Run_Check ("build i18n CLDR data tools", Root & "/cldr", Alr_Path, Build_CLDR_Tools_Args);
-      Run_Check
-        ("check i18n CLDR upstream source inventory",
-         Root & "/cldr",
-         Root & "/cldr/bin/check_cldr_sources",
-         Check_CLDR_Args);
-      Run_Check
-        ("check i18n IANA tzdb source inventory",
-         Root & "/cldr",
-         Root & "/cldr/bin/check_tzdb_sources",
-         Check_CLDR_Args);
-      Run_Check
-        ("check generated i18n CLDR staged export",
-         Root & "/cldr",
-         Root & "/cldr/bin/generate_cldr_export",
-         Check_CLDR_Args);
-      Run_Check
-        ("check imported i18n CLDR raw data",
-         Root & "/cldr",
-         Root & "/cldr/bin/import_cldr_raw",
-         Check_CLDR_Args);
-      Run_Check
-        ("check extracted i18n CLDR normalized data",
-         Root & "/cldr",
-         Root & "/cldr/bin/extract_cldr_normalized",
-         Check_CLDR_Args);
-      Run_Check
-        ("check imported i18n CLDR subset",
-         Root & "/cldr",
-         Root & "/cldr/bin/import_cldr_subset",
-         Check_CLDR_Args);
-      Run_Check
-        ("check generated i18n CLDR data",
-         Root & "/cldr",
-         Root & "/cldr/bin/generate_cldr_data",
-         Check_CLDR_Args);
+      --  Every one of these re-runs a pipeline stage against the vendored CLDR
+      --  tree and compares the result with what is checked in. Without the
+      --  tree there is nothing to compare against, so they are skipped with
+      --  the file requirements rather than failing for the same reason.
+      if Project_Tools.Processes.Has_Argument ("--no-upstream") then
+         Ada.Text_IO.Put_Line
+           ("note: --no-upstream, skipping 7 CLDR pipeline stage checks");
+      else
+         Run_Check
+           ("check i18n CLDR upstream source inventory",
+            Root & "/cldr",
+            Root & "/cldr/bin/check_cldr_sources",
+            Check_CLDR_Args);
+         Run_Check
+           ("check i18n IANA tzdb source inventory",
+            Root & "/cldr",
+            Root & "/cldr/bin/check_tzdb_sources",
+            Check_CLDR_Args);
+         Run_Check
+           ("check generated i18n CLDR staged export",
+            Root & "/cldr",
+            Root & "/cldr/bin/generate_cldr_export",
+            Check_CLDR_Args);
+         Run_Check
+           ("check imported i18n CLDR raw data",
+            Root & "/cldr",
+            Root & "/cldr/bin/import_cldr_raw",
+            Check_CLDR_Args);
+         Run_Check
+           ("check extracted i18n CLDR normalized data",
+            Root & "/cldr",
+            Root & "/cldr/bin/extract_cldr_normalized",
+            Check_CLDR_Args);
+         Run_Check
+           ("check imported i18n CLDR subset",
+            Root & "/cldr",
+            Root & "/cldr/bin/import_cldr_subset",
+            Check_CLDR_Args);
+         Run_Check
+           ("check generated i18n CLDR data",
+            Root & "/cldr",
+            Root & "/cldr/bin/generate_cldr_data",
+            Check_CLDR_Args);
+      end if;
+
       Run_Check
         ("build i18n ICU/CLDR conformance harness",
          Root,
