@@ -1,4 +1,5 @@
 with Ada.Command_Line;
+with Ada.Directories;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
@@ -468,7 +469,33 @@ procedure Check_I18N is
    end Run_Release_Builds;
 
    procedure Require_Text (Relative_Path : String; Pattern : String; Message : String) is
+      Sibling_Prefix : constant String := "-";
    begin
+      if Project_Tools.Files.File_Contains (Root & "/" & Relative_Path, Pattern) then
+         return;
+      end if;
+
+      --  A body split into `separate` subunits still covers what the parent
+      --  used to: the text moved to a sibling file, it did not disappear.
+      --  Accept it there rather than making every coverage requirement name
+      --  the subunit that happens to hold it today.
+      declare
+         Dir  : constant String :=
+           Ada.Directories.Containing_Directory (Root & "/" & Relative_Path);
+         Base : constant String :=
+           Ada.Directories.Base_Name (Relative_Path);
+         Subunits : constant Project_Tools.Files.Path_List :=
+           Project_Tools.Files.List_Tree (Dir, Base & Sibling_Prefix & "*.adb");
+      begin
+         for Path of Subunits loop
+            if Project_Tools.Files.File_Contains
+              (Ada.Strings.Unbounded.To_String (Path), Pattern)
+            then
+               return;
+            end if;
+         end loop;
+      end;
+
       Project_Tools.Release_Checks.Require_Text (Checks, Relative_Path, Pattern);
    exception
       when Program_Error =>
@@ -747,18 +774,31 @@ begin
    Project_Tools.Release_Checks.Require_File (Checks, "src/i18n-cldr_data.adb");
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/CLDR_DATA.md");
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/cldr_tools.gpr");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/source_manifest.txt");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/source_files.txt");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/cldr_export.jsonl");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/source_manifest.txt");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/tzdata.zi");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/zone1970.tab");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/zone.tab");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/leapseconds");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/raw/cldr_records.txt");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/raw/coverage.txt");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/import/normalized_cldr.txt");
-   Project_Tools.Release_Checks.Require_File (Checks, "cldr/data/cldr_subset.txt");
+   --  The vendored CLDR tree and everything derived from it are deliberately
+   --  untracked: upstream is roughly a gigabyte, and the pinned data it
+   --  produces is regenerated rather than reviewed. A checkout without it can
+   --  still be checked -- the generated Ada sources are committed -- so
+   --  --no-upstream drops these requirements and says so, rather than the
+   --  release gate being unsatisfiable anywhere the tree is absent.
+   if Project_Tools.Processes.Has_Argument ("--no-upstream") then
+      Ada.Text_IO.Put_Line
+        ("note: --no-upstream, skipping"
+         & Integer'Image (12)
+         & " vendored-CLDR file checks");
+   else
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/source_manifest.txt");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/source_files.txt");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/cldr_export.jsonl");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/source_manifest.txt");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/tzdata.zi");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/zone1970.tab");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/zone.tab");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/upstream/tzdb/leapseconds");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/raw/cldr_records.txt");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/raw/coverage.txt");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/import/normalized_cldr.txt");
+      Project_Tools.Release_Checks.Require_File (Checks, "cldr/data/cldr_subset.txt");
+   end if;
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/src/check_cldr_sources.adb");
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/src/check_tzdb_sources.adb");
    Project_Tools.Release_Checks.Require_File (Checks, "cldr/src/generate_cldr_export.adb");
@@ -1657,7 +1697,9 @@ begin
       "feature tests must cover measure-unit numbering-system digits");
    Require_Text
      ("tests/src/i18n-runtime-tests-features.adb",
-      "short measure-unit skeleton renders slash per-unit form",
+      --  Renamed with the fix: en short kilometer-per-hour is the named
+      --  "km/h", not a slash form composed from "km" and "hr".
+      "short measure-unit skeleton renders the named short rate",
       "feature tests must cover short measure-unit rate formatting");
    Require_Text
      ("tests/src/i18n-runtime-tests-features.adb",

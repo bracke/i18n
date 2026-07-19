@@ -83,7 +83,11 @@ jobs:
 
       - name: Run project_tools release checker
         working-directory: i18n/check_i18n
-        run: ./bin/check_i18n --skip-alr-test
+        # cldr/upstream/ and the artifacts derived from it are untracked (the
+        # vendored CLDR tree is about a gigabyte), so a fresh checkout cannot
+        # satisfy those file requirements. --no-upstream drops exactly those and
+        # reports the count; every other release gate still runs here.
+        run: ./bin/check_i18n --skip-alr-test --no-upstream
 
       - name: Run Alire packaging test action
         working-directory: i18n
