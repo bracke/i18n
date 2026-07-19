@@ -74,6 +74,10 @@ procedure Generate_CLDR_Data is
    TZDB_Transition_Count : Natural := 0;
    Errors     : Natural := 0;
 
+   --  Set from --locales=; "all" is every locale in the pinned subset.
+   Wanted_Locales : US.Unbounded_String := US.To_Unbounded_String ("all");
+
+
    function S (Value : US.Unbounded_String) return String renames US.To_String;
 
    function Trim (Value : String) return String is
@@ -448,6 +452,29 @@ procedure Generate_CLDR_Data is
       Add_Error
         (TZDB_Path & ": line" & Positive'Image (Line_Number) & ": " & Message);
    end Add_TZDB_Line_Error;
+
+
+   --  --locales=en,de,fr narrows the generated tables; the default is every
+   --  locale in the pinned subset. The value comes from the crate
+   --  configuration variable of the same name.
+   procedure Read_Wanted_Locales is
+      Prefix : constant String := "--locales=";
+   begin
+      for Index in 1 .. Ada.Command_Line.Argument_Count loop
+         declare
+            Argument : constant String := Ada.Command_Line.Argument (Index);
+         begin
+            if Argument'Length > Prefix'Length
+              and then Argument (Argument'First ..
+                                   Argument'First + Prefix'Length - 1) = Prefix
+            then
+               Wanted_Locales :=
+                 US.To_Unbounded_String
+                   (Argument (Argument'First + Prefix'Length .. Argument'Last));
+            end if;
+         end;
+      end loop;
+   end Read_Wanted_Locales;
 
    function Has_Argument (Value : String) return Boolean is
    begin
@@ -833,6 +860,71 @@ procedure Generate_CLDR_Data is
       return Count;
    end Comma_Count;
 
+   --  Which locales the generated tables carry. "all" is every locale in the
+   --  pinned subset; otherwise a comma-separated list from the crate
+   --  configuration. Filtering happens here, at the one place every row
+   --  enters, so no emitter has to know about it.
+   --
+   --  The locale is not in a fixed field, and for some kinds it is a list:
+   --
+   --    cardinal, ordinal                      field B, a list
+   --    digits, day_month_year, indian_grouping,
+   --    symbol_first                           field A, a list
+   --    name_set_hex                           field B
+   --    currency, unit_short                   no locale -- always kept
+   --    everything else                        field A
+   function Locale_Wanted (Value : String) return Boolean is
+      List : constant String := S (Wanted_Locales);
+      Start : Positive := List'First;
+   begin
+      --  Numbering systems and the root rows are not locales and always stay.
+      if List = "all"
+        or else Value'Length = 0
+        or else Starts_With (Value, "nu-")
+        or else Value = "und"
+        or else Value = "root"
+      then
+         return True;
+      end if;
+
+      for Index in List'Range loop
+         if List (Index) = ',' then
+            if List (Start .. Index - 1) = Value then
+               return True;
+            end if;
+            Start := Index + 1;
+         end if;
+      end loop;
+
+      return List (Start .. List'Last) = Value;
+   end Locale_Wanted;
+
+   --  A locale list keeps the wanted entries; empty means drop the row.
+   function Wanted_Subset (Value : String) return String is
+      Result : US.Unbounded_String;
+      Start  : Positive := Value'First;
+
+      procedure Take (Item : String) is
+      begin
+         if Item'Length > 0 and then Locale_Wanted (Item) then
+            if US.Length (Result) > 0 then
+               US.Append (Result, ",");
+            end if;
+            US.Append (Result, Item);
+         end if;
+      end Take;
+   begin
+      for Index in Value'Range loop
+         if Value (Index) = ',' then
+            Take (Value (Start .. Index - 1));
+            Start := Index + 1;
+         end if;
+      end loop;
+      Take (Value (Start .. Value'Last));
+
+      return S (Result);
+   end Wanted_Subset;
+
    procedure Add_Rule
      (Kind : String;
       A    : String := "";
@@ -848,11 +940,46 @@ procedure Generate_CLDR_Data is
          return;
       end if;
 
+      if S (Wanted_Locales) /= "all" then
+         if Kind = "currency" or else Kind = "unit_short" then
+            null;                       --  no locale of its own
+         elsif Kind = "cardinal" or else Kind = "ordinal" then
+            if Wanted_Subset (B) = "" then
+               return;
+            end if;
+         elsif Kind = "digits"
+           or else Kind = "day_month_year"
+           or else Kind = "indian_grouping"
+           or else Kind = "symbol_first"
+         then
+            if Wanted_Subset (A) = "" then
+               return;
+            end if;
+         elsif Kind = "name_set_hex" then
+            if not Locale_Wanted (B) then
+               return;
+            end if;
+         elsif not Locale_Wanted (A) then
+            return;
+         end if;
+      end if;
+
       Rule_Count := Rule_Count + 1;
       Rules (Rule_Count) :=
         (Kind => US.To_Unbounded_String (Kind),
-         A    => US.To_Unbounded_String (A),
-         B    => US.To_Unbounded_String (B),
+         A    =>
+           US.To_Unbounded_String
+             (if S (Wanted_Locales) /= "all"
+                and then (Kind = "digits"
+                          or else Kind = "day_month_year"
+                          or else Kind = "indian_grouping"
+                          or else Kind = "symbol_first")
+              then Wanted_Subset (A) else A),
+         B    =>
+           US.To_Unbounded_String
+             (if S (Wanted_Locales) /= "all"
+                and then (Kind = "cardinal" or else Kind = "ordinal")
+              then Wanted_Subset (B) else B),
          C    => US.To_Unbounded_String (C),
          D    => US.To_Unbounded_String (D),
          E    => US.To_Unbounded_String (E),
@@ -11295,9 +11422,10 @@ Emit_Locale_Table
    end Generate;
 
 begin
+   Read_Wanted_Locales;
    if Has_Argument ("--help") then
       Ada.Text_IO.Put_Line
-        ("usage: generate_cldr_data [--check]" & ASCII.LF
+        ("usage: generate_cldr_data [--check] [--locales=en,de,...]" & ASCII.LF
          & "Generates src/i18n-cldr_data.adb from data/cldr_subset.txt "
          & "and checked tzdb alias/transition metadata.");
       return;

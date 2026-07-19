@@ -9,6 +9,12 @@ website = "https://github.com/bracke/i18n"
 tags = ["messages","i18n","locales"]
 project-files = ["i18n.gpr"]
 
+[configuration.variables]
+#  Which locales the generated CLDR tables carry. "all" is every locale in the
+#  pinned subset; otherwise a comma-separated list, e.g. "en,de,fr". The
+#  default is everything -- narrowing is the consuming application's choice.
+locales = { type = "String", default = "all" }
+
 [[depends-on]]
 gnat = ">=12"
 
