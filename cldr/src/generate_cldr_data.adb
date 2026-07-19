@@ -2212,10 +2212,32 @@ procedure Generate_CLDR_Data is
             procedure Close_Segment is
             begin
                if US.Length (Current) > 0 then
-                  US.Append
-                    (Index_Data,
-                     S (Current) & "|" & Trim (Seg_First'Image) & "|"
-                     & Trim (Natural'Image (US.Length (Style_Data))) & "~");
+                  --  Fixed-width records: a 14-character locale field padded
+                  --  with spaces, then two 7-digit offsets. No separators, so
+                  --  entry N starts at (N - 1) * 28 + 1 and the table can be
+                  --  bisected instead of parsed.
+                  --
+                  --  The pad must be a space, or lower: bisection needs the
+                  --  padded keys in the same order as the locales, and a
+                  --  locale is a prefix of its own children ("en", "en-GB").
+                  --  Space (16#20#) sorts below '-' and below every character
+                  --  a tag can contain, so "en    " stays before "en-GB ";
+                  --  pad with anything higher and prefix pairs inverts, which
+                  --  the search would then miss for those locales alone.
+                  declare
+                     Key   : constant String := S (Current);
+                     First : constant String :=
+                       Trim (Natural'Image (Seg_First));
+                     Last  : constant String :=
+                       Trim (Natural'Image (US.Length (Style_Data)));
+                  begin
+                     US.Append (Index_Data, Key);
+                     US.Append (Index_Data, (1 .. 14 - Key'Length => ' '));
+                     US.Append (Index_Data, (1 .. 7 - First'Length => '0'));
+                     US.Append (Index_Data, First);
+                     US.Append (Index_Data, (1 .. 7 - Last'Length => '0'));
+                     US.Append (Index_Data, Last);
+                  end;
                end if;
             end Close_Segment;
          begin
@@ -2260,52 +2282,88 @@ procedure Generate_CLDR_Data is
          --  canonical form, so a plain comparison answers almost every call.
          --  Canonical => True is the retry for a caller that spelled the
          --  locale differently ("EN_gb"), which Locale_Equals still accepts.
+         --  Bisect the fixed-width index. Entries are sorted by locale, so a
+         --  lookup is about ten comparisons of a padded 14-character key
+         --  rather than a walk that parses every entry it passes.
+         L ("      Index_Width : constant := 28;");
+         L ("      Index_Count : constant Natural :=");
+         L ("        Index_Data'Length / Index_Width;");
+         L;
+         L ("      function Index_Key (N : Positive) return String is");
+         L ("        (Index_Data (Index_Data'First + (N - 1) * Index_Width ..");
+         L ("                     Index_Data'First + (N - 1) * Index_Width + 13));");
+         L;
+         L ("      function Padded (Cand : String) return String is");
+         L ("        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)");
+         L ("         else Cand & (1 .. 14 - Cand'Length => ' '));");
+         L;
          L ("      procedure Segment");
          L ("        (Cand      : String;");
          L ("         Canonical : Boolean;");
          L ("         First     : out Natural;");
          L ("         Last      : out Natural)");
          L ("      is");
-         L ("         Start : Positive := Index_Data'First;");
+         L ("         Low  : Natural := 1;");
+         L ("         High : Natural := Index_Count;");
+         L ("         Mid  : Natural;");
+         L;
+         L ("         procedure Take (N : Positive) is");
+         L ("            Base : constant Natural :=");
+         L ("              Index_Data'First + (N - 1) * Index_Width + 14;");
+         L ("         begin");
+         L ("            First := Natural'Value (Index_Data (Base .. Base + 6));");
+         L ("            Last := Natural'Value (Index_Data (Base + 7 .. Base + 13));");
+         L ("         end Take;");
          L ("      begin");
          L ("         First := 0;");
          L ("         Last := 0;");
-         L ("         while Start <= Index_Data'Last loop");
-         L ("            declare");
-         L ("               Sep1 : Natural := 0;");
-         L ("               Sep2 : Natural := 0;");
-         L ("               Stop : Natural := Index_Data'Last + 1;");
-         L ("            begin");
-         L ("               for Index in Start .. Index_Data'Last loop");
-         L ("                  if Index_Data (Index) = '|' then");
-         L ("                     if Sep1 = 0 then");
-         L ("                        Sep1 := Index;");
-         L ("                     elsif Sep2 = 0 then");
-         L ("                        Sep2 := Index;");
-         L ("                     end if;");
-         L ("                  elsif Index_Data (Index) = '~' then");
-         L ("                     Stop := Index;");
-         L ("                     exit;");
+         L ("         if Cand'Length = 0 or else Index_Count = 0 then");
+         L ("            return;");
+         L ("         end if;");
+         L;
+         L ("         if Canonical then");
+         L ("            --  A locale spelled some other way does not sort where");
+         L ("            --  its canonical form would, so this one is a walk.");
+         L ("            for N in 1 .. Index_Count loop");
+         L ("               declare");
+         L ("                  Key : constant String := Index_Key (N);");
+         L ("                  Stop : Natural := Key'Last;");
+         L ("               begin");
+         L ("                  while Stop >= Key'First");
+         L ("                    and then Key (Stop) = ' '");
+         L ("                  loop");
+         L ("                     Stop := Stop - 1;");
+         L ("                  end loop;");
+         L ("                  if Locale_Equals (Cand, Key (Key'First .. Stop)) then");
+         L ("                     Take (N);");
+         L ("                     return;");
          L ("                  end if;");
-         L ("               end loop;");
-         L ("               exit when Sep1 = 0 or else Sep2 = 0;");
-         L ("               if (if Canonical then");
-         L ("                     Locale_Equals (Cand, Index_Data (Start .. Sep1 - 1))");
-         L ("                   else Index_Data (Start .. Sep1 - 1) = Cand)");
-         L ("               then");
-         L ("                  First :=");
-         L ("                    Natural'Value (Index_Data (Sep1 + 1 .. Sep2 - 1));");
-         L ("                  Last :=");
-         L ("                    Natural'Value (Index_Data (Sep2 + 1 .. Stop - 1));");
-         L ("                  return;");
-         L ("               end if;");
-         L ("               Start := Stop + 1;");
-         L ("            end;");
-         L ("         end loop;");
+         L ("               end;");
+         L ("            end loop;");
+         L ("            return;");
+         L ("         end if;");
+         L;
+         L ("         declare");
+         L ("            Wanted : constant String := Padded (Cand);");
+         L ("         begin");
+         L ("            while Low <= High loop");
+         L ("               Mid := (Low + High) / 2;");
+         L ("               declare");
+         L ("                  Key : constant String := Index_Key (Mid);");
+         L ("               begin");
+         L ("                  if Key = Wanted then");
+         L ("                     Take (Mid);");
+         L ("                     return;");
+         L ("                  elsif Key < Wanted then");
+         L ("                     Low := Mid + 1;");
+         L ("                  else");
+         L ("                     High := Mid - 1;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end loop;");
+         L ("         end;");
          L ("      end Segment;");
          L;
-         --  Within one locale's run there are at most a few dozen rows, so the
-         --  calendar and style match is a short scan rather than a table walk.
          L ("      function In_Segment");
          L ("        (First, Last : Natural;");
          L ("         Wanted_Calendar : String)");
