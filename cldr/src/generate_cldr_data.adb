@@ -1,4 +1,5 @@
 with Ada.Command_Line;
+with Ada.Containers.Generic_Array_Sort;
 with Ada.Directories;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
@@ -2061,14 +2062,69 @@ procedure Generate_CLDR_Data is
          L ("   end Locale_In_List;");
       end Emit_Static_Prelude;
 
+      --  Entries for a bisected locale table, shared by the tables below.
+      --  Collected here so the sort and the packing are written once rather
+      --  than once per emitter.
+      Max_Table_Entries : constant := 20_000;
+
+      type Table_Entry is record
+         Key   : US.Unbounded_String;
+         --  Hex, as HB decodes it in the generated body.
+         Value : US.Unbounded_String;
+         First : Natural := 0;
+         Last  : Natural := 0;
+      end record;
+
+      type Table_Entry_Array is array (Positive range <>) of Table_Entry;
+      type Table_Entry_Array_Access is access Table_Entry_Array;
+
+      Table_Entries : constant Table_Entry_Array_Access :=
+        new Table_Entry_Array (1 .. Max_Table_Entries);
+      Table_Entry_Count : Natural := 0;
+
+      function Padded_Key (Value : String) return String is
+        (if Value'Length >= 14 then Value (Value'First .. Value'First + 13)
+         else Value & (1 .. 14 - Value'Length => ' '));
+
+      function Key_Less (Left, Right : Table_Entry) return Boolean is
+        (Padded_Key (S (Left.Key)) < Padded_Key (S (Right.Key)));
+
+      procedure Sort_Entries is new Ada.Containers.Generic_Array_Sort
+        (Index_Type   => Positive,
+         Element_Type => Table_Entry,
+         Array_Type   => Table_Entry_Array,
+         "<"          => Key_Less);
+
+      procedure Reset_Table is
+      begin
+         Table_Entry_Count := 0;
+      end Reset_Table;
+
+      procedure Add_Table_Entry (Key : String; Value : String) is
+      begin
+         if Key'Length = 0 or else Key'Length > 14 then
+            Add_Error ("locale key does not fit the index: " & Key);
+            return;
+         elsif Table_Entry_Count = Max_Table_Entries then
+            Add_Error ("too many entries for a locale table");
+            return;
+         end if;
+
+         Table_Entry_Count := Table_Entry_Count + 1;
+         Table_Entries (Table_Entry_Count) :=
+           (Key   => US.To_Unbounded_String (Key),
+            Value => US.To_Unbounded_String (Value),
+            First => 0,
+            Last  => 0);
+      end Add_Table_Entry;
+
       --  A locale-keyed value as a table rather than a chain. The chain form
       --  emitted two branches per locale -- exact, then fallback -- so a
       --  lookup walked up to 1,532 Locale_In_List calls, each canonicalising
       --  both strings before comparing. The table is bisected instead, and the
       --  same 6 KB-per-766-locales trade as the date-pattern index applies.
-      procedure Emit_Locale_Return_Table
+      procedure Emit_Locale_Table
         (Name         : String;
-         Kind         : String;
          Default_Expr : String)
       is
          Values : US.Unbounded_String;
@@ -2098,18 +2154,40 @@ procedure Generate_CLDR_Data is
             end loop;
          end Emit_String_Expression;
       begin
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, Kind) then
-               declare
-                  Key : constant String := S (Rules (Index).A);
-                  Hex : constant String :=
-                    Ada_Expression_UTF8_Hex (S (Rules (Index).B));
-                  First : constant String :=
-                    Trim (Natural'Image (US.Length (Values) + 1));
-                  Last : constant String :=
-                    Trim (Natural'Image (US.Length (Values) + Hex'Length));
-               begin
+         --  Bisection needs the padded keys in order, and rows do not always
+         --  arrive that way: a rule family lists its locales, so exploding it
+         --  yields keys in family order.
+         Sort_Entries (Table_Entries (1 .. Table_Entry_Count));
+
+         for N in 1 .. Table_Entry_Count loop
+            declare
+               Key : constant String := S (Table_Entries (N).Key);
+               Hex : constant String := S (Table_Entries (N).Value);
+            begin
+               --  Values repeat heavily -- a rule family has a handful of
+               --  distinct names across hundreds of locales -- so point a
+               --  repeat at the copy already packed.
+               for Prior in 1 .. N - 1 loop
+                  if S (Table_Entries (Prior).Value) = Hex then
+                     Table_Entries (N).First := Table_Entries (Prior).First;
+                     Table_Entries (N).Last := Table_Entries (Prior).Last;
+                     exit;
+                  end if;
+               end loop;
+
+               if Table_Entries (N).First = 0 then
+                  Table_Entries (N).First := US.Length (Values) + 1;
+                  Table_Entries (N).Last :=
+                    US.Length (Values) + Hex'Length;
                   US.Append (Values, Hex);
+               end if;
+
+               declare
+                  First : constant String :=
+                    Trim (Natural'Image (Table_Entries (N).First));
+                  Last : constant String :=
+                    Trim (Natural'Image (Table_Entries (N).Last));
+               begin
                   --  Same fixed-width record and the same space-pad rule as
                   --  the date-pattern index: the pad must sort below '-'.
                   US.Append (Index_Data, Key);
@@ -2119,7 +2197,7 @@ procedure Generate_CLDR_Data is
                   US.Append (Index_Data, (1 .. 7 - Last'Length => '0'));
                   US.Append (Index_Data, Last);
                end;
-            end if;
+            end;
          end loop;
 
          L;
@@ -2234,37 +2312,25 @@ procedure Generate_CLDR_Data is
          L;
          L ("      return " & Default_Expr & ";");
          L ("   end " & Name & ";");
-      end Emit_Locale_Return_Table;
+      end Emit_Locale_Table;
 
-      procedure Emit_Locale_Return_Function
+      --  One row per locale: the key is the locale, the value the row's text.
+      procedure Emit_Locale_Return_Table
         (Name         : String;
          Kind         : String;
          Default_Expr : String)
       is
-         First : Boolean := True;
       begin
-         L;
-         L ("   function " & Name & " (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, Kind) then
-                  L ("      " & (if First then "if" else "elsif")
-                     & " Locale_In_List");
-                  L ("        (Locale => Locale,");
-                  L ("         List => """ & S (Rules (Index).A) & """,");
-                  L ("         Include_Fallback => " & (if Pass = 1 then "False" else "True")
-                     & ") then");
-                  L ("         return " & S (Rules (Index).B) & ";");
-                  First := False;
-               end if;
-            end loop;
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, Kind) then
+               Add_Table_Entry
+                 (S (Rules (Index).A),
+                  Ada_Expression_UTF8_Hex (S (Rules (Index).B)));
+            end if;
          end loop;
-         L ("      else");
-         L ("         return " & Default_Expr & ";");
-         L ("      end if;");
-         L ("   end " & Name & ";");
-      end Emit_Locale_Return_Function;
+         Emit_Locale_Table (Name, Default_Expr);
+      end Emit_Locale_Return_Table;
 
       procedure Emit_Grouping is
       begin
@@ -10197,65 +10263,38 @@ procedure Generate_CLDR_Data is
          L ("   end Relative_Unit_Display_Name;");
       end Emit_Relative_Unit_Display_Name;
 
+      --  The same table, built the other way round: a family names the
+      --  locales that use it, so each list is exploded into one entry per
+      --  locale. The families themselves repeat across hundreds of locales
+      --  and are packed once.
       procedure Emit_Rule_Family (Name : String; Kind : String) is
-         First : Boolean := True;
-
-         procedure Emit_In_List_Branch
-           (Keyword : String;
-            Locales : String)
-         is
-            Chunk_Size : constant := 72;
-            Start      : Positive := Locales'First;
-            Stop       : Natural;
-            Term       : Positive := 1;
-         begin
-            if Locales'Length <= Chunk_Size then
-               L ("            " & Keyword & " Locale_In_List");
-               L ("              (Locale => Locale,");
-               L ("               List => """ & Locales & """,");
-               L ("               Include_Fallback => Include_Fallback)");
-               L ("            then");
-               return;
-            end if;
-
-            L ("            " & Keyword & " Locale_In_List");
-            L ("              (Locale => Locale,");
-            L ("               List =>");
-            while Start <= Locales'Last loop
-               Stop := Natural'Min (Start + Chunk_Size - 1, Locales'Last);
-               L ("                 " & (if Term = 1 then "" else "& ")
-                  & """" & Locales (Start .. Stop) & """"
-                  & (if Stop = Locales'Last then "," else ""));
-               Start := Stop + 1;
-               Term := Term + 1;
-            end loop;
-            L ("               Include_Fallback => Include_Fallback)");
-            L ("            then");
-         end Emit_In_List_Branch;
       begin
-         L;
-         L ("   function " & Name & " (Locale : String) return String is");
-         L ("   begin");
-         L ("      for Pass in 1 .. 2 loop");
-         L ("         declare");
-         L ("            Include_Fallback : constant Boolean := Pass = 2;");
-         L ("         begin");
+         Reset_Table;
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, Kind) then
-               Emit_In_List_Branch
-                 ((if First then "if" else "elsif"), S (Rules (Index).B));
-               L ("               return """ & S (Rules (Index).A) & """;");
-               First := False;
+               declare
+                  Locales : constant String := S (Rules (Index).B);
+                  Family : constant String :=
+                    Ada_Expression_UTF8_Hex
+                      ("""" & S (Rules (Index).A) & """");
+                  Start : Positive := Locales'First;
+               begin
+                  for Position in Locales'Range loop
+                     if Locales (Position) = ',' then
+                        Add_Table_Entry
+                          (Locales (Start .. Position - 1), Family);
+                        Start := Position + 1;
+                     end if;
+                  end loop;
+
+                  if Start <= Locales'Last then
+                     Add_Table_Entry (Locales (Start .. Locales'Last), Family);
+                  end if;
+               end;
             end if;
          end loop;
-         if not First then
-            L ("            end if;");
-         end if;
-         L ("         end;");
-         L ("      end loop;");
-         L;
-         L ("      return ""other-only"";");
-         L ("   end " & Name & ";");
+
+         Emit_Locale_Table (Name, """other-only""");
       end Emit_Rule_Family;
 
    begin
