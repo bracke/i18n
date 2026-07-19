@@ -2061,6 +2061,181 @@ procedure Generate_CLDR_Data is
          L ("   end Locale_In_List;");
       end Emit_Static_Prelude;
 
+      --  A locale-keyed value as a table rather than a chain. The chain form
+      --  emitted two branches per locale -- exact, then fallback -- so a
+      --  lookup walked up to 1,532 Locale_In_List calls, each canonicalising
+      --  both strings before comparing. The table is bisected instead, and the
+      --  same 6 KB-per-766-locales trade as the date-pattern index applies.
+      procedure Emit_Locale_Return_Table
+        (Name         : String;
+         Kind         : String;
+         Default_Expr : String)
+      is
+         Values : US.Unbounded_String;
+         Index_Data : US.Unbounded_String;
+
+         procedure Emit_String_Expression
+           (Indent : String;
+            Value  : String;
+            Suffix : String := "")
+         is
+            Chunk : constant := 72;
+            Start : Positive := Value'First;
+            Stop  : Natural;
+            Term  : Positive := 1;
+         begin
+            if Value'Length = 0 then
+               L (Indent & """""" & Suffix);
+               return;
+            end if;
+            while Start <= Value'Last loop
+               Stop := Natural'Min (Start + Chunk - 1, Value'Last);
+               L (Indent & (if Term = 1 then "" else "& ")
+                  & """" & Value (Start .. Stop) & """"
+                  & (if Stop = Value'Last then Suffix else ""));
+               Start := Stop + 1;
+               Term := Term + 1;
+            end loop;
+         end Emit_String_Expression;
+      begin
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, Kind) then
+               declare
+                  Key : constant String := S (Rules (Index).A);
+                  Hex : constant String :=
+                    Ada_Expression_UTF8_Hex (S (Rules (Index).B));
+                  First : constant String :=
+                    Trim (Natural'Image (US.Length (Values) + 1));
+                  Last : constant String :=
+                    Trim (Natural'Image (US.Length (Values) + Hex'Length));
+               begin
+                  US.Append (Values, Hex);
+                  --  Same fixed-width record and the same space-pad rule as
+                  --  the date-pattern index: the pad must sort below '-'.
+                  US.Append (Index_Data, Key);
+                  US.Append (Index_Data, (1 .. 14 - Key'Length => ' '));
+                  US.Append (Index_Data, (1 .. 7 - First'Length => '0'));
+                  US.Append (Index_Data, First);
+                  US.Append (Index_Data, (1 .. 7 - Last'Length => '0'));
+                  US.Append (Index_Data, Last);
+               end;
+            end if;
+         end loop;
+
+         L;
+         L ("   function " & Name & " (Locale : String) return String is");
+         L ("      Values : constant String :=");
+         Emit_String_Expression ("        ", S (Values), ";");
+         L ("      Index_Data : constant String :=");
+         Emit_String_Expression ("        ", S (Index_Data), ";");
+         L ("      Width : constant := 28;");
+         L ("      Count : constant Natural := Index_Data'Length / Width;");
+         L;
+         L ("      function Key (N : Positive) return String is");
+         L ("        (Index_Data (Index_Data'First + (N - 1) * Width ..");
+         L ("                     Index_Data'First + (N - 1) * Width + 13));");
+         L;
+         L ("      function Padded (Cand : String) return String is");
+         L ("        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)");
+         L ("         else Cand & (1 .. 14 - Cand'Length => ' '));");
+         L;
+         L ("      function Value_At (N : Positive) return String is");
+         L ("         Base : constant Natural :=");
+         L ("           Index_Data'First + (N - 1) * Width + 14;");
+         L ("         F : constant Natural :=");
+         L ("           Natural'Value (Index_Data (Base .. Base + 6));");
+         L ("         T : constant Natural :=");
+         L ("           Natural'Value (Index_Data (Base + 7 .. Base + 13));");
+         L ("      begin");
+         L ("         return HB (Values (F .. T));");
+         L ("      end Value_At;");
+         L;
+         L ("      function Lookup (Cand : String; Canonical : Boolean) return String is");
+         L ("         Low : Natural := 1;");
+         L ("         High : Natural := Count;");
+         L ("         Mid : Natural;");
+         L ("      begin");
+         L ("         if Cand'Length = 0 or else Count = 0 then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
+         L ("         if Canonical then");
+         L ("            --  A locale spelled some other way does not sort where");
+         L ("            --  its canonical form would, so this one is a walk.");
+         L ("            for N in 1 .. Count loop");
+         L ("               declare");
+         L ("                  K : constant String := Key (N);");
+         L ("                  Stop : Natural := K'Last;");
+         L ("               begin");
+         L ("                  while Stop >= K'First and then K (Stop) = ' ' loop");
+         L ("                     Stop := Stop - 1;");
+         L ("                  end loop;");
+         L ("                  if Locale_Equals (Cand, K (K'First .. Stop)) then");
+         L ("                     return Value_At (N);");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end loop;");
+         L ("            return """";");
+         L ("         end if;");
+         L;
+         L ("         declare");
+         L ("            Wanted : constant String := Padded (Cand);");
+         L ("         begin");
+         L ("            while Low <= High loop");
+         L ("               Mid := (Low + High) / 2;");
+         L ("               if Key (Mid) = Wanted then");
+         L ("                  return Value_At (Mid);");
+         L ("               elsif Key (Mid) < Wanted then");
+         L ("                  Low := Mid + 1;");
+         L ("               else");
+         L ("                  High := Mid - 1;");
+         L ("               end if;");
+         L ("            end loop;");
+         L ("         end;");
+         L ("         return """";");
+         L ("      end Lookup;");
+         L;
+         L ("      --  Bisect on the spelling as written, which answers almost");
+         L ("      --  every call; only a caller who spelled it some other way");
+         L ("      --  (""DE_at"") pays for the walk.");
+         L ("      function Resolve (Cand : String) return String is");
+         L ("         Hit : constant String := Lookup (Cand, False);");
+         L ("      begin");
+         L ("         if Hit /= """" then");
+         L ("            return Hit;");
+         L ("         end if;");
+         L ("         return Lookup (Cand, True);");
+         L ("      end Resolve;");
+         L;
+         L ("      --  Parents are cut from the canonical spelling: ""de_AT"" has");
+         L ("      --  no '-' to cut, and would otherwise lose its fallback.");
+         L ("      Canon : constant String := Canonical_Locale (Locale);");
+         L ("      Exact : constant String := Resolve (Locale);");
+         L ("      Cut : Natural := Canon'Last;");
+         L ("   begin");
+         L ("      if Exact /= """" then");
+         L ("         return Exact;");
+         L ("      end if;");
+         L;
+         L ("      --  Then each parent, which is what the fallback pass did.");
+         L ("      while Cut > Canon'First loop");
+         L ("         if Canon (Cut) = '-' then");
+         L ("            declare");
+         L ("               Hit : constant String :=");
+         L ("                 Resolve (Canon (Canon'First .. Cut - 1));");
+         L ("            begin");
+         L ("               if Hit /= """" then");
+         L ("                  return Hit;");
+         L ("               end if;");
+         L ("            end;");
+         L ("         end if;");
+         L ("         Cut := Cut - 1;");
+         L ("      end loop;");
+         L;
+         L ("      return " & Default_Expr & ";");
+         L ("   end " & Name & ";");
+      end Emit_Locale_Return_Table;
+
       procedure Emit_Locale_Return_Function
         (Name         : String;
          Kind         : String;
@@ -10087,8 +10262,8 @@ procedure Generate_CLDR_Data is
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
       Current_File := Output'Unchecked_Access;
       Emit_Static_Prelude;
-      Emit_Locale_Return_Function ("Decimal_Separator", "decimal", """.""");
-      Emit_Locale_Return_Function ("Group_Separator", "group", """,""");
+      Emit_Locale_Return_Table ("Decimal_Separator", "decimal", """.""");
+      Emit_Locale_Return_Table ("Group_Separator", "group", """,""");
       Emit_Grouping;
       Emit_Day_Month_Year;
       Emit_Week_Data;
