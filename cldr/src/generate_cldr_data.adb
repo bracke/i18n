@@ -2118,41 +2118,15 @@ procedure Generate_CLDR_Data is
             Last  => 0);
       end Add_Table_Entry;
 
-      --  A locale-keyed value as a table rather than a chain. The chain form
-      --  emitted two branches per locale -- exact, then fallback -- so a
-      --  lookup walked up to 1,532 Locale_In_List calls, each canonicalising
-      --  both strings before comparing. The table is bisected instead, and the
-      --  same 6 KB-per-766-locales trade as the date-pattern index applies.
-      procedure Emit_Locale_Table
-        (Name         : String;
-         Default_Expr : String)
+      --  Sort the collected entries and append them to a packed value string
+      --  and a fixed-width index. Both are in out, so a table built in
+      --  several passes -- one per skeleton, say -- shares one value string
+      --  and one index, and a repeat found in an earlier pass still costs
+      --  nothing.
+      procedure Pack_Table
+        (Values     : in out US.Unbounded_String;
+         Index_Data : in out US.Unbounded_String)
       is
-         Values : US.Unbounded_String;
-         Index_Data : US.Unbounded_String;
-
-         procedure Emit_String_Expression
-           (Indent : String;
-            Value  : String;
-            Suffix : String := "")
-         is
-            Chunk : constant := 72;
-            Start : Positive := Value'First;
-            Stop  : Natural;
-            Term  : Positive := 1;
-         begin
-            if Value'Length = 0 then
-               L (Indent & """""" & Suffix);
-               return;
-            end if;
-            while Start <= Value'Last loop
-               Stop := Natural'Min (Start + Chunk - 1, Value'Last);
-               L (Indent & (if Term = 1 then "" else "& ")
-                  & """" & Value (Start .. Stop) & """"
-                  & (if Stop = Value'Last then Suffix else ""));
-               Start := Stop + 1;
-               Term := Term + 1;
-            end loop;
-         end Emit_String_Expression;
       begin
          --  Bisection needs the padded keys in order, and rows do not always
          --  arrive that way: a rule family lists its locales, so exploding it
@@ -2199,6 +2173,45 @@ procedure Generate_CLDR_Data is
                end;
             end;
          end loop;
+      end Pack_Table;
+
+      --  A locale-keyed value as a table rather than a chain. The chain form
+      --  emitted two branches per locale -- exact, then fallback -- so a
+      --  lookup walked up to 1,532 Locale_In_List calls, each canonicalising
+      --  both strings before comparing. The table is bisected instead, and the
+      --  same 6 KB-per-766-locales trade as the date-pattern index applies.
+      procedure Emit_Locale_Table
+        (Name         : String;
+         Default_Expr : String)
+      is
+         Values : US.Unbounded_String;
+         Index_Data : US.Unbounded_String;
+
+         procedure Emit_String_Expression
+           (Indent : String;
+            Value  : String;
+            Suffix : String := "")
+         is
+            Chunk : constant := 72;
+            Start : Positive := Value'First;
+            Stop  : Natural;
+            Term  : Positive := 1;
+         begin
+            if Value'Length = 0 then
+               L (Indent & """""" & Suffix);
+               return;
+            end if;
+            while Start <= Value'Last loop
+               Stop := Natural'Min (Start + Chunk - 1, Value'Last);
+               L (Indent & (if Term = 1 then "" else "& ")
+                  & """" & Value (Start .. Stop) & """"
+                  & (if Stop = Value'Last then Suffix else ""));
+               Start := Stop + 1;
+               Term := Term + 1;
+            end loop;
+         end Emit_String_Expression;
+      begin
+         Pack_Table (Values, Index_Data);
 
          L;
          L ("   function " & Name & " (Locale : String) return String is");
@@ -2796,24 +2809,32 @@ procedure Generate_CLDR_Data is
          L ("   end Time_Style_Pattern;");
       end Emit_Time_Style_Pattern;
 
+      --  Two levels: a couple of dozen skeletons select a segment of the
+      --  locale index, and the locale is bisected inside that segment. The
+      --  chain tested up to 822 Locale_In_List calls -- one per distinct
+      --  (skeleton, pattern) pair, each parsing a comma-separated locale
+      --  list -- to answer a single lookup.
       procedure Emit_Available_Format_Pattern is
+         Values : US.Unbounded_String;
+         Locale_Index : US.Unbounded_String;
+         Skeleton_Index : US.Unbounded_String;
+
          procedure Emit_String_Expression
            (Indent : String;
             Value  : String;
             Suffix : String := "")
          is
-            Chunk_Size : constant := 72;
-            Start      : Positive := Value'First;
-            Stop       : Natural;
-            Term       : Positive := 1;
+            Chunk : constant := 72;
+            Start : Positive := Value'First;
+            Stop  : Natural;
+            Term  : Positive := 1;
          begin
-            if Value'Length <= Chunk_Size then
-               L (Indent & """" & Value & """" & Suffix);
+            if Value'Length = 0 then
+               L (Indent & """""" & Suffix);
                return;
             end if;
-
             while Start <= Value'Last loop
-               Stop := Natural'Min (Start + Chunk_Size - 1, Value'Last);
+               Stop := Natural'Min (Start + Chunk - 1, Value'Last);
                L (Indent & (if Term = 1 then "" else "& ")
                   & """" & Value (Start .. Stop) & """"
                   & (if Stop = Value'Last then Suffix else ""));
@@ -2822,25 +2843,7 @@ procedure Generate_CLDR_Data is
             end loop;
          end Emit_String_Expression;
 
-         procedure Emit_Locale_List_Test
-           (First_Branch : in out Boolean;
-            Locales      : String)
-         is
-         begin
-            L ("                  " & (if First_Branch then "if" else "elsif")
-               & " Locale_In_List_For_Pass");
-            L ("                    (List =>");
-            Emit_String_Expression ("                       ", Locales, ",");
-            L ("                     Include_Fallback => Include_Fallback,");
-            L ("                     Fallback_Depth => Fallback_Depth)");
-            L ("                  then");
-            First_Branch := False;
-         end Emit_Locale_List_Test;
-
-         function Has_Available_Format_Skeleton
-           (Index : Positive)
-            return Boolean
-         is
+         function Skeleton_Seen_Before (Index : Positive) return Boolean is
          begin
             for Prior in 1 .. Index - 1 loop
                if Is_Kind (Prior, "available_format")
@@ -2851,136 +2854,206 @@ procedure Generate_CLDR_Data is
             end loop;
 
             return False;
-         end Has_Available_Format_Skeleton;
-
-         function Has_Available_Format_Pattern
-           (Index : Positive)
-            return Boolean
-         is
-         begin
-            for Prior in 1 .. Index - 1 loop
-               if Is_Kind (Prior, "available_format")
-                 and then S (Rules (Prior).B) = S (Rules (Index).B)
-                 and then S (Rules (Prior).C) = S (Rules (Index).C)
-               then
-                  return True;
-               end if;
-            end loop;
-
-            return False;
-         end Has_Available_Format_Pattern;
-
-         function Locale_List_For
-           (Skeleton : String;
-            Pattern  : String)
-            return String
-         is
-            Result : US.Unbounded_String;
-         begin
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "available_format")
-                 and then S (Rules (Index).B) = Skeleton
-                 and then S (Rules (Index).C) = Pattern
-               then
-                  if US.Length (Result) > 0 then
-                     US.Append (Result, ",");
-                  end if;
-                  US.Append (Result, S (Rules (Index).A));
-               end if;
-            end loop;
-
-            return S (Result);
-         end Locale_List_For;
+         end Skeleton_Seen_Before;
       begin
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "available_format")
+              and then not Skeleton_Seen_Before (Index)
+            then
+               declare
+                  Skeleton : constant String := S (Rules (Index).B);
+                  First_Row : constant Natural :=
+                    US.Length (Locale_Index) / 28 + 1;
+                  Last_Row : Natural;
+               begin
+                  if Skeleton'Length > 8 then
+                     Add_Error ("skeleton does not fit the index: " & Skeleton);
+                  end if;
+
+                  Reset_Table;
+                  for Row in 1 .. Rule_Count loop
+                     if Is_Kind (Row, "available_format")
+                       and then S (Rules (Row).B) = Skeleton
+                     then
+                        Add_Table_Entry
+                          (S (Rules (Row).A),
+                           Ada_Expression_UTF8_Hex (S (Rules (Row).C)));
+                     end if;
+                  end loop;
+
+                  --  Values and the locale index accumulate across skeletons,
+                  --  so a pattern already packed for an earlier skeleton is
+                  --  reused rather than stored again.
+                  Pack_Table (Values, Locale_Index);
+                  Last_Row := US.Length (Locale_Index) / 28;
+
+                  declare
+                     F : constant String := Trim (Natural'Image (First_Row));
+                     T : constant String := Trim (Natural'Image (Last_Row));
+                  begin
+                     US.Append (Skeleton_Index, Skeleton);
+                     US.Append
+                       (Skeleton_Index, (1 .. 8 - Skeleton'Length => ' '));
+                     US.Append (Skeleton_Index, (1 .. 7 - F'Length => '0'));
+                     US.Append (Skeleton_Index, F);
+                     US.Append (Skeleton_Index, (1 .. 7 - T'Length => '0'));
+                     US.Append (Skeleton_Index, T);
+                  end;
+               end;
+            end if;
+         end loop;
+
          L;
          L ("   function Available_Format_Pattern");
          L ("     (Locale   : String;");
          L ("      Skeleton : String)");
          L ("      return String");
          L ("   is");
+         L ("      Values : constant String :=");
+         Emit_String_Expression ("        ", S (Values), ";");
+         L ("      Locale_Index : constant String :=");
+         Emit_String_Expression ("        ", S (Locale_Index), ";");
+         L ("      Skeleton_Index : constant String :=");
+         Emit_String_Expression ("        ", S (Skeleton_Index), ";");
+         L ("      Width : constant := 28;");
+         L ("      Skeleton_Width : constant := 22;");
+         L ("      Skeleton_Count : constant Natural :=");
+         L ("        Skeleton_Index'Length / Skeleton_Width;");
          L;
-         L ("      function Dash_Count (Value : String) return Natural is");
-         L ("         Count : Natural := 0;");
+         L ("      --  The segment of Locale_Index holding the wanted skeleton.");
+         L ("      Segment_First : Natural := 0;");
+         L ("      Segment_Last : Natural := 0;");
+         L;
+         L ("      function Key (N : Positive) return String is");
+         L ("        (Locale_Index (Locale_Index'First + (N - 1) * Width ..");
+         L ("                      Locale_Index'First + (N - 1) * Width + 13));");
+         L;
+         L ("      function Padded (Cand : String) return String is");
+         L ("        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)");
+         L ("         else Cand & (1 .. 14 - Cand'Length => ' '));");
+         L;
+         L ("      function Value_At (N : Positive) return String is");
+         L ("         Base : constant Natural :=");
+         L ("           Locale_Index'First + (N - 1) * Width + 14;");
+         L ("         F : constant Natural :=");
+         L ("           Natural'Value (Locale_Index (Base .. Base + 6));");
+         L ("         T : constant Natural :=");
+         L ("           Natural'Value (Locale_Index (Base + 7 .. Base + 13));");
          L ("      begin");
-         L ("         for C of Value loop");
-         L ("            if C = '-' then");
-         L ("               Count := Count + 1;");
-         L ("            end if;");
-         L ("         end loop;");
-         L ("         return Count;");
-         L ("      end Dash_Count;");
+         L ("         return HB (Values (F .. T));");
+         L ("      end Value_At;");
          L;
-         L ("      function Locale_In_List_For_Pass");
-         L ("        (List             : String;");
-         L ("         Include_Fallback : Boolean;");
-         L ("         Fallback_Depth   : Natural)");
-         L ("         return Boolean");
-         L ("      is");
-         L ("         Start : Positive := List'First;");
+         L ("      function Lookup (Cand : String; Canonical : Boolean) return String is");
+         L ("         Low : Natural := Segment_First;");
+         L ("         High : Natural := Segment_Last;");
+         L ("         Mid : Natural;");
+         L ("      begin");
+         L ("         if Cand'Length = 0 or else Segment_First = 0 then");
+         L ("            return """";");
+         L ("         end if;");
          L;
-         L ("         function Matches (Candidate : String) return Boolean is");
+         L ("         if Canonical then");
+         L ("            --  A locale spelled some other way does not sort where");
+         L ("            --  its canonical form would, so this one is a walk.");
+         L ("            for N in Segment_First .. Segment_Last loop");
+         L ("               declare");
+         L ("                  K : constant String := Key (N);");
+         L ("                  Stop : Natural := K'Last;");
+         L ("               begin");
+         L ("                  while Stop >= K'First and then K (Stop) = ' ' loop");
+         L ("                     Stop := Stop - 1;");
+         L ("                  end loop;");
+         L ("                  if Locale_Equals (Cand, K (K'First .. Stop)) then");
+         L ("                     return Value_At (N);");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end loop;");
+         L ("            return """";");
+         L ("         end if;");
+         L;
+         L ("         declare");
+         L ("            Wanted : constant String := Padded (Cand);");
          L ("         begin");
-         L ("            if Include_Fallback then");
-         L ("               return Dash_Count (Candidate) = Fallback_Depth");
-         L ("                 and then Locale_Fallback_Matches (Locale, Candidate);");
-         L ("            else");
-         L ("               return Locale_Equals (Locale, Candidate);");
-         L ("            end if;");
-         L ("         end Matches;");
-         L ("      begin");
-         L ("         for Index in List'Range loop");
-         L ("            if List (Index) = ',' then");
-         L ("               if Matches (List (Start .. Index - 1)) then");
-         L ("                  return True;");
+         L ("            while Low <= High loop");
+         L ("               Mid := (Low + High) / 2;");
+         L ("               if Key (Mid) = Wanted then");
+         L ("                  return Value_At (Mid);");
+         L ("               elsif Key (Mid) < Wanted then");
+         L ("                  Low := Mid + 1;");
+         L ("               else");
+         L ("                  High := Mid - 1;");
          L ("               end if;");
-         L ("               Start := Index + 1;");
-         L ("            end if;");
-         L ("         end loop;");
+         L ("            end loop;");
+         L ("         end;");
+         L ("         return """";");
+         L ("      end Lookup;");
          L;
-         L ("         return Matches (List (Start .. List'Last));");
-         L ("      end Locale_In_List_For_Pass;");
+         L ("      function Resolve (Cand : String) return String is");
+         L ("         Hit : constant String := Lookup (Cand, False);");
+         L ("      begin");
+         L ("         if Hit /= """" then");
+         L ("            return Hit;");
+         L ("         end if;");
+         L ("         return Lookup (Cand, True);");
+         L ("      end Resolve;");
          L ("   begin");
-
-         for Skeleton_Index in 1 .. Rule_Count loop
-            if Is_Kind (Skeleton_Index, "available_format")
-              and then not Has_Available_Format_Skeleton (Skeleton_Index)
-            then
-               L ("      if Skeleton = """ & S (Rules (Skeleton_Index).B) & """ then");
-               L ("         for Pass in 1 .. 2 loop");
-               L ("            declare");
-               L ("               Include_Fallback : constant Boolean := Pass = 2;");
-               L ("            begin");
-               L ("               for Fallback_Depth in reverse 0 .. 8 loop");
-               L ("                  if Include_Fallback or else Fallback_Depth = 8 then");
-               declare
-                  First_Branch : Boolean := True;
-               begin
-                  for Pattern_Index in 1 .. Rule_Count loop
-                     if Is_Kind (Pattern_Index, "available_format")
-                       and then S (Rules (Pattern_Index).B) =
-                         S (Rules (Skeleton_Index).B)
-                       and then not Has_Available_Format_Pattern
-                         (Pattern_Index)
-                     then
-                        Emit_Locale_List_Test
-                          (First_Branch,
-                           Locale_List_For
-                             (S (Rules (Pattern_Index).B),
-                              S (Rules (Pattern_Index).C)));
-                        L ("                     return "
-                           & S (Rules (Pattern_Index).C) & ";");
-                     end if;
-                  end loop;
-               end;
-               L ("                  end if;");
-               L ("                  end if;");
-               L ("               end loop;");
-               L ("            end;");
-               L ("         end loop;");
-               L ("      end if;");
-            end if;
-         end loop;
-
+         L ("      --  A couple of dozen skeletons: a scan costs less than the");
+         L ("      --  arithmetic to bisect them.");
+         L ("      for N in 1 .. Skeleton_Count loop");
+         L ("         declare");
+         L ("            Base : constant Natural :=");
+         L ("              Skeleton_Index'First + (N - 1) * Skeleton_Width;");
+         L ("            Name : constant String :=");
+         L ("              Skeleton_Index (Base .. Base + 7);");
+         L ("            Stop : Natural := Name'Last;");
+         L ("         begin");
+         L ("            while Stop >= Name'First and then Name (Stop) = ' ' loop");
+         L ("               Stop := Stop - 1;");
+         L ("            end loop;");
+         L ("            if Name (Name'First .. Stop) = Skeleton then");
+         L ("               Segment_First :=");
+         L ("                 Natural'Value");
+         L ("                   (Skeleton_Index (Base + 8 .. Base + 14));");
+         L ("               Segment_Last :=");
+         L ("                 Natural'Value");
+         L ("                   (Skeleton_Index (Base + 15 .. Base + 21));");
+         L ("               exit;");
+         L ("            end if;");
+         L ("         end;");
+         L ("      end loop;");
+         L;
+         L ("      if Segment_First = 0 then");
+         L ("         return """";");
+         L ("      end if;");
+         L;
+         L ("      declare");
+         L ("         Exact : constant String := Resolve (Locale);");
+         L ("      begin");
+         L ("         if Exact /= """" then");
+         L ("            return Exact;");
+         L ("         end if;");
+         L ("      end;");
+         L;
+         L ("      --  Then each parent, longest first, which is the order the");
+         L ("      --  Fallback_Depth loop went in.");
+         L ("      declare");
+         L ("         Canon : constant String := Canonical_Locale (Locale);");
+         L ("         Cut : Natural := Canon'Last;");
+         L ("      begin");
+         L ("         while Cut > Canon'First loop");
+         L ("            if Canon (Cut) = '-' then");
+         L ("               declare");
+         L ("                  Hit : constant String :=");
+         L ("                    Resolve (Canon (Canon'First .. Cut - 1));");
+         L ("               begin");
+         L ("                  if Hit /= """" then");
+         L ("                     return Hit;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L ("            Cut := Cut - 1;");
+         L ("         end loop;");
+         L ("      end;");
          L;
          L ("      return """";");
          L ("   end Available_Format_Pattern;");
@@ -3045,7 +3118,53 @@ procedure Generate_CLDR_Data is
             L ("         end case;");
             First := False;
          end Emit_Digit_Case;
+         --  One row per locale, ten digits of four bytes each. The digits of
+         --  a numbering system are not always contiguous, so all ten are
+         --  stored; padding them to a fixed width keeps the row sliceable,
+         --  and UTF-8 never contains a NUL, so the pad strips unambiguously.
+         function Digit_Row_Hex (Index : Positive) return String is
+            Row : US.Unbounded_String;
+         begin
+            for Digit in 0 .. 9 loop
+               declare
+                  Hex : constant String :=
+                    Ada_Expression_UTF8_Hex
+                      ("U (" & Field (S (Rules (Index).B), Digit + 1, ',')
+                       & ")");
+               begin
+                  US.Append (Row, Hex);
+                  US.Append (Row, (1 .. 8 - Hex'Length => '0'));
+               end;
+            end loop;
+
+            return S (Row);
+         end Digit_Row_Hex;
       begin
+         Reset_Table;
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "digits")
+              and then not Starts_With (S (Rules (Index).A), "nu-")
+            then
+               declare
+                  Locales : constant String := S (Rules (Index).A);
+                  Row : constant String := Digit_Row_Hex (Index);
+                  Start : Positive := Locales'First;
+               begin
+                  for Position in Locales'Range loop
+                     if Locales (Position) = ',' then
+                        Add_Table_Entry (Locales (Start .. Position - 1), Row);
+                        Start := Position + 1;
+                     end if;
+                  end loop;
+
+                  if Start <= Locales'Last then
+                     Add_Table_Entry (Locales (Start .. Locales'Last), Row);
+                  end if;
+               end;
+            end if;
+         end loop;
+         Emit_Locale_Table ("Digit_Row", """""");
+
          L;
          L ("   function Digit_Text (Locale : String; Digit : Character) return String is");
          L ("      Lang : constant String := Language (Locale);");
@@ -3081,23 +3200,29 @@ procedure Generate_CLDR_Data is
                Emit_Digit_Case (Index);
             end if;
          end loop;
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "digits")
-                 and then not Starts_With (S (Rules (Index).A), "nu-")
-               then
-                  L ("      " & (if First then "if" else "elsif")
-                     & " Locale_In_List");
-                  L ("        (Locale => Locale,");
-                  L ("         List => """ & S (Rules (Index).A) & """,");
-                  L ("         Include_Fallback => " & (if Pass = 1 then "False" else "True")
-                     & ") then");
-                  Emit_Digit_Case (Index);
-               end if;
-            end loop;
-         end loop;
          L ("      else");
-         L ("         return [1 => Digit];");
+         L ("         declare");
+         L ("            Row : constant String := Digit_Row (Locale);");
+         L ("         begin");
+         L ("            if Row'Length = 40 and then Digit in '0' .. '9' then");
+         L ("               declare");
+         L ("                  Base : constant Natural :=");
+         L ("                    Row'First");
+         L ("                      + (Character'Pos (Digit)");
+         L ("                         - Character'Pos ('0')) * 4;");
+         L ("                  Stop : Natural := Base + 3;");
+         L ("               begin");
+         L ("                  while Stop >= Base");
+         L ("                    and then Row (Stop) = Character'Val (0)");
+         L ("                  loop");
+         L ("                     Stop := Stop - 1;");
+         L ("                  end loop;");
+         L ("                  return Row (Base .. Stop);");
+         L ("               end;");
+         L ("            end if;");
+         L;
+         L ("            return [1 => Digit];");
+         L ("         end;");
          L ("      end if;");
          L ("   end Digit_Text;");
       end Emit_Digits;
