@@ -338,6 +338,24 @@ package body I18N.Date_Time_Format is
       end if;
    end First_Week_Min_Days;
 
+   --  The CLDR key for the calendar this locale selects, so the pattern comes
+   --  from the calendar actually being rendered rather than from gregorian.
+   function Calendar_Key (Locale : String) return String is
+   begin
+      case Calendar_For (Locale) is
+         when Buddhist            => return "buddhist";
+         when Japanese            => return "japanese";
+         when Persian             => return "persian";
+         when Coptic              => return "coptic";
+         when Ethiopic
+            | Ethiopic_Amete_Alem => return "ethiopic";
+         when Hebrew              => return "hebrew";
+         when Indian              => return "indian";
+         when ROC                 => return "roc";
+         when others              => return "gregorian";
+      end case;
+   end Calendar_Key;
+
    function Date_Style_Pattern
      (Locale : String;
       Style  : String)
@@ -349,7 +367,8 @@ package body I18N.Date_Time_Format is
           (Locale, "uses_day_month_year", Found);
    begin
       if not Found then
-         return I18N.CLDR_Data.Date_Style_Pattern (Locale, Style);
+         return I18N.CLDR_Data.Date_Style_Pattern
+           (Locale, Calendar_Key (Locale), Style);
       elsif DMY then
          if Style = "short" then
             return "dd'.'MM'.'yy";

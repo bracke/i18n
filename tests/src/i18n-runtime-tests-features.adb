@@ -810,20 +810,26 @@ package body I18N.Runtime.Tests.Features is
          & " 29.02.24 09:05 one");
       Assert_Render
         ("fr-CA", "0",
-         "fr 1" & U (16#202F#) & "234" & U (16#202F#)
-         & "567,89 1" & U (16#202F#) & "234" & U (16#202F#)
-         & "567,80 " & U (16#20AC#) & " 29. f" & U (16#E9#)
-         & "vrier 2024 09:05 one");
+         "fr 1" & U (16#202F#) & "234" & U (16#202F#) & "567,89 1"
+         & U (16#202F#) & "234" & U (16#202F#) & "567,80 " & U (16#20AC#)
+         & " 29 f" & U (16#E9#) & "vrier 2024 09:05 one");
       Assert_Render
         ("hi-IN-x-test", "2",
-         "hi 12,34,567.89 " & U (16#20B9#)
-         & "12,34,567.80 29. " & U (16#92B#) & U (16#93C#)
-         & U (16#930#) & U (16#935#) & U (16#930#)
-         & U (16#940#) & " 2024 09:05 other");
+         "hi 12,34,567.89 " & U (16#20B9#) & "12,34,567.80 29 "
+         & U (16#92B#) & U (16#93C#) & U (16#930#) & U (16#935#)
+         & U (16#930#) & U (16#940#) & " 2024 09:05 other");
       Assert_Render
         ("ar-EG", "3",
-         "ar " & Arabic_Number & " " & Arabic_Currency & " "
-         & Arabic_Date & " " & Arabic_Time & " few");
+         "ar " & U (16#661#) & U (16#66C#) & U (16#662#) & U (16#663#)
+         & U (16#664#) & U (16#66C#) & U (16#665#) & U (16#666#)
+         & U (16#667#) & U (16#66B#) & U (16#668#) & U (16#669#) & " "
+         & U (16#661#) & U (16#66C#) & U (16#662#) & U (16#663#)
+         & U (16#664#) & U (16#66C#) & U (16#665#) & U (16#666#)
+         & U (16#667#) & U (16#66B#) & U (16#668#) & U (16#660#) & " $ "
+         & U (16#662#) & U (16#669#) & U (16#200F#) & "/" & U (16#662#)
+         & U (16#200F#) & "/" & U (16#662#) & U (16#660#) & U (16#662#)
+         & U (16#664#) & " " & U (16#660#) & U (16#669#) & ":"
+         & U (16#660#) & U (16#665#) & " few");
       Assert_Render
         ("fa-IR", "1",
          "fa " & Persian_Number & " " & Persian_Currency & " "
@@ -831,24 +837,23 @@ package body I18N.Runtime.Tests.Features is
       Assert_Render
         ("ro-MD", "2",
          "ro 1.234.567,89 1.234.567,80 " & U (16#20AC#)
-         & " 29. februarie 2024 09:05 few");
+         & " 29 februarie 2024 09:05 few");
       Assert_Render
         ("lt-LT", "2",
-         "lt 1" & U (16#A0#) & "234" & U (16#A0#)
-         & "567,89 1" & U (16#A0#) & "234" & U (16#A0#)
-         & "567,80 " & U (16#20AC#) & " vasario 29, 2024 09:05 few");
+         "lt 1" & U (16#A0#) & "234" & U (16#A0#) & "567,89 1"
+         & U (16#A0#) & "234" & U (16#A0#) & "567,80 " & U (16#20AC#)
+         & " 2024 m. vasario 29 d. 09:05 few");
       Assert_Render
         ("sl-SI", "2",
          "sl 1.234.567,89 1.234.567,80 " & U (16#20AC#)
          & " 29. februar 2024 09:05 two");
       Assert_Render
         ("th-u-ca-buddhist-extra", "2",
-         "th " & U (16#E52#) & U (16#E59#) & ". "
-         & U (16#E01#) & U (16#E38#) & U (16#E21#)
-         & U (16#E20#) & U (16#E32#) & U (16#E1E#)
-         & U (16#E31#) & U (16#E19#) & U (16#E18#)
-         & U (16#E4C#) & " " & U (16#E52#) & U (16#E55#)
-         & U (16#E56#) & U (16#E57#));
+         "th " & U (16#E52#) & U (16#E59#) & " " & U (16#E01#)
+         & U (16#E38#) & U (16#E21#) & U (16#E20#) & U (16#E32#)
+         & U (16#E1E#) & U (16#E31#) & U (16#E19#) & U (16#E18#)
+         & U (16#E4C#) & " " & U (16#E52#) & U (16#E55#) & U (16#E56#)
+         & U (16#E57#));
       Assert_Render
         ("ja-u-ca-japanese-extra", "2",
          "ja " & U (16#4EE4#) & U (16#548C#) & " 6"
@@ -2429,9 +2434,14 @@ package body I18N.Runtime.Tests.Features is
               "Russian few branch nests number formatting");
       I18N.Arguments.Set (Args, "count", "5");
       Assert (Rendered (Runtime, "ru", "summary", Args) =
-                "many 29. " & U (16#444#) & U (16#435#) & U (16#432#)
+                --  CLDR ru long is "d MMMM y 'г'." -- the year carries a
+                --  "г." (god, year) suffix and no point after the day.
+                --  CLDR ru long is "d MMMM y\u202F'г'." -- the year carries a
+                --  "г." (year) suffix, joined by a narrow no-break space, and
+                --  there is no point after the day.
+                "many 29 " & U (16#444#) & U (16#435#) & U (16#432#)
                 & U (16#440#) & U (16#430#) & U (16#43B#)
-                & U (16#44F#) & " 2024",
+                & U (16#44F#) & " 2024" & U (16#202F#) & U (16#433#) & ".",
               "Russian many branch nests localized long date formatting");
 
       I18N.Arguments.Set (Args, "count", "0");

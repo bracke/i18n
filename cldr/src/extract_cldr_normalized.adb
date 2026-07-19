@@ -1324,6 +1324,33 @@ procedure Extract_CLDR_Normalized is
                L (Kind & "_text|" & Locale & "|" & Value);
                Seen_Output := True;
             end;
+         elsif Kind = "date_style_pattern" then
+            declare
+               Locale   : constant String := Field (Line, 2);
+               Calendar : constant String := Field (Line, 3);
+               Style    : constant String := Field (Line, 4);
+               Pattern  : constant String := Field (Line, 5);
+            begin
+               if Field_Count (Line) /= 5
+                 or else Locale = ""
+                 or else Calendar = ""
+                 or else (Style /= "full" and then Style /= "long"
+                          and then Style /= "medium" and then Style /= "short")
+                 or else Pattern = ""
+               then
+                  Add_Line_Error
+                    (Line_Number, "invalid date_style_pattern record");
+                  return;
+               end if;
+               Add_Key
+                 ("date_style_pattern|" & Locale & "|" & Calendar
+                  & "|" & Style,
+                  Line_Number);
+               L
+                 ("date_style_pattern_text|" & Locale & "|" & Calendar
+                  & "|" & Style & "|" & Pattern);
+               Seen_Output := True;
+            end;
          elsif Kind = "available_format" then
             declare
                Locale   : constant String := Field (Line, 2);

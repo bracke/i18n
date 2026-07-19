@@ -2229,6 +2229,95 @@ procedure Generate_CLDR_Export is
             end loop;
          end Emit_Available_Format_Rows;
 
+         --  The four dateFormats styles, straight from CLDR. Without these the
+         --  generated Date_Style_Pattern has to guess a locale's date order from
+         --  a day-month-year flag and hand back one of two Western shapes, so a
+         --  locale whose long form is neither -- Thai writes "d MMMM y", with no
+         --  comma and no point -- could not be rendered at all.
+         procedure Emit_Date_Style_Pattern_Rows (Locale : String) is
+            --  Calendars carry their own date formats, and the difference is not
+            --  cosmetic: Thai gregorian long is "d MMMM G y" but Thai buddhist
+            --  long is "d MMMM y" -- the era belongs to one and not the other.
+            --  A gregorian-only table would put an era on every buddhist date.
+            type Calendar_Source is record
+               Name    : access constant String;
+               Source  : access constant String;
+            end record;
+
+            Calendars : constant array (1 .. 9) of Calendar_Source :=
+              [(new String'("gregorian"), new String'("cldr-dates-full")),
+               (new String'("buddhist"),  new String'("cldr-cal-buddhist-full")),
+               (new String'("japanese"),  new String'("cldr-cal-japanese-full")),
+               (new String'("persian"),   new String'("cldr-cal-persian-full")),
+               (new String'("coptic"),    new String'("cldr-cal-coptic-full")),
+               (new String'("ethiopic"),  new String'("cldr-cal-ethiopic-full")),
+               (new String'("hebrew"),    new String'("cldr-cal-hebrew-full")),
+               (new String'("indian"),    new String'("cldr-cal-indian-full")),
+               (new String'("roc"),       new String'("cldr-cal-roc-full"))];
+
+            procedure Emit_Calendar (Calendar : String; Pkg : String) is
+               Path : constant String :=
+                 "cldr-json/" & Pkg & "/main/" & Locale
+                 & "/ca-" & Calendar & ".json";
+               Text : constant String :=
+                 (if Project_Tools.Files.File_Exists ("upstream/" & Path)
+                  then Project_Tools.Files.Read_Raw_File ("upstream/" & Path)
+                  else "");
+               Main      : constant String := Object_Field_Object (Text, "main");
+               Locale_Obj : constant String :=
+                 Object_Field_Object (Main, Locale);
+               Dates     : constant String :=
+                 Object_Field_Object (Locale_Obj, "dates");
+               Cals      : constant String :=
+                 Object_Field_Object (Dates, "calendars");
+               Cal_Obj   : constant String :=
+                 Object_Field_Object (Cals, Calendar);
+               Formats   : constant String :=
+                 Object_Field_Object (Cal_Obj, "dateFormats");
+
+               procedure Emit_Style (Style : String) is
+                  --  A style is normally a pattern string, but CLDR writes an
+                  --  object when the pattern pins a numbering system -- Yiddish
+                  --  hebrew is {"_value": "d 'ב'MMMM y", "_numbers": "hebr"}.
+                  --  Take the pattern out of the object; the numbering system
+                  --  is chosen elsewhere and is not part of the pattern.
+                  Nested : constant String :=
+                    Object_Field_Object (Formats, Style);
+                  Raw : constant String :=
+                    (if Nested /= ""
+                     then Project_Tools.JSON.Object_Field_Value
+                       (Nested, "_value")
+                     else Project_Tools.JSON.Object_Field_Value
+                       (Formats, Style));
+                  Pattern : constant String := Raw;
+                  Internal : constant String :=
+                    (if Pattern /= "" then Internal_Pattern (Pattern) else "");
+               begin
+                  if Internal /= "" then
+                     Emit_JSON
+                       ("{""type"":""date_style_pattern"",""locale"":"""
+                        & Locale & """,""calendar"":""" & Calendar
+                        & """,""style"":""" & Style
+                        & """,""pattern"":"""
+                        & JSON_Escape (Internal) & """}");
+                  end if;
+               end Emit_Style;
+            begin
+               if Formats = "" then
+                  return;
+               end if;
+
+               Emit_Style ("full");
+               Emit_Style ("long");
+               Emit_Style ("medium");
+               Emit_Style ("short");
+            end Emit_Calendar;
+         begin
+            for Source of Calendars loop
+               Emit_Calendar (Source.Name.all, Source.Source.all);
+            end loop;
+         end Emit_Date_Style_Pattern_Rows;
+
          procedure Emit_List_Separator_Rows is
             function Trim_Spaces (Value : String) return String is
                First : Natural := Value'First;
@@ -3306,6 +3395,7 @@ procedure Generate_CLDR_Export is
                Emit_Relative_Current_Rows (Locale);
                Emit_Relative_Time_Pattern_Rows (Locale);
                Emit_Available_Format_Rows (Locale);
+               Emit_Date_Style_Pattern_Rows (Locale);
                Emit_Time_Zone_Format_Rows (Locale);
                Emit_Time_Zone_Exemplar_Rows (Locale);
                Emit_Time_Zone_Metazone_Rows (Locale);

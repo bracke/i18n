@@ -990,6 +990,22 @@ procedure Generate_CLDR_Data is
             Field (Line, 2),
             Field (Line, 3),
             Field (Line, 4));
+      elsif Kind = "date_style_pattern" then
+         if Field_Count (Line) /= 5
+           or else Field (Line, 2) = ""
+           or else Field (Line, 3) = ""
+           or else Field (Line, 4) = ""
+           or else Field (Line, 5) = ""
+         then
+            Add_Line_Error
+              (Line_Number, "invalid date_style_pattern row shape");
+         end if;
+         Add_Rule
+           (Kind,
+            Field (Line, 2),
+            Field (Line, 3),
+            Field (Line, 4),
+            Field (Line, 5));
       elsif Kind = "unit_short" then
          if Field_Count (Line) /= 3
            or else not Is_Unit_Base (Field (Line, 2))
@@ -2154,16 +2170,165 @@ procedure Generate_CLDR_Data is
       end Emit_Week_Data;
 
       procedure Emit_Date_Style_Pattern is
+         Style_Data : US.Unbounded_String;
+
+         procedure Emit_String_Expression
+           (Indent : String;
+            Value  : String;
+            Suffix : String := "")
+         is
+            Chunk_Size : constant := 72;
+            Start      : Positive := Value'First;
+            Stop       : Natural;
+            Term       : Positive := 1;
+         begin
+            if Value'Length = 0 then
+               L (Indent & """""" & Suffix);
+               return;
+            elsif Value'Length <= Chunk_Size then
+               L (Indent & """" & Value & """" & Suffix);
+               return;
+            end if;
+
+            while Start <= Value'Last loop
+               Stop := Natural'Min (Start + Chunk_Size - 1, Value'Last);
+               L (Indent & (if Term = 1 then "" else "& ")
+                  & """" & Value (Start .. Stop) & """"
+                  & (if Stop = Value'Last then Suffix else ""));
+               Start := Stop + 1;
+               Term := Term + 1;
+            end loop;
+         end Emit_String_Expression;
       begin
+         for Index in 1 .. Rule_Count loop
+            if Is_Kind (Index, "date_style_pattern") then
+               US.Append
+                 (Style_Data,
+                  S (Rules (Index).A) & "|" & S (Rules (Index).B) & "|"
+                  & S (Rules (Index).C) & "|"
+                  & Ada_Expression_UTF8_Hex (S (Rules (Index).D)) & "~");
+            end if;
+         end loop;
+
          L;
+         L ("   --  CLDR's own dateFormats, by locale and calendar. The heuristic");
+         L ("   --  below is the fallback for locales outside the pinned subset:");
+         L ("   --  it can only choose between a day-month-year and a");
+         L ("   --  month-day-year shape, which is not what every locale writes.");
          L ("   function Date_Style_Pattern");
-         L ("     (Locale : String;");
-         L ("      Style  : String)");
+         L ("     (Locale   : String;");
+         L ("      Calendar : String;");
+         L ("      Style    : String)");
          L ("      return String");
          L ("   is");
          L ("      Lang : constant String := Language (Locale);");
          L ("      DMY : constant Boolean := Uses_Day_Month_Year (Locale);");
+         L ("      Style_Data : constant String :=");
+         Emit_String_Expression ("        ", S (Style_Data), ";");
+         L;
+         L ("      function Matches_Locale");
+         L ("        (Candidate : String;");
+         L ("         Fallback  : Boolean)");
+         L ("         return Boolean is");
+         L ("      begin");
+         L ("         if Fallback then");
+         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
+         L ("         else");
+         L ("            return Locale_Equals (Locale, Candidate);");
+         L ("         end if;");
+         L ("      end Matches_Locale;");
+         L;
+         L ("      function Search");
+         L ("        (Fallback        : Boolean;");
+         L ("         Wanted_Calendar : String)");
+         L ("         return String");
+         L ("      is");
+         L ("         Start : Positive := Style_Data'First;");
+         L ("      begin");
+         L ("         while Start <= Style_Data'Last loop");
+         L ("            declare");
+         L ("               Sep1 : Natural := 0;");
+         L ("               Sep2 : Natural := 0;");
+         L ("               Sep3 : Natural := 0;");
+         L ("               Stop : Natural := Style_Data'Last + 1;");
+         L ("            begin");
+         L ("               for Index in Start .. Style_Data'Last loop");
+         L ("                  if Style_Data (Index) = '|' then");
+         L ("                     if Sep1 = 0 then");
+         L ("                        Sep1 := Index;");
+         L ("                     elsif Sep2 = 0 then");
+         L ("                        Sep2 := Index;");
+         L ("                     elsif Sep3 = 0 then");
+         L ("                        Sep3 := Index;");
+         L ("                     end if;");
+         L ("                  elsif Style_Data (Index) = '~' then");
+         L ("                     Stop := Index;");
+         L ("                     exit;");
+         L ("                  end if;");
+         L ("               end loop;");
+         L;
+         L ("               if Sep1 /= 0");
+         L ("                 and then Sep2 /= 0");
+         L ("                 and then Sep3 /= 0");
+         L ("                 and then Sep1 > Start");
+         L ("                 and then Sep2 > Sep1 + 1");
+         L ("                 and then Sep3 > Sep2 + 1");
+         L ("                 and then Stop > Sep3 + 1");
+         L ("                 and then Style_Data (Sep1 + 1 .. Sep2 - 1)");
+         L ("                   = Wanted_Calendar");
+         L ("                 and then Style_Data (Sep2 + 1 .. Sep3 - 1) = Style");
+         L ("                 and then Matches_Locale");
+         L ("                   (Style_Data (Start .. Sep1 - 1), Fallback)");
+         L ("               then");
+         L ("                  return HB (Style_Data (Sep3 + 1 .. Stop - 1));");
+         L ("               end if;");
+         L;
+         L ("               Start := Stop + 1;");
+         L ("            end;");
+         L ("         end loop;");
+         L;
+         L ("         return """";");
+         L ("      end Search;");
+         L;
+         L ("      Effective_Calendar : constant String :=");
+         L ("        (if Calendar = """" then ""gregorian"" else Calendar);");
+         L ("      Exact : constant String :=");
+         L ("        Search (False, Effective_Calendar);");
          L ("   begin");
+         L ("      if Exact /= """" then");
+         L ("         return Exact;");
+         L ("      end if;");
+         L;
+         L ("      --  A calendar that ships no pattern of its own follows the");
+         L ("      --  locale's gregorian one.");
+         L ("      if Effective_Calendar /= ""gregorian"" then");
+         L ("         declare");
+         L ("            Greg : constant String := Search (False, ""gregorian"");");
+         L ("         begin");
+         L ("            if Greg /= """" then");
+         L ("               return Greg;");
+         L ("            end if;");
+         L ("         end;");
+         L ("      end if;");
+         L;
+         L ("      declare");
+         L ("         Near : constant String :=");
+         L ("           Search (True, Effective_Calendar);");
+         L ("      begin");
+         L ("         if Near /= """" then");
+         L ("            return Near;");
+         L ("         end if;");
+         L ("      end;");
+         L;
+         L ("      declare");
+         L ("         Near_Greg : constant String :=");
+         L ("           Search (True, ""gregorian"");");
+         L ("      begin");
+         L ("         if Near_Greg /= """" then");
+         L ("            return Near_Greg;");
+         L ("         end if;");
+         L ("      end;");
+         L;
          L ("      if In_List (Lang, ""ja,zh"") then");
          L ("         if Style = ""short"" then");
          L ("            return ""yy'/'M'/'d"";");
@@ -2212,6 +2377,14 @@ procedure Generate_CLDR_Data is
          L ("            return ""yyyy'-'MM'-'dd"";");
          L ("         end if;");
          L ("      end if;");
+         L ("   end Date_Style_Pattern;");
+         L;
+         L ("   function Date_Style_Pattern");
+         L ("     (Locale : String;");
+         L ("      Style  : String)");
+         L ("      return String is");
+         L ("   begin");
+         L ("      return Date_Style_Pattern (Locale, ""gregorian"", Style);");
          L ("   end Date_Style_Pattern;");
       end Emit_Date_Style_Pattern;
 

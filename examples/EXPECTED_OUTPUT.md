@@ -130,7 +130,7 @@ date de: Datum: Donnerstag, 29. Februar 2024
 date skeleton: Date skeleton: Feb 29, 2024
 date numeric skeleton: Numeric skeleton: 2024 02 29
 date japanese calendar: Japanese calendar: 令和 6年2月29日
-date buddhist calendar: Buddhist calendar: กุมภาพันธ์ ๒๙, ๒๕๖๗
+date buddhist calendar: Buddhist calendar: ๒๙ กุมภาพันธ์ ๒๕๖๗
 date locale week: Locale week fields: 2016/1/1/2016
 date persian calendar: Persian calendar: AP 1403 01 01
 ```

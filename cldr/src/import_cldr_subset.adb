@@ -715,6 +715,11 @@ procedure Import_CLDR_Subset is
       then
          return "available_format|" & Field (Payload, 2)
            & "|" & Field (Payload, 3);
+      elsif Kind = "date_style_pattern"
+        or else Kind = "date_style_pattern_text"
+      then
+         return "date_style_pattern|" & Field (Payload, 2)
+           & "|" & Field (Payload, 3) & "|" & Field (Payload, 4);
       else
          return "";
       end if;
@@ -1296,6 +1301,34 @@ procedure Import_CLDR_Subset is
 
                Add_Key (Output_Kind & "|" & Locale, Line_Number);
                L (Output_Kind & "|" & Locale & "|" & Text_Expr (Value));
+               Seen_Output := True;
+            end;
+         elsif Kind = "date_style_pattern_text" then
+            declare
+               Locale   : constant String := Field (Line, 2);
+               Calendar : constant String := Field (Line, 3);
+               Style    : constant String := Field (Line, 4);
+               Pattern  : constant String := Field (Line, 5);
+            begin
+               if Field_Count (Line) /= 5
+                 or else Locale = ""
+                 or else Calendar = ""
+                 or else (Style /= "full" and then Style /= "long"
+                          and then Style /= "medium" and then Style /= "short")
+                 or else Pattern = ""
+               then
+                  Add_Line_Error
+                    (Line_Number, "invalid date_style_pattern_text row shape");
+                  return;
+               end if;
+
+               Add_Key
+                 ("date_style_pattern|" & Locale & "|" & Calendar
+                  & "|" & Style,
+                  Line_Number);
+               L
+                 ("date_style_pattern|" & Locale & "|" & Calendar
+                  & "|" & Style & "|" & Text_Expr (Pattern));
                Seen_Output := True;
             end;
          elsif Kind = "available_format_text" then

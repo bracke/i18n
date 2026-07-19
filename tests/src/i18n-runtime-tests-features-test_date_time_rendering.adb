@@ -10,14 +10,12 @@ is
    Last    : Natural := 0;
    Status  : I18N.Result.Render_Status;
    Arabic_Full : constant String :=
-     U (16#627#) & U (16#644#) & U (16#62E#) & U (16#645#)
-     & U (16#64A#) & U (16#633#) & ", " & U (16#662#)
-     & U (16#669#) & ". " & U (16#641#) & U (16#628#)
-     & U (16#631#) & U (16#627#) & U (16#64A#) & U (16#631#)
-     & " " & U (16#662#) & U (16#660#) & U (16#662#)
-     & U (16#664#) & " " & U (16#660#) & U (16#669#)
-     & ":" & U (16#660#) & U (16#665#)
-     & ":" & U (16#660#) & U (16#667#);
+     U (16#627#) & U (16#644#) & U (16#62E#) & U (16#645#) & U (16#64A#)
+     & U (16#633#) & U (16#60C#) & " " & U (16#662#) & U (16#669#) & " "
+     & U (16#641#) & U (16#628#) & U (16#631#) & U (16#627#)
+     & U (16#64A#) & U (16#631#) & " " & U (16#662#) & U (16#660#)
+     & U (16#662#) & U (16#664#) & " " & U (16#660#) & U (16#669#) & ":"
+     & U (16#660#) & U (16#665#) & ":" & U (16#660#) & U (16#667#);
 begin
    I18N.Runtime.Load_Text
      (Runtime, "base",
@@ -795,7 +793,10 @@ begin
            "iso8601 calendar extension uses ISO week data");
    I18N.Arguments.Set (Args, "day", "2024-02-29");
    Assert (Rendered (Runtime, "th-u-ca-buddhist", "buddhist", Args) =
-             U (16#E52#) & U (16#E59#) & ". "
+             --  CLDR th buddhist long is "d MMMM y" -- no point after the
+             --  day, and no era (the gregorian pattern has one, buddhist
+             --  does not).
+             U (16#E52#) & U (16#E59#) & " "
              & U (16#E01#) & U (16#E38#) & U (16#E21#)
              & U (16#E20#) & U (16#E32#) & U (16#E1E#)
              & U (16#E31#) & U (16#E19#) & U (16#E18#)

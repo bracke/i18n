@@ -757,6 +757,31 @@ procedure Import_CLDR_Raw is
                  ("available_format|" & Locale & "|" & Skeleton
                   & "|" & Pattern);
             end;
+         elsif Kind = "date_style_pattern" then
+            declare
+               Locale   : constant String := JSON_Value (Line, "locale");
+               Calendar : constant String := JSON_Value (Line, "calendar");
+               Style    : constant String := JSON_Value (Line, "style");
+               Pattern  : constant String := JSON_Value (Line, "pattern");
+            begin
+               if not Valid_Value (Locale)
+                 or else not Valid_Value (Calendar)
+                 or else (Style /= "full" and then Style /= "long"
+                          and then Style /= "medium" and then Style /= "short")
+                 or else not Valid_Value (Pattern)
+               then
+                  Add_Line_Error
+                    (Line_Number, "invalid staged date_style_pattern record");
+                  return;
+               end if;
+               Add_Key
+                 ("date_style_pattern|" & Locale & "|" & Calendar
+                  & "|" & Style,
+                  Line_Number);
+               Emit_Record
+                 ("date_style_pattern|" & Locale & "|" & Calendar
+                  & "|" & Style & "|" & Pattern);
+            end;
          elsif Kind = "list_separator" then
             declare
                Locale : constant String := JSON_Value (Line, "locale");

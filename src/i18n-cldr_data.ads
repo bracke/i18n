@@ -49,6 +49,22 @@ private package I18N.CLDR_Data is
       Style  : String)
       return String;
 
+   --  Return the date style pattern a calendar writes for a locale.
+   --
+   --  The calendar is part of the pattern, not just of the year it prints:
+   --  Thai gregorian long is "d MMMM G y" and Thai buddhist long is
+   --  "d MMMM y" -- the era belongs to one and not the other. A calendar with
+   --  no pattern of its own follows the locale's gregorian one.
+   --  @param Locale Locale identifier or catalog locale key.
+   --  @param Calendar Stable calendar key, such as gregorian or buddhist.
+   --  @param Style Date style: default, short, medium, long, or full.
+   --  @return Pattern text consumed by the date/time formatter.
+   function Date_Style_Pattern
+     (Locale   : String;
+      Calendar : String;
+      Style    : String)
+      return String;
+
    --  Return the deterministic time style pattern for a locale.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Style Time style: default, short, medium, long, or full.
