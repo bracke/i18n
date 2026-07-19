@@ -4251,6 +4251,10 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
       procedure Emit_Time_Zone_Data is
          Zone_Names : Label_Array;
          Zone_Count : Natural;
+         Family_Labels : Label_Array;
+         Family_Label_Count : Natural;
+         Display_Zones : Label_Array;
+         Display_Zone_Count : Natural;
 
          procedure Emit_String_Expression
            (Indent : String;
@@ -4755,6 +4759,12 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L;
          --  Two blobs, each walked whole on each of two passes. One
          --  segment per locale for each, and the locale field drops out.
+         --  A family is one of 17 and a zone one of 36, so each is a single
+         --  coded character in the record; the scanner below is the same for
+         --  both, since by then a key is just a code.
+         Collect_Labels ("zone_family_display", 2,
+                         Family_Labels, Family_Label_Count);
+         Collect_Labels ("zone_display", 2, Display_Zones, Display_Zone_Count);
          Reset_Table;
          declare
             Current : US.Unbounded_String;
@@ -4774,7 +4784,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|"
+                     Label_Code (Family_Labels, Family_Label_Count,
+                                 S (Rules (Index).B), 1)
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).C)) & "~");
                end if;
             end loop;
@@ -4806,7 +4817,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
 
                   US.Append
                     (Rows,
-                     S (Rules (Index).B) & "|"
+                     Label_Code (Display_Zones, Display_Zone_Count,
+                                 S (Rules (Index).B), 1)
                      & Ada_Expression_UTF8_Hex (S (Rules (Index).C)) & "~");
                end if;
             end loop;
@@ -4828,29 +4840,36 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("      Family : constant String := Time_Zone_DST_Family (Zone);");
          L;
          L;
+         Emit_Label_Chain ("Family_Code", "Family",
+                           Family_Labels, Family_Label_Count, 1);
+         L;
+         Emit_Label_Chain ("Zone_Code", "Zone",
+                           Display_Zones, Display_Zone_Count, 1);
+         L;
+         L ("      --  One coded character, then the hex. The same scan serves");
+         L ("      --  both tables: by here a key is only a code.");
          L ("      function Search (Rows : String; Wanted : String) return String is");
          L ("         Start : Positive := Rows'First;");
          L ("      begin");
+         L ("         if Wanted = "" "" then");
+         L ("            return """";");
+         L ("         end if;");
+         L;
          L ("         while Start <= Rows'Last loop");
          L ("            declare");
-         L ("               Sep : Natural := 0;");
          L ("               Stop : Natural := Rows'Last + 1;");
          L ("            begin");
          L ("               for Index in Start .. Rows'Last loop");
-         L ("                  if Rows (Index) = '|' and then Sep = 0 then");
-         L ("                     Sep := Index;");
-         L ("                  elsif Rows (Index) = '~' then");
+         L ("                  if Rows (Index) = '~' then");
          L ("                     Stop := Index;");
          L ("                     exit;");
          L ("                  end if;");
          L ("               end loop;");
          L;
-         L ("               if Sep /= 0");
-         L ("                 and then Sep > Start");
-         L ("                 and then Stop > Sep + 1");
-         L ("                 and then Rows (Start .. Sep - 1) = Wanted");
+         L ("               if Stop > Start + 1");
+         L ("                 and then Rows (Start .. Start) = Wanted");
          L ("               then");
-         L ("                  return HB (Rows (Sep + 1 .. Stop - 1));");
+         L ("                  return HB (Rows (Start + 1 .. Stop - 1));");
          L ("               end if;");
          L;
          L ("               Start := Stop + 1;");
@@ -4862,7 +4881,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L;
          L ("      --  The locale, then each parent, longest first.");
          L ("      function Family_Display return String is");
-         L ("         Exact : constant String := Search (Zone_Family_Display_Row (Locale), Family);");
+         L ("         Exact : constant String :=");
+         L ("           Search (Zone_Family_Display_Row (Locale), Family_Code);");
          L ("         Canon : constant String := Canonical_Locale (Locale);");
          L ("         Cut : Natural := Canon'Last;");
          L ("      begin");
@@ -4875,7 +4895,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("               declare");
          L ("                  Hit : constant String :=");
          L ("                    Search");
-         L ("                      (Zone_Family_Display_Row (Canon (Canon'First .. Cut - 1)), Family);");
+         L ("                      (Zone_Family_Display_Row (Canon (Canon'First .. Cut - 1)),");
+         L ("                       Family_Code);");
          L ("               begin");
          L ("                  if Hit /= """" then");
          L ("                     return Hit;");
@@ -4890,7 +4911,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L;
          L ("      --  The locale, then each parent, longest first.");
          L ("      function Zone_Display return String is");
-         L ("         Exact : constant String := Search (Zone_Display_Row (Locale), Zone);");
+         L ("         Exact : constant String :=");
+         L ("           Search (Zone_Display_Row (Locale), Zone_Code);");
          L ("         Canon : constant String := Canonical_Locale (Locale);");
          L ("         Cut : Natural := Canon'Last;");
          L ("      begin");
@@ -4903,7 +4925,8 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
          L ("               declare");
          L ("                  Hit : constant String :=");
          L ("                    Search");
-         L ("                      (Zone_Display_Row (Canon (Canon'First .. Cut - 1)), Zone);");
+         L ("                      (Zone_Display_Row (Canon (Canon'First .. Cut - 1)),");
+         L ("                       Zone_Code);");
          L ("               begin");
          L ("                  if Hit /= """" then");
          L ("                     return Hit;");
