@@ -5121,24 +5121,122 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L ("   end Canonical_Time_Zone;");
          L;
+         --  Zone -> index was a chain of up to 447 Canonical = "..." tests.
+         --  It is now a table keyed on the canonical zone name, padded to a
+         --  fixed field so the body can bisect it, with the index packed
+         --  beside each name in base 62. The UTC aliases keep their own guard
+         --  above the table, as they never had a row.
          L ("   function Time_Zone_TZDB_Index (Zone : String) return Natural is");
          L ("      Canonical : constant String := Canonical_Time_Zone (Zone);");
-         L ("   begin");
-         L ("      if Canonical = ""UTC""");
-         L ("        or else Canonical = ""Z""");
-         L ("        or else Canonical = ""GMT""");
-         L ("        or else Canonical = ""Etc/UTC""");
-         L ("        or else Canonical = ""Etc/GMT""");
-         L ("      then");
-         L ("         return 0;");
-         for Zone_Index in 1 .. TZDB_Zone_Count loop
-            L ("      elsif Canonical = """ & S (TZDB_Zone_Names (Zone_Index)) & """ then");
-            L ("         return" & Natural'Image (Zone_Index) & ";");
-         end loop;
-         L ("      else");
-         L ("         return 0;");
-         L ("      end if;");
-         L ("   end Time_Zone_TZDB_Index;");
+         declare
+            type Zone_Entry is record
+               Key   : US.Unbounded_String;
+               Value : Natural;
+            end record;
+
+            Items      : array (1 .. Natural'Max (TZDB_Zone_Count, 1)) of
+              Zone_Entry;
+            Count      : Natural := 0;
+            Zone_Width : Natural := 0;
+            Index_Data : US.Unbounded_String;
+         begin
+            for Zone_Index in 1 .. TZDB_Zone_Count loop
+               Zone_Width :=
+                 Natural'Max
+                   (Zone_Width, S (TZDB_Zone_Names (Zone_Index))'Length);
+            end loop;
+
+            for Zone_Index in 1 .. TZDB_Zone_Count loop
+               declare
+                  Name : constant String := S (TZDB_Zone_Names (Zone_Index));
+               begin
+                  Count := Count + 1;
+                  Items (Count).Key :=
+                    US.To_Unbounded_String
+                      (Name & (1 .. Zone_Width - Name'Length => ' '));
+                  Items (Count).Value := Zone_Index;
+               end;
+            end loop;
+
+            --  Sorted by the padded key so the emitted body can bisect. The
+            --  pad is a space, which sorts below every character a zone name
+            --  contains, so this order matches the raw-name order too.
+            for Outer in 2 .. Count loop
+               declare
+                  Current     : constant Zone_Entry := Items (Outer);
+                  Current_Key : constant String := S (Current.Key);
+                  Probe       : Natural := Outer - 1;
+               begin
+                  while Probe >= 1
+                    and then S (Items (Probe).Key) > Current_Key
+                  loop
+                     Items (Probe + 1) := Items (Probe);
+                     Probe := Probe - 1;
+                  end loop;
+                  Items (Probe + 1) := Current;
+               end;
+            end loop;
+
+            for N in 1 .. Count loop
+               US.Append (Index_Data, S (Items (N).Key));
+               US.Append (Index_Data, To_Base62 (Items (N).Value, 3));
+            end loop;
+
+            L ("      Index_Data : constant String :=");
+            Emit_Unit_String_Expression ("        ", S (Index_Data), ";");
+            L ("      Zone_Width : constant := "
+               & Trim (Integer'Image (Zone_Width)) & ";");
+            L ("      Width : constant := Zone_Width + 3;");
+            L ("      Count : constant Natural := Index_Data'Length / Width;");
+            L;
+            L ("      function Key (N : Positive) return String is");
+            L ("        (Index_Data (Index_Data'First + (N - 1) * Width ..");
+            L ("                     Index_Data'First + (N - 1) * Width"
+               & " + Zone_Width - 1));");
+            L;
+            L ("      function Value_At (N : Positive) return Natural is");
+            L ("         Base : constant Natural :=");
+            L ("           Index_Data'First + (N - 1) * Width + Zone_Width;");
+            L ("      begin");
+            L ("         return N62 (Index_Data (Base .. Base + 2));");
+            L ("      end Value_At;");
+            L;
+            L ("      Low : Natural := 1;");
+            L ("      High : Natural := Count;");
+            L ("      Mid : Natural;");
+            L ("   begin");
+            L ("      if Canonical = ""UTC""");
+            L ("        or else Canonical = ""Z""");
+            L ("        or else Canonical = ""GMT""");
+            L ("        or else Canonical = ""Etc/UTC""");
+            L ("        or else Canonical = ""Etc/GMT""");
+            L ("      then");
+            L ("         return 0;");
+            L ("      end if;");
+            L;
+            L ("      if Canonical'Length = 0"
+               & " or else Canonical'Length > Zone_Width then");
+            L ("         return 0;");
+            L ("      end if;");
+            L;
+            L ("      declare");
+            L ("         Wanted : constant String :=");
+            L ("           Canonical & (1 .. Zone_Width - Canonical'Length => ' ');");
+            L ("      begin");
+            L ("         while Low <= High loop");
+            L ("            Mid := (Low + High) / 2;");
+            L ("            if Key (Mid) = Wanted then");
+            L ("               return Value_At (Mid);");
+            L ("            elsif Key (Mid) < Wanted then");
+            L ("               Low := Mid + 1;");
+            L ("            else");
+            L ("               High := Mid - 1;");
+            L ("            end if;");
+            L ("         end loop;");
+            L ("      end;");
+            L ("      return 0;");
+            L ("   end Time_Zone_TZDB_Index;");
+         end;
          L;
          L ("   function TZDB_Key");
          L ("     (Year   : Natural;");
