@@ -3824,7 +3824,6 @@ procedure Generate_CLDR_Data is
          Index_Name   : String;
          Default_Kind : String)
       is
-         First : Boolean := True;
          Start_Index : Integer := -1;
 
          procedure Emit_Return
@@ -3850,6 +3849,162 @@ procedure Generate_CLDR_Data is
                Term_Number := Term_Number + 1;
             end loop;
          end Emit_Return;
+
+         --  A handful of languages (Chakma, Adlam, ...) carry names the packed
+         --  locale rows do not, keyed by language and index. The chain that
+         --  compared Lang to each in turn becomes a bisected override table:
+         --  the key is the language left-justified in a fixed field followed by
+         --  one index character (so it orders by language, then index), and the
+         --  name is the row's evaluated UTF-8, packed once and VB-decoded. A
+         --  miss falls through to the English case, exactly as the chain did.
+         procedure Emit_Override_Table is
+            Max_Overrides : constant := 512;
+            type Override_Entry is record
+               Key   : US.Unbounded_String;
+               Value : US.Unbounded_String;
+               First : Natural := 0;
+               Last  : Natural := 0;
+            end record;
+
+            Items      : array (1 .. Max_Overrides) of Override_Entry;
+            Count      : Natural := 0;
+            Lang_Width : Natural := 0;
+            Max_Index  : Natural := 0;
+
+            Names     : US.Unbounded_String;
+            Overrides : US.Unbounded_String;
+         begin
+            --  Widths first: the language field is as wide as the widest code,
+            --  and the guard below rejects an index the table never carries.
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, Kind) then
+                  Lang_Width :=
+                    Natural'Max (Lang_Width, S (Rules (Index).A)'Length);
+                  Max_Index :=
+                    Natural'Max
+                      (Max_Index, Decimal_Value (S (Rules (Index).B)));
+               end if;
+            end loop;
+
+            if Lang_Width = 0 then
+               return;
+            end if;
+
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, Kind) then
+                  declare
+                     Lang : constant String := S (Rules (Index).A);
+                     Idx  : constant Natural :=
+                       Decimal_Value (S (Rules (Index).B));
+                  begin
+                     Count := Count + 1;
+                     Items (Count).Key :=
+                       US.To_Unbounded_String
+                         (Lang & (1 .. Lang_Width - Lang'Length => ' ')
+                          & (1 => Character'Val (Character'Pos ('0') + Idx)));
+                     Items (Count).Value :=
+                       US.To_Unbounded_String
+                         (Ada_Expression_UTF8_Hex (S (Rules (Index).C)));
+                  end;
+               end if;
+            end loop;
+
+            --  Sorted by key so the emitted body can bisect.
+            for Outer in 2 .. Count loop
+               declare
+                  Current     : constant Override_Entry := Items (Outer);
+                  Current_Key : constant String := S (Current.Key);
+                  Probe       : Natural := Outer - 1;
+               begin
+                  while Probe >= 1
+                    and then S (Items (Probe).Key) > Current_Key
+                  loop
+                     Items (Probe + 1) := Items (Probe);
+                     Probe := Probe - 1;
+                  end loop;
+                  Items (Probe + 1) := Current;
+               end;
+            end loop;
+
+            --  Pack the value store and the fixed-width index; repeats share
+            --  one copy.
+            for N in 1 .. Count loop
+               US.Append (Overrides, S (Items (N).Key));
+               for Prior in 1 .. N - 1 loop
+                  if US."=" (Items (Prior).Value, Items (N).Value) then
+                     Items (N).First := Items (Prior).First;
+                     Items (N).Last := Items (Prior).Last;
+                     exit;
+                  end if;
+               end loop;
+
+               if Items (N).First = 0 then
+                  declare
+                     Packed : constant String := S (Items (N).Value);
+                  begin
+                     Items (N).First := US.Length (Names) + 1;
+                     Items (N).Last := US.Length (Names) + Packed'Length;
+                     US.Append (Names, Packed);
+                  end;
+               end if;
+
+               US.Append (Overrides, To_Base62 (Items (N).First, 5));
+               US.Append (Overrides, To_Base62 (Items (N).Last, 5));
+            end loop;
+
+            L ("      declare");
+            L ("         Names : constant String :=");
+            Emit_Unit_String_Expression ("           ", S (Names), ";");
+            L ("         Overrides : constant String :=");
+            Emit_Unit_String_Expression ("           ", S (Overrides), ";");
+            L ("         Lang_Width : constant := "
+               & Trim (Integer'Image (Lang_Width)) & ";");
+            L ("         Width : constant := Lang_Width + 11;");
+            L ("         Count : constant Natural := Overrides'Length / Width;");
+            L;
+            L ("         function Key (N : Positive) return String is");
+            L ("           (Overrides (Overrides'First + (N - 1) * Width ..");
+            L ("                       Overrides'First + (N - 1) * Width"
+               & " + Lang_Width));");
+            L;
+            L ("         function Value_At (N : Positive) return String is");
+            L ("            Base : constant Natural :=");
+            L ("              Overrides'First + (N - 1) * Width + Lang_Width + 1;");
+            L ("            F : constant Natural :=");
+            L ("              N62 (Overrides (Base .. Base + 4));");
+            L ("            T : constant Natural :=");
+            L ("              N62 (Overrides (Base + 5 .. Base + 9));");
+            L ("         begin");
+            L ("            return VB (Names (F .. T));");
+            L ("         end Value_At;");
+            L;
+            L ("         Low : Natural := 1;");
+            L ("         High : Natural := Count;");
+            L ("         Mid : Natural;");
+            L ("      begin");
+            L ("         if Lang'Length <= Lang_Width and then " & Index_Name
+               & " <= " & Trim (Integer'Image (Max_Index)) & " then");
+            L ("            declare");
+            L ("               Wanted : constant String :=");
+            L ("                 Lang & (1 .. Lang_Width - Lang'Length => ' ')");
+            L ("                 & (1 => Character'Val (Character'Pos ('0') + "
+               & Index_Name & "));");
+            L ("            begin");
+            L ("               while Low <= High loop");
+            L ("                  Mid := (Low + High) / 2;");
+            L ("                  if Key (Mid) = Wanted then");
+            L ("                     return Value_At (Mid);");
+            L ("                  elsif Key (Mid) < Wanted then");
+            L ("                     Low := Mid + 1;");
+            L ("                  else");
+            L ("                     High := Mid - 1;");
+            L ("                  end if;");
+            L ("               end loop;");
+            L ("            end;");
+            L ("         end if;");
+            L ("      end;");
+            L;
+         end Emit_Override_Table;
       begin
          --  The start index is the same for every locale of a kind, so it is
          --  a literal in the emitted function rather than a column.
@@ -3896,20 +4051,7 @@ procedure Generate_CLDR_Data is
             & " + 1);");
          L ("      end if;");
          L;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, Kind) then
-               L ("      " & (if First then "if" else "elsif")
-                  & " Lang = """ & S (Rules (Index).A) & """ and then "
-                  & Index_Name & " = " & S (Rules (Index).B) & " then");
-               Emit_Return (S (Rules (Index).C));
-               First := False;
-            end if;
-         end loop;
-
-         if not First then
-            L ("      end if;");
-            L;
-         end if;
+         Emit_Override_Table;
 
          L ("      case " & Index_Name & " is");
          for Index in 1 .. Rule_Count loop
