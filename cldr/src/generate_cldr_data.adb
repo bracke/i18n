@@ -2001,7 +2001,6 @@ procedure Generate_CLDR_Data is
       procedure Subunit_Header is
       begin
          L ("pragma Style_Checks (Off);");
-         L ("pragma Warnings (Off);");
          L ("separate (I18N.CLDR_Data)");
       end Subunit_Header;
 
@@ -2014,7 +2013,6 @@ procedure Generate_CLDR_Data is
          L ("   --  Large generated lookup tables intentionally do not follow");
          L ("   --  handwritten Ada style layout.");
          L ("   pragma Style_Checks (Off);");
-         L ("   pragma Warnings (Off);");
          L;
          L ("   function U (Code : Natural) return String is");
          L ("   begin");
@@ -2141,27 +2139,6 @@ procedure Generate_CLDR_Data is
          L ("           & H (Hex (First + 4 .. Hex'Last));");
          L ("      end if;");
          L ("   end H;");
-         L;
-         L ("   function HB (Hex : String) return String is");
-         L ("   begin");
-         L ("      if Hex'Length = 0 then");
-         L ("         return """";");
-         L ("      else");
-         L ("         declare");
-         L ("            Result : String (1 .. Hex'Length / 2);");
-         L ("            Source : Natural;");
-         L ("         begin");
-         L ("            for Index in Result'Range loop");
-         L ("               Source := Hex'First + (Index - Result'First) * 2;");
-         L ("               Result (Index) :=");
-         L ("                 Character'Val");
-         L ("                   (Hex_Value (Hex (Source)) * 16");
-         L ("                    + Hex_Value (Hex (Source + 1)));");
-         L ("            end loop;");
-         L ("            return Result;");
-         L ("         end;");
-         L ("      end if;");
-         L ("   end HB;");
          L;
          L ("   function Currency_Name_From_Payload");
          L ("     (Payload  : String;");
@@ -2794,7 +2771,7 @@ procedure Generate_CLDR_Data is
          L;
          L ("      function Padded (Cand : String) return String is");
          L ("        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)");
-         L ("         else Cand & (1 .. 14 - Cand'Length => ' '));");
+         L ("         else Cand & [1 .. 14 - Cand'Length => ' ']);");
          L;
          L ("      function Value_At (N : Positive) return String is");
          L ("         Base : constant Natural :=");
@@ -2819,7 +2796,10 @@ procedure Generate_CLDR_Data is
          L ("         High : Natural := Count;");
          L ("         Mid : Natural;");
          L ("      begin");
-         L ("         if Cand'Length = 0 or else Count = 0 then");
+         --  No "Count = 0" disjunct: an empty table leaves High at 0, so the
+         --  loop below already answers "" without it -- and where the table is
+         --  non-empty (a static literal), GNAT flags the test as always False.
+         L ("         if Cand'Length = 0 then");
          L ("            return """";");
          L ("         end if;");
          L;
@@ -3410,7 +3390,7 @@ procedure Generate_CLDR_Data is
          L;
          L ("      function Padded (Cand : String) return String is");
          L ("        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)");
-         L ("         else Cand & (1 .. 14 - Cand'Length => ' '));");
+         L ("         else Cand & [1 .. 14 - Cand'Length => ' ']);");
          L;
          L ("      function Value_At (N : Positive) return String is");
          L ("         Base : constant Natural :=");
@@ -3986,9 +3966,9 @@ procedure Generate_CLDR_Data is
                & " <= " & Trim (Integer'Image (Max_Index)) & " then");
             L ("            declare");
             L ("               Wanted : constant String :=");
-            L ("                 Lang & (1 .. Lang_Width - Lang'Length => ' ')");
-            L ("                 & (1 => Character'Val (Character'Pos ('0') + "
-               & Index_Name & "));");
+            L ("                 Lang & [1 .. Lang_Width - Lang'Length => ' ']");
+            L ("                 & [1 => Character'Val (Character'Pos ('0') + "
+               & Index_Name & ")];");
             L ("            begin");
             L ("               while Low <= High loop");
             L ("                  Mid := (Low + High) / 2;");
@@ -4038,11 +4018,16 @@ procedure Generate_CLDR_Data is
          L ("      Row : constant String := " & Name & "_Row (Locale);");
          L ("   begin");
          L ("      if Row /= """" then");
-         L ("         if " & Index_Name & " < " & Trim (Integer'Image (Start_Index))
-            & " then");
-         L ("            return """";");
-         L ("         end if;");
-         L;
+         --  The low-bound guard is only meaningful when the start index is
+         --  positive; for a zero-based kind (weekdays) the argument is Natural,
+         --  so "< 0" is impossible and GNAT would flag it as always False.
+         if Start_Index > 0 then
+            L ("         if " & Index_Name & " < "
+               & Trim (Integer'Image (Start_Index)) & " then");
+            L ("            return """";");
+            L ("         end if;");
+            L;
+         end if;
          L ("         --  Hex_List_Item answers """" past the end of the row, so");
          L ("         --  only the low bound needs a guard here -- and it does");
          L ("         --  need one, since Number is Positive.");
@@ -4404,9 +4389,9 @@ procedure Generate_CLDR_Data is
             L ("            end if;");
             L ("            declare");
             L ("               Wanted : constant String :=");
-            L ("                 Cand & (1 .. Loc_Width - Cand'Length => ' ')");
-            L ("                 & (1 => Character'Val"
-               & " (Character'Pos ('0') + Quarter));");
+            L ("                 Cand & [1 .. Loc_Width - Cand'Length => ' ']");
+            L ("                 & [1 => Character'Val"
+               & " (Character'Pos ('0') + Quarter)];");
             L ("            begin");
             L ("               while Low <= High loop");
             L ("                  Mid := (Low + High) / 2;");
@@ -5064,7 +5049,7 @@ procedure Generate_CLDR_Data is
          --  above: Initial_Offset, First, Last -- and Key, Offset for the
          --  transitions.
          L ("   TZDB_Zones : constant array (Positive range <>) of TZDB_Zone_Data :=");
-         L ("     (");
+         L ("     [");
          for Zone_Index in 1 .. TZDB_Zone_Count loop
             declare
                First : Natural := 0;
@@ -5086,10 +5071,10 @@ procedure Generate_CLDR_Data is
                   & (if Zone_Index = TZDB_Zone_Count then "" else ","));
             end;
          end loop;
-         L ("     );");
+         L ("     ];");
          L;
          L ("   TZDB_Transitions : constant array (Positive range <>) of TZDB_Transition :=");
-         L ("     (");
+         L ("     [");
          for Transition_Index in 1 .. TZDB_Transition_Count loop
             L ("      ("
                & Trim (Long_Long_Integer'Image
@@ -5099,7 +5084,7 @@ procedure Generate_CLDR_Data is
                & ")"
                & (if Transition_Index = TZDB_Transition_Count then "" else ","));
          end loop;
-         L ("     );");
+         L ("     ];");
          L;
          --  Alias -> canonical was a chain of up to 153 Zone = "..." tests.
          --  It is now a table keyed on the alias name, padded to a fixed field,
@@ -5232,7 +5217,7 @@ procedure Generate_CLDR_Data is
             L ("      if Zone'Length <= Link_Width then");
             L ("         declare");
             L ("            Wanted : constant String :=");
-            L ("              Zone & (1 .. Link_Width - Zone'Length => ' ');");
+            L ("              Zone & [1 .. Link_Width - Zone'Length => ' '];");
             L ("         begin");
             L ("            while Low <= High loop");
             L ("               Mid := (Low + High) / 2;");
@@ -5350,7 +5335,7 @@ procedure Generate_CLDR_Data is
             L;
             L ("      declare");
             L ("         Wanted : constant String :=");
-            L ("           Canonical & (1 .. Zone_Width - Canonical'Length => ' ');");
+            L ("           Canonical & [1 .. Zone_Width - Canonical'Length => ' '];");
             L ("      begin");
             L ("         while Low <= High loop");
             L ("            Mid := (Low + High) / 2;");
@@ -6220,7 +6205,7 @@ procedure Generate_CLDR_Data is
          L ("         Mid : Natural;");
          L ("         Wanted : constant String :=");
          L ("           (if Zone'Length >= 32 then Zone (Zone'First .. Zone'First + 31)");
-         L ("            else Zone & (1 .. 32 - Zone'Length => ' '));");
+         L ("            else Zone & [1 .. 32 - Zone'Length => ' ']);");
          L ("      begin");
          L ("         while Low <= High loop");
          L ("            Mid := (Low + High) / 2;");
@@ -8338,7 +8323,7 @@ procedure Generate_CLDR_Data is
          L ("         Mid : Natural;");
          L ("         Wanted : constant String :=");
          L ("           (if Base'Length >= 33 then Base (Base'First .. Base'First + 32)");
-         L ("            else Base & (1 .. 33 - Base'Length => ' '));");
+         L ("            else Base & [1 .. 33 - Base'Length => ' ']);");
          L ("      begin");
          L ("         while Low <= High loop");
          L ("            Mid := (Low + High) / 2;");
