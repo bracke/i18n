@@ -7,8 +7,6 @@ with Ada.Strings.Hash;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
-with Project_Tools.Files;
-
 procedure Import_CLDR_Subset is
    package US renames Ada.Strings.Unbounded;
    package String_Sets is new Ada.Containers.Indefinite_Hashed_Sets
@@ -1447,6 +1445,7 @@ begin
 
    declare
       Generated : constant String := Generate;
+      pragma Unreferenced (Generated);
    begin
       if Errors /= 0 then
          Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

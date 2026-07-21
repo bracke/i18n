@@ -30,6 +30,7 @@ procedure Import_CLDR_Raw is
    Source_Record_Count : Natural := 0;
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
+   pragma Unreferenced (S);
 
    procedure Add_Error (Message : String) is
    begin
@@ -1067,6 +1068,7 @@ begin
 
    declare
       Generated : constant String := Generate;
+      pragma Unreferenced (Generated);
    begin
       if Errors = 0 then
          Validate_Source_Manifest;

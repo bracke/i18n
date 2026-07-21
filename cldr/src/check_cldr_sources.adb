@@ -548,6 +548,7 @@ procedure Check_CLDR_Sources is
       Require_Day_Period ("dayPeriodWide");
       Require_Day_Period ("dayPeriodAbbreviated");
    end Validate_Selected_Date_Source;
+   pragma Unreferenced (Validate_Selected_Date_Source);
 
    procedure Validate_Full_Date_Source (Path : String; Text : String) is
       Full_Path : constant String := "upstream/" & Path;
@@ -674,6 +675,7 @@ procedure Check_CLDR_Sources is
             & " must declare relativeUnitRows locale/base/category/value rows");
       end if;
    end Validate_List_Source;
+   pragma Unreferenced (Validate_List_Source);
 
    procedure Validate_Time_Zone_Source (Path : String; Text : String) is
       Full_Path : constant String := "upstream/" & Path;
@@ -702,6 +704,7 @@ procedure Check_CLDR_Sources is
             & " must declare zoneShortFamilyRows locale/family/standard/daylight/generic rows");
       end if;
    end Validate_Time_Zone_Source;
+   pragma Unreferenced (Validate_Time_Zone_Source);
 
    procedure Validate_Full_Time_Zone_Source (Path : String; Text : String) is
       Full_Path  : constant String := "upstream/" & Path;

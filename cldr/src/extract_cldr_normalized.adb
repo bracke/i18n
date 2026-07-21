@@ -1676,6 +1676,7 @@ begin
 
    declare
       Generated : constant String := Generate;
+      pragma Unreferenced (Generated);
    begin
       if Errors /= 0 then
          Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

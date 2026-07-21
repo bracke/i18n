@@ -77,7 +77,6 @@ procedure Generate_CLDR_Data is
    --  Set from --locales=; "all" is every locale in the pinned subset.
    Wanted_Locales : US.Unbounded_String := US.To_Unbounded_String ("all");
 
-
    function S (Value : US.Unbounded_String) return String renames US.To_String;
 
    function Trim (Value : String) return String is
@@ -453,7 +452,6 @@ procedure Generate_CLDR_Data is
         (TZDB_Path & ": line" & Positive'Image (Line_Number) & ": " & Message);
    end Add_TZDB_Line_Error;
 
-
    --  --locales=en,de,fr narrows the generated tables; the default is every
    --  locale in the pinned subset. The value comes from the crate
    --  configuration variable of the same name.
@@ -578,7 +576,8 @@ procedure Generate_CLDR_Data is
          if not (C in 'A' .. 'Z'
                  or else C in 'a' .. 'z'
                  or else C in '0' .. '9'
-                 or else C in '_' | '-' | '+' | '/') then
+                 or else C in '_' | '-' | '+' | '/')
+         then
             return False;
          end if;
       end loop;
@@ -638,6 +637,7 @@ procedure Generate_CLDR_Data is
 
       return 0;
    end TZDB_Zone_Index;
+   pragma Unreferenced (TZDB_Zone_Index);
 
    function Is_Decimal_Text (Value : String) return Boolean is
    begin
@@ -1161,15 +1161,15 @@ procedure Generate_CLDR_Data is
                      or else Decimal_Value (Field (Line, 3)) > 12)
          then
             Add_Line_Error (Line_Number, "month index must be 1 through 12");
-        elsif (Kind = "weekday_full" or else Kind = "weekday_short")
+         elsif (Kind = "weekday_full" or else Kind = "weekday_short")
            and then Decimal_Value (Field (Line, 3)) > 6
          then
             Add_Line_Error (Line_Number, "weekday index must be 0 through 6");
-        elsif (Kind = "quarter" or else Kind = "quarter_short")
-          and then (Decimal_Value (Field (Line, 3)) < 1
-                    or else Decimal_Value (Field (Line, 3)) > 4)
-        then
-           Add_Line_Error (Line_Number, "quarter index must be 1 through 4");
+         elsif (Kind = "quarter" or else Kind = "quarter_short")
+           and then (Decimal_Value (Field (Line, 3)) < 1
+                     or else Decimal_Value (Field (Line, 3)) > 4)
+         then
+            Add_Line_Error (Line_Number, "quarter index must be 1 through 4");
          end if;
          Add_Rule (Kind, Field (Line, 2), Field (Line, 3), Field (Line, 4));
       elsif Kind = "name_set_hex" then
@@ -1592,7 +1592,6 @@ procedure Generate_CLDR_Data is
    end Add_TZDB_Transition;
 
    procedure Load_TZDB_Transitions is
-      use type US.Unbounded_String;
 
       Zic   : constant String := Project_Tools.Processes.Locate_Command ("zic");
       ZDump : constant String := Project_Tools.Processes.Locate_Command ("zdump");
@@ -1702,7 +1701,7 @@ procedure Generate_CLDR_Data is
       Ada.Directories.Create_Path (Out_Dir);
 
       declare
-         Args : GNAT.OS_Lib.Argument_List (1 .. 3) :=
+         Args : constant GNAT.OS_Lib.Argument_List (1 .. 3) :=
            [new String'("-d"), new String'(Out_Dir), new String'(TZDB_Path)];
       begin
          if Project_Tools.Processes.Run_Status
@@ -1717,10 +1716,10 @@ procedure Generate_CLDR_Data is
          declare
             Zone_Path : constant String := Out_Dir & "/" & S (TZDB_Zone_Names (Zone_Index));
             Output    : US.Unbounded_String;
-            Args_I    : GNAT.OS_Lib.Argument_List (1 .. 4) :=
+            Args_I    : constant GNAT.OS_Lib.Argument_List (1 .. 4) :=
               [new String'("-i"), new String'("-c"), new String'("1900,2051"),
                new String'(Zone_Path)];
-            Args_V    : GNAT.OS_Lib.Argument_List (1 .. 4) :=
+            Args_V    : constant GNAT.OS_Lib.Argument_List (1 .. 4) :=
               [new String'("-v"), new String'("-c"), new String'("1900,2051"),
                new String'(Zone_Path)];
          begin
@@ -1786,6 +1785,7 @@ procedure Generate_CLDR_Data is
          end if;
          raise;
    end File_Equals_Content;
+   pragma Unreferenced (File_Equals_Content);
 
    function File_Equals_File (Left_Path : String; Right_Path : String) return Boolean is
       use Ada.Streams;
@@ -1914,6 +1914,7 @@ procedure Generate_CLDR_Data is
          return False;
       end if;
    end Duplicate_Key;
+   pragma Unreferenced (Duplicate_Key);
 
    procedure Validate_Rules is
       Has_Month_Full_EN    : array (1 .. 12) of Boolean := [others => False];
@@ -2588,7 +2589,7 @@ procedure Generate_CLDR_Data is
             end if;
          end loop;
 
-         return (1 .. Width => ' ');
+         return [1 .. Width => ' '];
       end Label_Code;
 
       --  A chain, for a handful of labels. Anything unmatched codes as
@@ -2655,7 +2656,7 @@ procedure Generate_CLDR_Data is
                   Add_Error ("label does not fit the index: " & Name);
                end if;
                US.Append (Index_Text, Name);
-               US.Append (Index_Text, (1 .. Key_Width - Name'Length => ' '));
+               US.Append (Index_Text, [1 .. Key_Width - Name'Length => ' ']);
                US.Append
                  (Index_Text, Label_Code (Names, Count, Name, Code_Width));
             end;
@@ -2722,7 +2723,7 @@ procedure Generate_CLDR_Data is
                   --  silently widens to eight rather than truncating, which
                   --  shifts every record after it.
                   US.Append (Index_Data, Key);
-                  US.Append (Index_Data, (1 .. 14 - Key'Length => ' '));
+                  US.Append (Index_Data, [1 .. 14 - Key'Length => ' ']);
                   US.Append (Index_Data, First);
                   US.Append (Index_Data, Last);
                end;
@@ -3372,10 +3373,10 @@ procedure Generate_CLDR_Data is
                   begin
                      US.Append (Skeleton_Index, Skeleton);
                      US.Append
-                       (Skeleton_Index, (1 .. 8 - Skeleton'Length => ' '));
-                     US.Append (Skeleton_Index, (1 .. 7 - F'Length => '0'));
+                       (Skeleton_Index, [1 .. 8 - Skeleton'Length => ' ']);
+                     US.Append (Skeleton_Index, [1 .. 7 - F'Length => '0']);
                      US.Append (Skeleton_Index, F);
-                     US.Append (Skeleton_Index, (1 .. 7 - T'Length => '0'));
+                     US.Append (Skeleton_Index, [1 .. 7 - T'Length => '0']);
                      US.Append (Skeleton_Index, T);
                   end;
                end;
@@ -4284,7 +4285,7 @@ procedure Generate_CLDR_Data is
                Add_Table_Entry (S (Current), S (Rows));
             end if;
          end;
-Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
+         Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
 
          L;
          L ("   function Day_Period_Name");
@@ -4644,6 +4645,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
                Term := Term + 1;
             end loop;
          end Emit_String_Expression;
+         pragma Unreferenced (Emit_String_Expression);
 
          function Zone_Exemplar_Data return String is
             Result : US.Unbounded_String;
@@ -4661,6 +4663,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
 
             return S (Result);
          end Zone_Exemplar_Data;
+         pragma Unreferenced (Zone_Exemplar_Data);
       begin
          L;
          L ("   type TZDB_Zone_Data is record");
@@ -5717,7 +5720,7 @@ Emit_Locale_Table ("Day_Period_Row", """""", Raw => True);
                Add_Table_Entry (S (Current), S (Rows));
             end if;
          end;
-Emit_Locale_Table
+         Emit_Locale_Table
            ("Zone_Family_Row", """""", Raw => True, Walk_Parents => False);
 
          L;
@@ -5997,6 +6000,7 @@ Emit_Locale_Table
                Term := Term + 1;
             end loop;
          end Emit_String_Argument;
+         pragma Unreferenced (Emit_String_Argument);
       begin
          L;
          L ("   function Currency_Display_Name");
@@ -7623,6 +7627,7 @@ Emit_Locale_Table
                Start := Stop + 1;
             end loop;
          end Emit_String_Term;
+         pragma Unreferenced (Emit_String_Term);
       begin
          Collect_Unit_Bases;
          L;
@@ -7688,7 +7693,7 @@ Emit_Locale_Table
                   Name : constant String := S (Unit_Base_Names (Position));
                begin
                   US.Append (Index_Text, Name);
-                  US.Append (Index_Text, (1 .. 33 - Name'Length => ' '));
+                  US.Append (Index_Text, [1 .. 33 - Name'Length => ' ']);
                   US.Append (Index_Text, Unit_Base_Code (Name));
                end;
             end loop;
@@ -9608,72 +9613,72 @@ Emit_Locale_Table
          L ("         return (if Plural then ""meters"" else ""meter"");");
          L ("      elsif Base = ""kilometer"" then");
          L ("         return (if Plural then ""kilometers"" else ""kilometer"");");
-      L ("      elsif Base = ""mile"" then");
-      L ("         return (if Plural then ""miles"" else ""mile"");");
-      L ("      elsif Base = ""yard"" then");
-      L ("         return (if Plural then ""yards"" else ""yard"");");
-      L ("      elsif Base = ""foot"" then");
-      L ("         return (if Plural then ""feet"" else ""foot"");");
-      L ("      elsif Base = ""inch"" then");
-      L ("         return (if Plural then ""inches"" else ""inch"");");
-      L ("      elsif Base = ""centimeter"" then");
-      L ("         return (if Plural then ""centimeters"" else ""centimeter"");");
-      L ("      elsif Base = ""millimeter"" then");
-      L ("         return (if Plural then ""millimeters"" else ""millimeter"");");
-      L ("      elsif Base = ""nautical-mile"" then");
-      L ("         return (if Plural then ""nautical miles"" else ""nautical mile"");");
-      L ("      elsif Base = ""astronomical-unit"" then");
-      L ("         return (if Plural then ""astronomical units"" else ""astronomical unit"");");
-      L ("      elsif Base = ""light-year"" then");
-      L ("         return (if Plural then ""light years"" else ""light year"");");
-      L ("      elsif Base = ""parsec"" then");
-      L ("         return (if Plural then ""parsecs"" else ""parsec"");");
-      L ("      elsif Base = ""fathom"" then");
-      L ("         return (if Plural then ""fathoms"" else ""fathom"");");
-      L ("      elsif Base = ""furlong"" then");
-      L ("         return (if Plural then ""furlongs"" else ""furlong"");");
-      L ("      elsif Base = ""pixel"" then");
-      L ("         return (if Plural then ""pixels"" else ""pixel"");");
-      L ("      elsif Base = ""point"" then");
-      L ("         return (if Plural then ""points"" else ""point"");");
-      L ("      elsif Base = ""solar-radius"" then");
-      L ("         return (if Plural then ""solar radii"" else ""solar radius"");");
-      L ("      elsif Base = ""liter"" then");
-      L ("         return (if Plural then ""liters"" else ""liter"");");
-      L ("      elsif Base = ""milliliter"" then");
-      L ("         return (if Plural then ""milliliters"" else ""milliliter"");");
-      L ("      elsif Base = ""gallon"" then");
-      L ("         return (if Plural then ""gallons"" else ""gallon"");");
-      L ("      elsif Base = ""fluid-ounce"" then");
-      L ("         return (if Plural then ""fluid ounces"" else ""fluid ounce"");");
-      L ("      elsif Base = ""cup"" then");
-      L ("         return (if Plural then ""cups"" else ""cup"");");
-      L ("      elsif Base = ""pint"" then");
-      L ("         return (if Plural then ""pints"" else ""pint"");");
-      L ("      elsif Base = ""quart"" then");
-      L ("         return (if Plural then ""quarts"" else ""quart"");");
-      L ("      elsif Base = ""gram"" then");
-      L ("         return (if Plural then ""grams"" else ""gram"");");
-      L ("      elsif Base = ""kilogram"" then");
-      L ("         return (if Plural then ""kilograms"" else ""kilogram"");");
-      L ("      elsif Base = ""milligram"" then");
-      L ("         return (if Plural then ""milligrams"" else ""milligram"");");
-      L ("      elsif Base = ""tonne"" then");
-      L ("         return (if Plural then ""tonnes"" else ""tonne"");");
-      L ("      elsif Base = ""pound"" then");
-      L ("         return (if Plural then ""pounds"" else ""pound"");");
-      L ("      elsif Base = ""ounce"" then");
-      L ("         return (if Plural then ""ounces"" else ""ounce"");");
-      L ("      elsif Base = ""stone"" then");
-      L ("         return (if Plural then ""stones"" else ""stone"");");
-      L ("      elsif Base = ""carat"" then");
-      L ("         return (if Plural then ""carats"" else ""carat"");");
-      L ("      elsif Base = ""nanosecond"" then");
-      L ("         return (if Plural then ""nanoseconds"" else ""nanosecond"");");
-      L ("      elsif Base = ""microsecond"" then");
-      L ("         return (if Plural then ""microseconds"" else ""microsecond"");");
-      L ("      elsif Base = ""millisecond"" then");
-      L ("         return (if Plural then ""milliseconds"" else ""millisecond"");");
+         L ("      elsif Base = ""mile"" then");
+         L ("         return (if Plural then ""miles"" else ""mile"");");
+         L ("      elsif Base = ""yard"" then");
+         L ("         return (if Plural then ""yards"" else ""yard"");");
+         L ("      elsif Base = ""foot"" then");
+         L ("         return (if Plural then ""feet"" else ""foot"");");
+         L ("      elsif Base = ""inch"" then");
+         L ("         return (if Plural then ""inches"" else ""inch"");");
+         L ("      elsif Base = ""centimeter"" then");
+         L ("         return (if Plural then ""centimeters"" else ""centimeter"");");
+         L ("      elsif Base = ""millimeter"" then");
+         L ("         return (if Plural then ""millimeters"" else ""millimeter"");");
+         L ("      elsif Base = ""nautical-mile"" then");
+         L ("         return (if Plural then ""nautical miles"" else ""nautical mile"");");
+         L ("      elsif Base = ""astronomical-unit"" then");
+         L ("         return (if Plural then ""astronomical units"" else ""astronomical unit"");");
+         L ("      elsif Base = ""light-year"" then");
+         L ("         return (if Plural then ""light years"" else ""light year"");");
+         L ("      elsif Base = ""parsec"" then");
+         L ("         return (if Plural then ""parsecs"" else ""parsec"");");
+         L ("      elsif Base = ""fathom"" then");
+         L ("         return (if Plural then ""fathoms"" else ""fathom"");");
+         L ("      elsif Base = ""furlong"" then");
+         L ("         return (if Plural then ""furlongs"" else ""furlong"");");
+         L ("      elsif Base = ""pixel"" then");
+         L ("         return (if Plural then ""pixels"" else ""pixel"");");
+         L ("      elsif Base = ""point"" then");
+         L ("         return (if Plural then ""points"" else ""point"");");
+         L ("      elsif Base = ""solar-radius"" then");
+         L ("         return (if Plural then ""solar radii"" else ""solar radius"");");
+         L ("      elsif Base = ""liter"" then");
+         L ("         return (if Plural then ""liters"" else ""liter"");");
+         L ("      elsif Base = ""milliliter"" then");
+         L ("         return (if Plural then ""milliliters"" else ""milliliter"");");
+         L ("      elsif Base = ""gallon"" then");
+         L ("         return (if Plural then ""gallons"" else ""gallon"");");
+         L ("      elsif Base = ""fluid-ounce"" then");
+         L ("         return (if Plural then ""fluid ounces"" else ""fluid ounce"");");
+         L ("      elsif Base = ""cup"" then");
+         L ("         return (if Plural then ""cups"" else ""cup"");");
+         L ("      elsif Base = ""pint"" then");
+         L ("         return (if Plural then ""pints"" else ""pint"");");
+         L ("      elsif Base = ""quart"" then");
+         L ("         return (if Plural then ""quarts"" else ""quart"");");
+         L ("      elsif Base = ""gram"" then");
+         L ("         return (if Plural then ""grams"" else ""gram"");");
+         L ("      elsif Base = ""kilogram"" then");
+         L ("         return (if Plural then ""kilograms"" else ""kilogram"");");
+         L ("      elsif Base = ""milligram"" then");
+         L ("         return (if Plural then ""milligrams"" else ""milligram"");");
+         L ("      elsif Base = ""tonne"" then");
+         L ("         return (if Plural then ""tonnes"" else ""tonne"");");
+         L ("      elsif Base = ""pound"" then");
+         L ("         return (if Plural then ""pounds"" else ""pound"");");
+         L ("      elsif Base = ""ounce"" then");
+         L ("         return (if Plural then ""ounces"" else ""ounce"");");
+         L ("      elsif Base = ""stone"" then");
+         L ("         return (if Plural then ""stones"" else ""stone"");");
+         L ("      elsif Base = ""carat"" then");
+         L ("         return (if Plural then ""carats"" else ""carat"");");
+         L ("      elsif Base = ""nanosecond"" then");
+         L ("         return (if Plural then ""nanoseconds"" else ""nanosecond"");");
+         L ("      elsif Base = ""microsecond"" then");
+         L ("         return (if Plural then ""microseconds"" else ""microsecond"");");
+         L ("      elsif Base = ""millisecond"" then");
+         L ("         return (if Plural then ""milliseconds"" else ""millisecond"");");
          L ("      elsif Base = ""second"" then");
          L ("         return (if Plural then ""seconds"" else ""second"");");
          L ("      elsif Base = ""minute"" then");
@@ -9756,18 +9761,18 @@ Emit_Locale_Table
          L ("         return (if Plural then ""pascals"" else ""pascal"");");
          L ("      elsif Base = ""kilopascal"" then");
          L ("         return (if Plural then ""kilopascals"" else ""kilopascal"");");
-      L ("      elsif Base = ""millibar"" then");
-      L ("         return (if Plural then ""millibars"" else ""millibar"");");
-      L ("      elsif Base = ""bar"" then");
-      L ("         return (if Plural then ""bars"" else ""bar"");");
-      L ("      elsif Base = ""atmosphere"" then");
-      L ("         return (if Plural then ""atmospheres"" else ""atmosphere"");");
-      L ("      elsif Base = ""inch-ofhg"" then");
-      L ("         return (if Plural then ""inches of mercury"" else ""inch of mercury"");");
-      L ("      elsif Base = ""millimeter-ofhg"" then");
-      L ("         return (if Plural then ""millimeters of mercury"" else ""millimeter of mercury"");");
-      L ("      elsif Base = ""ampere"" then");
-      L ("         return (if Plural then ""amperes"" else ""ampere"");");
+         L ("      elsif Base = ""millibar"" then");
+         L ("         return (if Plural then ""millibars"" else ""millibar"");");
+         L ("      elsif Base = ""bar"" then");
+         L ("         return (if Plural then ""bars"" else ""bar"");");
+         L ("      elsif Base = ""atmosphere"" then");
+         L ("         return (if Plural then ""atmospheres"" else ""atmosphere"");");
+         L ("      elsif Base = ""inch-ofhg"" then");
+         L ("         return (if Plural then ""inches of mercury"" else ""inch of mercury"");");
+         L ("      elsif Base = ""millimeter-ofhg"" then");
+         L ("         return (if Plural then ""millimeters of mercury"" else ""millimeter of mercury"");");
+         L ("      elsif Base = ""ampere"" then");
+         L ("         return (if Plural then ""amperes"" else ""ampere"");");
          L ("      elsif Base = ""volt"" then");
          L ("         return (if Plural then ""volts"" else ""volt"");");
          L ("      elsif Base = ""ohm"" then");
@@ -10712,7 +10717,7 @@ Emit_Locale_Table
                Add_Table_Entry (S (Current), S (Rows));
             end if;
          end;
-Emit_Locale_Table
+         Emit_Locale_Table
            ("Relative_Unit_Row", """""", Raw => True, Walk_Parents => False);
 
          L;
@@ -11445,6 +11450,7 @@ begin
 
    declare
       Generated : constant String := Generate;
+      pragma Unreferenced (Generated);
    begin
       if Has_Argument ("--check") then
          if File_Equals_File (Generated_Path, Target_Path)

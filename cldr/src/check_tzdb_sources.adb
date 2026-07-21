@@ -136,7 +136,8 @@ procedure Check_TZDB_Sources is
          if not (C in 'A' .. 'Z'
                  or else C in 'a' .. 'z'
                  or else C in '0' .. '9'
-                 or else C in '_' | '-' | '+' | '/') then
+                 or else C in '_' | '-' | '+' | '/')
+         then
             return False;
          end if;
       end loop;

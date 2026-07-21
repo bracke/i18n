@@ -150,7 +150,8 @@ procedure Generate_CLDR_Export is
          if not (C in 'A' .. 'Z'
                  or else C in 'a' .. 'z'
                  or else C in '0' .. '9'
-                 or else C in '_' | '-' | '+' | '/') then
+                 or else C in '_' | '-' | '+' | '/')
+         then
             return False;
          end if;
       end loop;
@@ -1065,6 +1066,7 @@ procedure Generate_CLDR_Export is
              ("upstream/cldr-json/cldr-core/supplemental/currencyData.json");
          Fractions      : constant String :=
            Object_Field_Object (Currency_Source, "fractions");
+         pragma Unreferenced (Fractions);
          Max_Locales    : constant := 1_000;
          Locales        : array (1 .. Max_Locales) of US.Unbounded_String;
          Payloads       : array (1 .. Max_Locales) of US.Unbounded_String;
@@ -1135,6 +1137,7 @@ procedure Generate_CLDR_Export is
             Payload : US.Unbounded_String;
 
             procedure Add_Code (Code : String; Value : String) is
+               pragma Unreferenced (Value);
                Object : constant String := Object_Field_Object (Currency_Data, Code);
                Base   : constant String :=
                  Project_Tools.JSON.Object_Field_Value (Object, "displayName");
@@ -1288,6 +1291,7 @@ procedure Generate_CLDR_Export is
                & Source_Value (Path, Field)
                & """}");
          end Emit_Plural_Family;
+         pragma Unreferenced (Emit_Plural_Family);
 
          function Rule_Body (Rule : String) return String is
          begin
@@ -1458,240 +1462,6 @@ procedure Generate_CLDR_Export is
             Emit_Real_Plural_Family ("ordinal", "uk-ordinal", Ordinal_Root, "uk");
          end;
          return;
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""n-is-1"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalNOneIs1")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""one-is-1"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalIOneVZero")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""one-is-0-or-1"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalNZeroOrOne")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""i-0-or-n-1"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalIZeroOrNOne")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""n-one-two"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalNOneTwo")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""n-is-1-compact-many"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalNOneCompactMany")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""i-0-1-compact-many"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalI01CompactMany")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""i-0-to-1-compact-many"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalI0To1CompactMany")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""i-1-v0-compact-many"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalI1V0CompactMany")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""ru"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalRu")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""pl"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalPl")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""cs"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalCs")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""ar"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalAr")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""ro"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalRo")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""lt"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalLt")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""sl"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalSl")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""sr"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalSr")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""cy"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalCy")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""cardinal"",""family"":""zero-one"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/plurals.json", "cardinalKsh")
-            & """}");
-         Emit_Plural_Family
-           ("cardinal", "ceb", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalCeb");
-         Emit_Plural_Family
-           ("cardinal", "ff", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalFf");
-         Emit_Plural_Family
-           ("cardinal", "dsb", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalDsb");
-         Emit_Plural_Family
-           ("cardinal", "lv", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalLv");
-         Emit_Plural_Family
-           ("cardinal", "be", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalBe");
-         Emit_Plural_Family
-           ("cardinal", "br", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalBr");
-         Emit_Plural_Family
-           ("cardinal", "da", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalDa");
-         Emit_Plural_Family
-           ("cardinal", "ga", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalGa");
-         Emit_Plural_Family
-           ("cardinal", "gd", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalGd");
-         Emit_Plural_Family
-           ("cardinal", "gv", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalGv");
-         Emit_Plural_Family
-           ("cardinal", "he", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalHe");
-         Emit_Plural_Family
-           ("cardinal", "is", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalIs");
-         Emit_Plural_Family
-           ("cardinal", "kw", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalKw");
-         Emit_Plural_Family
-           ("cardinal", "lag", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalLag");
-         Emit_Plural_Family
-           ("cardinal", "mk", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalMk");
-         Emit_Plural_Family
-           ("cardinal", "mt", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalMt");
-         Emit_Plural_Family
-           ("cardinal", "shi", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalShi");
-         Emit_Plural_Family
-           ("cardinal", "si", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalSi");
-         Emit_Plural_Family
-           ("cardinal", "tzm", "cldr-json/cldr-core/supplemental/plurals.json",
-            "cardinalTzm");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""ordinal"",""family"":""en-ordinal"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/ordinals.json", "ordinalEn")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""ordinal"",""family"":""n-one-ordinal"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/ordinals.json", "ordinalNOne")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""ordinal"",""family"":""it-ordinal"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/ordinals.json", "ordinalItalianMany")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""ordinal"",""family"":""indic-ordinal"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/ordinals.json", "ordinalIndic")
-            & """}");
-         Emit_JSON
-           ("{""type"":""plural_family"",""kind"":""ordinal"",""family"":""hi-ordinal"",""locales"":"""
-            & Source_Value
-                ("cldr-json/cldr-core/supplemental/ordinals.json", "ordinalHi")
-            & """}");
-         Emit_Plural_Family
-           ("ordinal", "az-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalAz");
-         Emit_Plural_Family
-           ("ordinal", "be-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalBe");
-         Emit_Plural_Family
-           ("ordinal", "blo-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalBlo");
-         Emit_Plural_Family
-           ("ordinal", "ca-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalCa");
-         Emit_Plural_Family
-           ("ordinal", "cy-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalCy");
-         Emit_Plural_Family
-           ("ordinal", "gd-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalGd");
-         Emit_Plural_Family
-           ("ordinal", "hu-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalHu");
-         Emit_Plural_Family
-           ("ordinal", "ka-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalKa");
-         Emit_Plural_Family
-           ("ordinal", "kk-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalKk");
-         Emit_Plural_Family
-           ("ordinal", "kw-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalKw");
-         Emit_Plural_Family
-           ("ordinal", "lij-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalLij");
-         Emit_Plural_Family
-           ("ordinal", "mk-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalMk");
-         Emit_Plural_Family
-           ("ordinal", "mr-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalMr");
-         Emit_Plural_Family
-           ("ordinal", "ne-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalNe");
-         Emit_Plural_Family
-           ("ordinal", "or-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalOr");
-         Emit_Plural_Family
-           ("ordinal", "sq-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalSq");
-         Emit_Plural_Family
-           ("ordinal", "sv-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalSv");
-         Emit_Plural_Family
-           ("ordinal", "tk-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalTk");
-         Emit_Plural_Family
-           ("ordinal", "uk-ordinal", "cldr-json/cldr-core/supplemental/ordinals.json",
-            "ordinalUk");
       end Emit_Migrated_Supplemental_Rows;
 
       procedure Emit_Migrated_Currency_Rows is
@@ -1787,7 +1557,7 @@ procedure Generate_CLDR_Export is
                   & """,""name"":""" & Display_Name (Code, (if Name = "" then Code else Name)) & """}");
             end if;
          end Emit_Currency;
-         begin
+      begin
          if Fractions = "" then
             Add_Error ("missing CLDR currency fractions");
          else
@@ -2239,9 +2009,10 @@ procedure Generate_CLDR_Export is
             --  cosmetic: Thai gregorian long is "d MMMM G y" but Thai buddhist
             --  long is "d MMMM y" -- the era belongs to one and not the other.
             --  A gregorian-only table would put an era on every buddhist date.
+            type Constant_String_Access is access constant String;
             type Calendar_Source is record
-               Name    : access constant String;
-               Source  : access constant String;
+               Name    : Constant_String_Access;
+               Source  : Constant_String_Access;
             end record;
 
             Calendars : constant array (1 .. 9) of Calendar_Source :=
@@ -3439,6 +3210,7 @@ begin
 
    declare
       Generated : constant String := Generate;
+      pragma Unreferenced (Generated);
    begin
       if Errors /= 0 then
          Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
