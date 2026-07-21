@@ -4265,6 +4265,192 @@ procedure Generate_CLDR_Data is
                Start := 1;
             end if;
          end Collect_Quarter_Rows;
+
+         --  A few languages carry per-quarter names the packed locale rows do
+         --  not. The old body scanned them twice -- every row for an exact
+         --  locale match, then every row for a fallback match. Both passes
+         --  become one bisected table keyed on the canonical locale (in a fixed
+         --  field) plus one quarter character; the emitted body probes the
+         --  exact locale, then each parent, which is the exact/fallback order
+         --  the two passes had and the shape every other locale table already
+         --  uses. A miss falls through to the language block below.
+         procedure Emit_Override_Table (Kind : String) is
+            Max_Overrides : constant := 512;
+            type Override_Entry is record
+               Key   : US.Unbounded_String;
+               Value : US.Unbounded_String;
+               First : Natural := 0;
+               Last  : Natural := 0;
+            end record;
+
+            Items     : array (1 .. Max_Overrides) of Override_Entry;
+            Count     : Natural := 0;
+            Loc_Width : Natural := 0;
+            Max_Index : Natural := 0;
+
+            Names     : US.Unbounded_String;
+            Overrides : US.Unbounded_String;
+         begin
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, Kind) then
+                  Loc_Width :=
+                    Natural'Max
+                      (Loc_Width, Canonical_Key (S (Rules (Index).A))'Length);
+                  Max_Index :=
+                    Natural'Max
+                      (Max_Index, Decimal_Value (S (Rules (Index).B)));
+               end if;
+            end loop;
+
+            if Loc_Width = 0 then
+               return;
+            end if;
+
+            for Index in 1 .. Rule_Count loop
+               if Is_Kind (Index, Kind) then
+                  declare
+                     Loc : constant String :=
+                       Canonical_Key (S (Rules (Index).A));
+                     Idx : constant Natural :=
+                       Decimal_Value (S (Rules (Index).B));
+                  begin
+                     Count := Count + 1;
+                     Items (Count).Key :=
+                       US.To_Unbounded_String
+                         (Loc & (1 .. Loc_Width - Loc'Length => ' ')
+                          & (1 => Character'Val (Character'Pos ('0') + Idx)));
+                     Items (Count).Value :=
+                       US.To_Unbounded_String
+                         (Ada_Expression_UTF8_Hex (S (Rules (Index).C)));
+                  end;
+               end if;
+            end loop;
+
+            --  Sorted by key so the emitted body can bisect.
+            for Outer in 2 .. Count loop
+               declare
+                  Current     : constant Override_Entry := Items (Outer);
+                  Current_Key : constant String := S (Current.Key);
+                  Probe       : Natural := Outer - 1;
+               begin
+                  while Probe >= 1
+                    and then S (Items (Probe).Key) > Current_Key
+                  loop
+                     Items (Probe + 1) := Items (Probe);
+                     Probe := Probe - 1;
+                  end loop;
+                  Items (Probe + 1) := Current;
+               end;
+            end loop;
+
+            for N in 1 .. Count loop
+               US.Append (Overrides, S (Items (N).Key));
+               for Prior in 1 .. N - 1 loop
+                  if US."=" (Items (Prior).Value, Items (N).Value) then
+                     Items (N).First := Items (Prior).First;
+                     Items (N).Last := Items (Prior).Last;
+                     exit;
+                  end if;
+               end loop;
+
+               if Items (N).First = 0 then
+                  declare
+                     Packed : constant String := S (Items (N).Value);
+                  begin
+                     Items (N).First := US.Length (Names) + 1;
+                     Items (N).Last := US.Length (Names) + Packed'Length;
+                     US.Append (Names, Packed);
+                  end;
+               end if;
+
+               US.Append (Overrides, To_Base62 (Items (N).First, 5));
+               US.Append (Overrides, To_Base62 (Items (N).Last, 5));
+            end loop;
+
+            L ("      declare");
+            L ("         Names : constant String :=");
+            Emit_Unit_String_Expression ("           ", S (Names), ";");
+            L ("         Overrides : constant String :=");
+            Emit_Unit_String_Expression ("           ", S (Overrides), ";");
+            L ("         Loc_Width : constant := "
+               & Trim (Integer'Image (Loc_Width)) & ";");
+            L ("         Width : constant := Loc_Width + 11;");
+            L ("         Count : constant Natural := Overrides'Length / Width;");
+            L;
+            L ("         function Key (N : Positive) return String is");
+            L ("           (Overrides (Overrides'First + (N - 1) * Width ..");
+            L ("                       Overrides'First + (N - 1) * Width"
+               & " + Loc_Width));");
+            L;
+            L ("         function Value_At (N : Positive) return String is");
+            L ("            Base : constant Natural :=");
+            L ("              Overrides'First + (N - 1) * Width + Loc_Width + 1;");
+            L ("            F : constant Natural :=");
+            L ("              N62 (Overrides (Base .. Base + 4));");
+            L ("            T : constant Natural :=");
+            L ("              N62 (Overrides (Base + 5 .. Base + 9));");
+            L ("         begin");
+            L ("            return VB (Names (F .. T));");
+            L ("         end Value_At;");
+            L;
+            L ("         function Lookup (Cand : String) return String is");
+            L ("            Low : Natural := 1;");
+            L ("            High : Natural := Count;");
+            L ("            Mid : Natural;");
+            L ("         begin");
+            L ("            if Cand'Length = 0 or else Cand'Length > Loc_Width"
+               & " then");
+            L ("               return """";");
+            L ("            end if;");
+            L ("            declare");
+            L ("               Wanted : constant String :=");
+            L ("                 Cand & (1 .. Loc_Width - Cand'Length => ' ')");
+            L ("                 & (1 => Character'Val"
+               & " (Character'Pos ('0') + Quarter));");
+            L ("            begin");
+            L ("               while Low <= High loop");
+            L ("                  Mid := (Low + High) / 2;");
+            L ("                  if Key (Mid) = Wanted then");
+            L ("                     return Value_At (Mid);");
+            L ("                  elsif Key (Mid) < Wanted then");
+            L ("                     Low := Mid + 1;");
+            L ("                  else");
+            L ("                     High := Mid - 1;");
+            L ("                  end if;");
+            L ("               end loop;");
+            L ("            end;");
+            L ("            return """";");
+            L ("         end Lookup;");
+            L;
+            L ("         Canon : constant String := Canonical_Locale (Locale);");
+            L ("         Cut : Natural := Canon'Last;");
+            L ("      begin");
+            L ("         if Quarter <= " & Trim (Integer'Image (Max_Index))
+               & " then");
+            L ("            declare");
+            L ("               Hit : constant String := Lookup (Canon);");
+            L ("            begin");
+            L ("               if Hit /= """" then");
+            L ("                  return Hit;");
+            L ("               end if;");
+            L ("            end;");
+            L;
+            L ("            while Cut > Canon'First loop");
+            L ("               if Canon (Cut) = '-' then");
+            L ("                  declare");
+            L ("                     Hit : constant String :=");
+            L ("                       Lookup (Canon (Canon'First .. Cut - 1));");
+            L ("                  begin");
+            L ("                     if Hit /= """" then");
+            L ("                        return Hit;");
+            L ("                     end if;");
+            L ("                  end;");
+            L ("               end if;");
+            L ("               Cut := Cut - 1;");
+            L ("            end loop;");
+            L ("         end if;");
+            L ("      end;");
+         end Emit_Override_Table;
       begin
          Collect_Quarter_Rows ("quarter", Quarter_Start);
          Emit_Locale_Table ("Quarter_Name_Row", """""", Raw => True);
@@ -4294,19 +4480,7 @@ procedure Generate_CLDR_Data is
          L ("            end if;");
          L ("         end;");
          L ("      end if;");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "quarter") then
-                  L ("      if "
-                     & (if Pass = 1 then "Locale_Equals" else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("        and then Quarter = " & S (Rules (Index).B));
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).C) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
+         Emit_Override_Table ("quarter");
          L ("      if Lang = ""de"" then");
          L ("         return Quarter_Text & "". Quartal"";");
          L ("      elsif Lang = ""fr"" then");
@@ -4376,19 +4550,7 @@ procedure Generate_CLDR_Data is
          L ("            end if;");
          L ("         end;");
          L ("      end if;");
-         for Pass in 1 .. 2 loop
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "quarter_short") then
-                  L ("      if "
-                     & (if Pass = 1 then "Locale_Equals" else "Locale_Fallback_Matches")
-                     & " (Locale, """ & S (Rules (Index).A) & """)");
-                  L ("        and then Quarter = " & S (Rules (Index).B));
-                  L ("      then");
-                  L ("         return " & S (Rules (Index).C) & ";");
-                  L ("      end if;");
-               end if;
-            end loop;
-         end loop;
+         Emit_Override_Table ("quarter_short");
          L ("      if Lang = ""fr"" or else Lang = ""es""");
          L ("        or else Lang = ""it"" or else Lang = ""pt""");
          L ("      then");
