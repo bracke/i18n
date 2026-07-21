@@ -2129,6 +2129,9 @@ package body I18N.Runtime.Tests.Features is
    procedure Test_Ecosystem_Formatters
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
+   procedure Test_Display_Names
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
    ---------------------------------------------------------------------------
    --  9. Compiled / indexed path preservation.
    ---------------------------------------------------------------------------
@@ -2524,6 +2527,9 @@ package body I18N.Runtime.Tests.Features is
         "selectordinal rendering follows the locale's CLDR ordinal rules");
       Register_Routine (T, Test_Plural_Render_Uses_Locale_Rules'Access,
         "plural rendering follows the locale's CLDR cardinal rules");
+      Register_Routine (T, Test_Display_Names'Access,
+                        "CLDR display names, delimiters, and measurement "
+                        & "from the runtime data file");
       Register_Routine (T, Test_Localized_Select_Plural_Corpus'Access,
         "localized select/plural corpus covers nested formatted arguments");
    end Register_Tests;

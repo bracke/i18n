@@ -39,18 +39,6 @@ fi
 LOCALE_ARG=""
 [ "$LOCALES" != "all" ] && LOCALE_ARG="--locales=$LOCALES"
 
-#  Step 1 -- already generated.
-#
-#  "Current" means newer than the subset it is generated from. Without the
-#  timestamp test a stale body silently survives a subset change, which is
-#  exactly the failure mode that makes generated-code bugs hard to see.
-if [ -f "$BODY" ]; then
-   if [ ! -f "$SUBSET" ] || [ "$BODY" -nt "$SUBSET" ]; then
-      exit 0
-   fi
-   log "$BODY is older than $SUBSET; regenerating"
-fi
-
 if [ ! -d "$CLDR_DIR" ]; then
    log "no $CLDR_DIR directory; cannot regenerate" >&2
    exit 1
@@ -59,9 +47,24 @@ fi
 #  The generators are their own crate (cldr_tools) so that the library never
 #  inherits an HTTP stack and a ZIP decoder. Build them on demand.
 build_tools () {
-   if [ ! -x "$CLDR_DIR/bin/generate_cldr_data" ]; then
+   if [ ! -x "$CLDR_DIR/bin/generate_cldr_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_display_data" ]; then
       log "building the CLDR tools"
       ( cd "$CLDR_DIR" && alr -n build --profiles='*=development' >/dev/null )
+   fi
+}
+
+#  Runtime data files for the "heavy/optional" areas (display names, ...) read
+#  upstream cldr-json directly, so they are only generated when the vendored
+#  upstream is present. Best-effort: the library compiles and runs without
+#  them, the feature just reports itself unavailable.
+generate_runtime_data () {
+   if [ -d "$CLDR_DIR/upstream/cldr-json/cldr-localenames-full" ]; then
+      build_tools
+      log "generating share/i18n/display-names.i18ndata"
+      ( cd "$CLDR_DIR" && ./bin/generate_cldr_display_data )
+   else
+      log "no vendored localenames; skipping runtime display-name data"
    fi
 }
 
@@ -69,6 +72,7 @@ generate () {
    build_tools
    log "generating $BODY${LOCALE_ARG:+ ($LOCALE_ARG)}"
    ( cd "$CLDR_DIR" && ./bin/generate_cldr_data $LOCALE_ARG )
+   generate_runtime_data
 }
 
 import_from_upstream () {
@@ -90,6 +94,20 @@ download_upstream () {
    log "fetching the CLDR release named by upstream/source_manifest.txt"
    ( cd "$CLDR_DIR" && ./bin/download_cldr_upstream )
 }
+
+RUNTIME_DATA="$CLDR_DIR/../share/i18n/display-names.i18ndata"
+
+#  Step 1 -- the compiled body is already current. "Current" means newer than
+#  the subset it is generated from; without the timestamp test a stale body
+#  silently survives a subset change. The runtime data files are separate
+#  artifacts, so still (re)generate them when they are missing.
+if [ -f "$BODY" ]; then
+   if [ ! -f "$SUBSET" ] || [ "$BODY" -nt "$SUBSET" ]; then
+      [ -f "$RUNTIME_DATA" ] || generate_runtime_data
+      exit 0
+   fi
+   log "$BODY is older than $SUBSET; regenerating"
+fi
 
 #  Step 2 -- the pinned subset is the generator's real input.
 if [ -f "$SUBSET" ]; then
