@@ -5058,6 +5058,11 @@ procedure Generate_CLDR_Data is
          L ("      Offset : Integer;");
          L ("   end record;");
          L;
+         --  Positional aggregates: the rows are a generated blob no one reads,
+         --  and the index and field names ("1 => (Initial_Offset => ...")
+         --  repeated per row cost more than the data. Order follows the record
+         --  above: Initial_Offset, First, Last -- and Key, Offset for the
+         --  transitions.
          L ("   TZDB_Zones : constant array (Positive range <>) of TZDB_Zone_Data :=");
          L ("     (");
          for Zone_Index in 1 .. TZDB_Zone_Count loop
@@ -5074,11 +5079,10 @@ procedure Generate_CLDR_Data is
                   end if;
                end loop;
 
-               L ("      " & Natural'Image (Zone_Index) & " => "
-                  & "(Initial_Offset =>"
-                  & Integer'Image (TZDB_Zone_Initial_Offsets (Zone_Index))
-                  & ", First =>" & Natural'Image (First)
-                  & ", Last =>" & Natural'Image (Last) & ")"
+               L ("      ("
+                  & Trim (Integer'Image (TZDB_Zone_Initial_Offsets (Zone_Index)))
+                  & "," & Trim (Natural'Image (First))
+                  & "," & Trim (Natural'Image (Last)) & ")"
                   & (if Zone_Index = TZDB_Zone_Count then "" else ","));
             end;
          end loop;
@@ -5087,11 +5091,11 @@ procedure Generate_CLDR_Data is
          L ("   TZDB_Transitions : constant array (Positive range <>) of TZDB_Transition :=");
          L ("     (");
          for Transition_Index in 1 .. TZDB_Transition_Count loop
-            L ("      " & Natural'Image (Transition_Index) & " => "
-               & "(Key =>"
-               & Long_Long_Integer'Image (TZDB_Transition_Keys (Transition_Index))
-               & ", Offset =>"
-               & Integer'Image (TZDB_Transition_Offsets (Transition_Index))
+            L ("      ("
+               & Trim (Long_Long_Integer'Image
+                         (TZDB_Transition_Keys (Transition_Index)))
+               & "," & Trim (Integer'Image
+                               (TZDB_Transition_Offsets (Transition_Index)))
                & ")"
                & (if Transition_Index = TZDB_Transition_Count then "" else ","));
          end loop;
