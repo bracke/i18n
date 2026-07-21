@@ -1,28 +1,27 @@
-name = "check_i18n"
-description = "Release and documentation checks for i18n"
-version = "0.1.0-dev"
-
+name = "i18n_benchmarks"
+description = "Rendering benchmarks for the i18n crate"
+version = "1.1.0"
 authors = ["Bent Bracke"]
 maintainers = ["Bent Bracke <bent@bracke.dk>"]
 maintainers-logins = ["bracke"]
 licenses = "MIT"
 website = "https://github.com/bracke/i18n"
-tags = ["tool", "release", "check"]
-project-files = ["check_i18n.gpr"]
+tags = ["i18n", "benchmarks", "performance"]
+project-files = ["benchmarks.gpr"]
 
-executables = ["check_i18n"]
+executables = ["render_benchmarks"]
 
 [[depends-on]]
 gnat_native = "=15.2.1"
 
 [[depends-on]]
-project_tools = "*"
+i18n = "*"
 
 [[pins]]
-project_tools = { path = "../../project_tools" }
+i18n = { path = ".." }
 
 # Build dependencies in the development profile (-Og) too, not the default
-# release (-O3), so roots that share these crates share object files rather
+# release (-O3), so this root and the parent share i18n object files rather
 # than forcing each other into full rebuilds.
 [build-profiles]
 "*" = "development"

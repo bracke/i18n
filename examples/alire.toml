@@ -1,0 +1,56 @@
+name = "i18n_examples"
+description = "Worked examples for the i18n crate"
+version = "1.1.0"
+authors = ["Bent Bracke"]
+maintainers = ["Bent Bracke <bent@bracke.dk>"]
+maintainers-logins = ["bracke"]
+licenses = "MIT"
+website = "https://github.com/bracke/i18n"
+tags = ["i18n", "examples", "messages"]
+project-files = ["examples.gpr"]
+
+executables = [
+   "hello_world",
+   "basic_render",
+   "plural_render",
+   "select_render",
+   "selectordinal_render",
+   "nested_message_render",
+   "number_formatting",
+   "currency_formatting",
+   "date_formatting",
+   "time_formatting",
+   "domain_formatting",
+   "locale_fallback",
+   "fallback_chain",
+   "missing_key",
+   "missing_argument",
+   "invalid_argument",
+   "invalid_catalog",
+   "invalid_catalog_fields",
+   "diagnostics_non_interference",
+   "equals_in_value",
+   "reuse_runtime",
+   "status_handling",
+   "diagnostics_inspection",
+   "default_locale_key",
+   "empty_message",
+   "argument_lifecycle",
+   "public_api_example",
+   "public_api_sealed",
+]
+
+[[depends-on]]
+gnat_native = "=15.2.1"
+
+[[depends-on]]
+i18n = "*"
+
+[[pins]]
+i18n = { path = ".." }
+
+# Build dependencies in the development profile (-Og) too, not the default
+# release (-O3), so this root and the parent share i18n object files rather
+# than forcing each other into full rebuilds.
+[build-profiles]
+"*" = "development"

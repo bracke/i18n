@@ -19,64 +19,64 @@ procedure Check_I18N is
    use GNAT.OS_Lib;
 
    Gnatprove_Check_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gnatprove"),
       4 => new String'("-P"),
       5 => new String'("i18n.gpr"),
       6 => new String'("--level=0"),
-      7 => new String'("--mode=check"));
+      7 => new String'("--mode=check")];
    Alr_Build_Args : constant Argument_List :=
-     (1 => new String'("build"));
+     [1 => new String'("build")];
    Alr_Test_Args : constant Argument_List :=
-     (1 => new String'("test"));
+     [1 => new String'("test")];
    Exec_Tests_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
-      3 => new String'("./bin/tests"));
+      3 => new String'("./bin/tests")];
    Build_Tests_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("tests.gpr"));
+      5 => new String'("tests.gpr")];
    Build_Examples_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("examples/examples.gpr"),
-      6 => new String'("-j1"));
-   No_Args : constant Argument_List (1 .. 0) := (others => null);
+      5 => new String'("examples.gpr"),
+      6 => new String'("-j1")];
+   No_Args : constant Argument_List (1 .. 0) := [others => null];
    Build_Benchmarks_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("benchmarks/benchmarks.gpr"),
-      6 => new String'("-j1"));
+      5 => new String'("benchmarks.gpr"),
+      6 => new String'("-j1")];
    Build_CLDR_Tools_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("cldr_tools.gpr"));
+      5 => new String'("cldr_tools.gpr")];
    Build_Conformance_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gprbuild"),
       4 => new String'("-P"),
-      5 => new String'("conformance/conformance.gpr"));
+      5 => new String'("conformance.gpr")];
    Run_Benchmarks_Args : constant Argument_List :=
-     (1 => new String'("--smoke"));
+     [1 => new String'("--smoke")];
    Check_CLDR_Args : constant Argument_List :=
-     (1 => new String'("--check"));
+     [1 => new String'("--check")];
    Gnatdoc_Args : constant Argument_List :=
-     (1 => new String'("exec"),
+     [1 => new String'("exec"),
       2 => new String'("--"),
       3 => new String'("gnatdoc"),
       4 => new String'("-P"),
-      5 => new String'("i18n.gpr"));
+      5 => new String'("i18n.gpr")];
 
    function Root_Directory return String is
       Root : constant String :=
@@ -138,7 +138,7 @@ procedure Check_I18N is
    procedure Check_Example_Output is
       use Ada.Strings.Unbounded;
 
-      LF   : constant String := (1 => ASCII.LF);
+      LF   : constant String := [1 => ASCII.LF];
       Euro : constant String :=
         Character'Val (16#E2#) & Character'Val (16#82#)
         & Character'Val (16#AC#);
@@ -408,9 +408,12 @@ procedure Check_I18N is
       Run_Check ("build i18n library", Root, Alr_Path, Alr_Build_Args);
       Run_Check ("build i18n tests", Root & "/tests", Alr_Path, Build_Tests_Args);
       Run_Check ("run i18n tests", Root & "/tests", Alr_Path, Exec_Tests_Args);
-      Run_Check ("build i18n examples", Root, Alr_Path, Build_Examples_Args);
+      Run_Check
+        ("build i18n examples", Root & "/examples", Alr_Path, Build_Examples_Args);
       Check_Example_Output;
-      Run_Check ("build i18n benchmarks", Root, Alr_Path, Build_Benchmarks_Args);
+      Run_Check
+        ("build i18n benchmarks", Root & "/benchmarks", Alr_Path,
+         Build_Benchmarks_Args);
       Run_Check ("build i18n CLDR data tools", Root & "/cldr", Alr_Path, Build_CLDR_Tools_Args);
       --  Every one of these re-runs a pipeline stage against the vendored CLDR
       --  tree and compares the result with what is checked in. Without the
@@ -459,7 +462,7 @@ procedure Check_I18N is
 
       Run_Check
         ("build i18n ICU/CLDR conformance harness",
-         Root,
+         Root & "/conformance",
          Alr_Path,
          Build_Conformance_Args);
       Run_Check

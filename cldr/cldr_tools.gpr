@@ -1,8 +1,9 @@
-with "../../project_tools/project_tools.gpr";
+with "config/cldr_tools_config.gpr";
 
 project CLDR_Tools is
-   for Source_Dirs use ("src");
-   for Object_Dir use "obj";
+   for Source_Dirs use ("src", "config");
+   for Object_Dir use "obj/" & Cldr_Tools_Config.Build_Profile;
+   for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";
    for Main use
      ("check_cldr_sources.adb",
@@ -14,6 +15,18 @@ project CLDR_Tools is
       "import_cldr_subset.adb");
 
    package Compiler is
-      for Default_Switches ("Ada") use ("-gnat2022", "-gnatyM120", "-gnatX", "-gnata");
+      --  -gnatWb overrides the -gnatW8 that Ada_Compiler_Switches brings in, and
+      --  must stay last: the final -gnatW wins. The main unit's encoding method
+      --  sets the run-time default for Text_IO output, and every one of these
+      --  tools writes CLDR data that is *already* UTF-8 bytes in a String. Under
+      --  -gnatW8 each of those bytes is encoded a second time -- U+00A0 comes out
+      --  as "Â " and the staged export grows by ~4.9 MB of mojibake.
+      for Default_Switches ("Ada") use
+        Cldr_Tools_Config.Ada_Compiler_Switches
+        & ("-gnat2022", "-gnatyM120", "-gnatX", "-gnata", "-gnatWb");
    end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
 end CLDR_Tools;

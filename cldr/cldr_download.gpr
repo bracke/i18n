@@ -1,0 +1,41 @@
+--  The upstream downloader is a project of its own, not another Main in
+--  cldr_tools.gpr: it is the only CLDR tool that needs an HTTP stack and a ZIP
+--  decoder, and linking OpenSSL into the six generator/checker tools that never
+--  touch the network would make every regeneration pay for a step that runs
+--  once. Dependencies arrive through the generated config project, so the two
+--  differ in nothing but their Main and their Linker package.
+
+with "config/cldr_tools_config.gpr";
+
+project CLDR_Download is
+   for Source_Dirs use ("src", "config");
+   for Object_Dir use "obj-download/" & Cldr_Tools_Config.Build_Profile;
+   --  Not shared with cldr_tools.gpr's obj/: two projects in one crate cannot
+   --  write to the same object directory.
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "bin";
+   for Main use ("download_cldr_upstream.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        Cldr_Tools_Config.Ada_Compiler_Switches & ("-gnat2022", "-gnatyM120", "-gnatX", "-gnata");
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+   package Linker is
+      --  httpclient leaves the OpenSSL bridge to its consumers; its own
+      --  examples.gpr links -lssl -lcrypto the same way.
+      case Cldr_Tools_Config.Alire_Host_OS is
+         when "windows" =>
+            --  OpenSSL on Windows pulls in the socket and certificate-store
+            --  system libraries that are part of libc elsewhere. Unverified:
+            --  no Windows host has built this yet.
+            for Default_Switches ("Ada") use ("-lssl", "-lcrypto", "-lws2_32", "-lcrypt32");
+         when others =>
+            for Default_Switches ("Ada") use ("-lssl", "-lcrypto");
+      end case;
+   end Linker;
+end CLDR_Download;

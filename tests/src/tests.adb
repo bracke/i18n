@@ -1,3 +1,4 @@
+with AUnit.Test_Cases;
 with Ada.Command_Line;
 with Ada.Characters.Handling;
 with Ada.Strings.Fixed;
@@ -35,46 +36,47 @@ procedure Tests is
       Name   : constant String :=
         To_Lower
           (Ada.Strings.Unbounded.To_String (Filtered_Suite));
+      type Test_Case_Access is access all AUnit.Test_Cases.Test_Case'Class;
       Result : constant AUnit.Test_Suites.Access_Test_Suite :=
         new AUnit.Test_Suites.Test_Suite;
    begin
       if Name = "all" or else Name = "" then
-         Result.Add_Test (new I18N.Runtime.Tests.Strict.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Compilation.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Execution.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Diagnostics.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Corpus.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Release.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Features.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Strict.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Compilation.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Execution.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Diagnostics.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Corpus.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Release.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Features.Test_Case));
 
       elsif Name = "parser" then
-         Result.Add_Test (new I18N.Runtime.Tests.Strict.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Strict.Test_Case));
 
       elsif Name = "validation" then
-         Result.Add_Test (new I18N.Runtime.Tests.Strict.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Compilation.Test_Case);
-         Result.Add_Test (new I18N.Runtime.Tests.Release.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Strict.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Compilation.Test_Case));
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Release.Test_Case));
 
       elsif Name = "strict" then
-         Result.Add_Test (new I18N.Runtime.Tests.Strict.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Strict.Test_Case));
 
       elsif Name = "compilation" then
-         Result.Add_Test (new I18N.Runtime.Tests.Compilation.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Compilation.Test_Case));
 
       elsif Name = "execution" then
-         Result.Add_Test (new I18N.Runtime.Tests.Execution.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Execution.Test_Case));
 
       elsif Name = "diagnostics" then
-         Result.Add_Test (new I18N.Runtime.Tests.Diagnostics.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Diagnostics.Test_Case));
 
       elsif Name = "corpus" then
-         Result.Add_Test (new I18N.Runtime.Tests.Corpus.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Corpus.Test_Case));
 
       elsif Name = "release" then
-         Result.Add_Test (new I18N.Runtime.Tests.Release.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Release.Test_Case));
 
       elsif Name = "features" then
-         Result.Add_Test (new I18N.Runtime.Tests.Features.Test_Case);
+         Result.Add_Test (Test_Case_Access'(new I18N.Runtime.Tests.Features.Test_Case));
 
       else
          raise Program_Error with "Unknown suite: " & Name;

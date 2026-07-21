@@ -49,12 +49,12 @@ jobs:
         run: alr exec -- ./bin/tests
 
       - name: Build public examples
-        working-directory: i18n
-        run: alr exec -- gprbuild -P examples/examples.gpr
+        working-directory: i18n/examples
+        run: alr --non-interactive build
 
       - name: Build render benchmarks
-        working-directory: i18n
-        run: alr exec -- gprbuild -P benchmarks/benchmarks.gpr
+        working-directory: i18n/benchmarks
+        run: alr --non-interactive build
 
       - name: Run render benchmark smoke
         working-directory: i18n

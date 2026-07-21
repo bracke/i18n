@@ -1,7 +1,7 @@
-with "../i18n.gpr";
+with "config/i18n_examples_config.gpr";
 
 project Examples is
-   for Source_Dirs use (".");
+   for Source_Dirs use (".", "config");
    for Main use
      ("hello_world.adb",
       "basic_render.adb",
@@ -31,14 +31,25 @@ project Examples is
       "argument_lifecycle.adb",
       "public_api_example.adb",
       "public_api_sealed.adb");
-   for Object_Dir use "../obj/examples";
+   for Object_Dir use "obj/" & I18n_Examples_Config.Build_Profile;
+   for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";
 
    package Compiler is
+      --  -gnatWb overrides the -gnatW8 that Ada_Compiler_Switches brings in.
+      --  The encoding method of the main unit sets the runtime's default
+      --  encoding for the standard output file: under -gnatW8 every byte of an
+      --  already-UTF-8 String is encoded a second time, so the per-mille sign
+      --  reaches the terminal as double-encoded mojibake and the outputs in
+      --  examples/EXPECTED_OUTPUT.md no longer match. These sources are pure
+      --  ASCII, so restoring GNAT's default brackets encoding changes nothing
+      --  else. Keep this switch last -- the final -gnatW wins.
       for Default_Switches ("Ada") use
-        ("-gnat2022",
-         "-gnata",
-         "-gnatwa",
-         "-gnatwe");
+        I18n_Examples_Config.Ada_Compiler_Switches
+        & ("-gnat2022", "-gnatyM120", "-gnatX", "-gnata", "-gnatwe", "-gnatWb");
    end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
 end Examples;

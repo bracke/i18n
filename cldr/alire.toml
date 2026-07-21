@@ -1,0 +1,58 @@
+#  The CLDR regeneration tooling is its own crate, deliberately separate from
+#  the i18n library crate. The downloader needs an HTTP stack and a ZIP
+#  decoder; the library does not, and consumers of i18n must not inherit those
+#  dependencies just because the tables they link were once generated here.
+
+name = "cldr_tools"
+description = "CLDR upstream download, import, and code-generation tooling for i18n"
+version = "0.1.0"
+authors = ["Bent Bracke"]
+maintainers = ["Bent Bracke <bent@bracke.dk>"]
+maintainers-logins = ["bracke"]
+licenses = "MIT"
+website = "https://github.com/bracke/i18n"
+tags = ["cldr", "tooling", "codegen"]
+project-files = ["cldr_tools.gpr", "cldr_download.gpr"]
+
+executables = [
+   "check_cldr_sources",
+   "check_tzdb_sources",
+   "generate_cldr_export",
+   "import_cldr_raw",
+   "extract_cldr_normalized",
+   "generate_cldr_data",
+   "import_cldr_subset",
+   "download_cldr_upstream",
+]
+
+[[depends-on]]
+gnat_native = "=15.2.1"
+
+[[depends-on]]
+httpclient = "*"
+
+[[depends-on]]
+project_tools = "*"
+
+#  zlib is a direct dependency, not an inherited one: cldr_download.gpr unpacks
+#  the release archive with it. httpclient happens to depend on zlib too, but
+#  relying on that would leave this build one httpclient refactor away from
+#  failing to resolve.
+[[depends-on]]
+zlib = "*"
+
+[[pins]]
+httpclient = { path = "../../httpclient" }
+project_tools = { path = "../../project_tools" }
+zlib = { path = "../../zlib" }
+
+# zlib depends on cryptolib, but Alire honours pins only in the root crate, so
+# every root that builds zlib must pin it too.
+[[pins]]
+cryptolib = { path = "../../cryptolib" }
+
+# Build dependencies in the development profile (-Og) too, not the default
+# release (-O3), so roots that share these crates share object files rather
+# than forcing each other into full rebuilds.
+[build-profiles]
+"*" = "development"

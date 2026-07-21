@@ -18,6 +18,14 @@ locales = { type = "String", default = "all" }
 [[depends-on]]
 gnat = ">=12"
 
+#  src/i18n-cldr_data*.adb are generated build artifacts and are gitignored, so
+#  a clone has the spec and no body. This regenerates them from whatever the
+#  tree has -- pinned subset, vendored upstream JSON, or a fresh download -- and
+#  costs ~3 ms once they exist. See cldr/regenerate.sh and cldr/CLDR_DATA.md.
+[[actions]]
+type = "pre-build"
+command = ["sh", "cldr/regenerate.sh"]
+
 [[actions]]
 type = "test"
 command = ["sh", "-c", "cd check_i18n && alr build && ./bin/check_i18n --skip-alr-test"]

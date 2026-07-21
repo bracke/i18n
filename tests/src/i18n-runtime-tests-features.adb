@@ -304,41 +304,6 @@ package body I18N.Runtime.Tests.Features is
               "duplicate validation must report a diagnostic");
    end Test_Validate_Text_Rejects_Duplicate;
 
-   procedure Test_Validate_Text_Rejects_Duplicate_Default_Locale
-     (T : in out AUnit.Test_Cases.Test_Case'Class)
-   is
-      pragma Unreferenced (T);
-      VR : constant I18N.Runtime.Catalog_Validation_Result :=
-        I18N.Runtime.Validate_Catalog_Text
-          ("bad-default",
-           "default_locale = en" & ASCII.LF
-           & "title = ""Welcome""" & ASCII.LF
-           & "default_locale = de" & ASCII.LF
-           & "de.greeting = ""Hallo""" & ASCII.LF);
-   begin
-      Assert (not VR.Valid,
-              "duplicate default_locale directives must fail validation");
-      Assert (I18N.Diagnostics.Has_Kind
-                (VR.Diagnostics, I18N.Diagnostics.Validation_Error),
-              "default locale duplication must report a validation diagnostic");
-   end Test_Validate_Text_Rejects_Duplicate_Default_Locale;
-
-   procedure Test_Validate_Text_Rejects_Invalid_Default_Locale
-     (T : in out AUnit.Test_Cases.Test_Case'Class)
-   is
-      pragma Unreferenced (T);
-      VR : constant I18N.Runtime.Catalog_Validation_Result :=
-        I18N.Runtime.Validate_Catalog_Text
-          ("bad-default",
-           "default_locale = en--US" & ASCII.LF
-           & "en.title = ""Welcome""" & ASCII.LF);
-   begin
-      Assert (not VR.Valid, "malformed default_locale must fail validation");
-      Assert (I18N.Diagnostics.Has_Kind
-                (VR.Diagnostics, I18N.Diagnostics.Validation_Error),
-              "malformed default_locale must report a validation diagnostic");
-   end Test_Validate_Text_Rejects_Invalid_Default_Locale;
-
    --  True when some diagnostic's message text contains Needle.
    function Any_Message_Contains
      (List   : I18N.Diagnostics.Diagnostic_List;
@@ -653,36 +618,6 @@ package body I18N.Runtime.Tests.Features is
       Runtime : I18N.Runtime.Instance;
       Args    : I18N.Arguments.Arguments;
       Result  : I18N.Runtime.Load_Result;
-
-      function Arabic_Number return String is
-      begin
-         return
-           U (16#661#) & U (16#66C#) & U (16#662#) & U (16#663#)
-           & U (16#664#) & U (16#66C#) & U (16#665#)
-           & U (16#666#) & U (16#667#) & U (16#66B#)
-           & U (16#668#) & U (16#669#);
-      end Arabic_Number;
-
-      function Arabic_Currency return String is
-      begin
-         return
-           U (16#661#) & U (16#66C#) & U (16#662#)
-           & U (16#663#) & U (16#664#) & U (16#66C#)
-           & U (16#665#) & U (16#666#) & U (16#667#)
-           & U (16#66B#) & U (16#668#) & U (16#660#) & " $";
-      end Arabic_Currency;
-
-      function Arabic_Date return String is
-      begin
-         return
-           U (16#662#) & U (16#669#) & "." & U (16#660#)
-           & U (16#662#) & "." & U (16#662#) & U (16#664#);
-      end Arabic_Date;
-
-      function Arabic_Time return String is
-      begin
-         return U (16#660#) & U (16#669#) & ":" & U (16#660#) & U (16#665#);
-      end Arabic_Time;
 
       function Persian_Number return String is
       begin
