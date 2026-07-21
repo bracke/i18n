@@ -3923,96 +3923,173 @@ procedure Generate_CLDR_Data is
          L ("   end " & Name & ";");
       end Emit_Date_Name_Function;
 
+      --  The currency accessors were the last linear Code = "..." chains: a
+      --  miss walked all 307 rows, comparing the argument to each in turn.
+      --  Each field becomes a currency-code-keyed table the emitted body
+      --  bisects instead. A String field packs its evaluated UTF-8 value once
+      --  (VB decodes it, and repeats -- most symbols are their own code --
+      --  collapse to a single copy) and keeps a 3+5+5 record per code; the two
+      --  Natural fields keep the small value inline as a base-62 pair, a 3+2
+      --  record. Rows whose value is the default are left out and answered by
+      --  the default arm, exactly as the chain skipped them.
       procedure Emit_Currency_Field
         (Name         : String;
          Field_Number : Positive;
          Return_Type  : String;
          Default_Expr : String)
       is
-         First : Boolean := True;
+         Is_String : constant Boolean := Return_Type = "String";
 
-         procedure Emit_Return (Expression : String) is
-            Term_Number : Positive := 1;
+         Max_Currency : constant := 512;
+         type Currency_Entry is record
+            Code  : US.Unbounded_String;
+            Value : US.Unbounded_String;
+            First : Natural := 0;
+            Last  : Natural := 0;
+         end record;
 
-            function Next_Concat (Start : Positive) return Natural is
-               In_String : Boolean := False;
-               Index     : Natural := Start;
-            begin
-               while Index <= Expression'Last loop
-                  if Expression (Index) = '"' then
-                     if In_String
-                       and then Index < Expression'Last
-                       and then Expression (Index + 1) = '"'
-                     then
-                        Index := Index + 2;
-                     else
-                        In_String := not In_String;
-                        Index := Index + 1;
-                     end if;
-                  elsif Expression (Index) = '&' and then not In_String then
-                     return Index;
-                  else
-                     Index := Index + 1;
-                  end if;
-               end loop;
+         Items : array (1 .. Max_Currency) of Currency_Entry;
+         Count : Natural := 0;
 
-               return 0;
-            end Next_Concat;
+         Values     : US.Unbounded_String;
+         Index_Data : US.Unbounded_String;
 
-            Start : Positive := Expression'First;
-            Split : Natural := Next_Concat (Start);
-         begin
-            if Split = 0 then
-               L ("         return " & Expression & ";");
-               return;
-            end if;
-
-            L ("         return");
-            loop
-               declare
-                  Current : constant String :=
-                    Trim
-                      (Expression
-                         (Start .. (if Split = 0 then Expression'Last else Split - 1)));
-               begin
-                  L ("           " & (if Term_Number = 1 then "" else "& ")
-                     & Current & (if Split = 0 then ";" else ""));
-               end;
-               exit when Split = 0;
-
-               Start := Split + 1;
-               Term_Number := Term_Number + 1;
-               Split := Next_Concat (Start);
-            end loop;
-         end Emit_Return;
+         function Field_Value (Index : Positive) return String is
+           (case Field_Number is
+               when 2 => S (Rules (Index).B),
+               when 3 => S (Rules (Index).C),
+               when 4 => S (Rules (Index).D),
+               when 5 => S (Rules (Index).E),
+               when 6 => S (Rules (Index).F),
+               when others => "");
       begin
-         L;
-         L ("   function " & Name & " (Code : String) return " & Return_Type & " is");
-         L ("   begin");
+         --  Collect the rows this field keeps. A String field has no literal
+         --  default to compare against (the default is the Code itself, or the
+         --  symbol accessor), so it keeps every row; the Natural fields drop
+         --  the rows the default already answers.
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, "currency") then
                declare
-                  Value : constant String :=
-                    (case Field_Number is
-                       when 2 => S (Rules (Index).B),
-                       when 3 => S (Rules (Index).C),
-                       when 4 => S (Rules (Index).D),
-                       when 5 => S (Rules (Index).E),
-                       when 6 => S (Rules (Index).F),
-                       when others => "");
+                  Raw : constant String := Field_Value (Index);
                begin
-                  if Value /= Default_Expr then
-                     L ("      " & (if First then "if" else "elsif")
-                        & " Code = """ & S (Rules (Index).A) & """ then");
-                     Emit_Return (Value);
-                     First := False;
+                  if Is_String or else Raw /= Default_Expr then
+                     if Count = Max_Currency then
+                        Add_Error ("too many currency rows for " & Name);
+                     else
+                        Count := Count + 1;
+                        Items (Count).Code := Rules (Index).A;
+                        Items (Count).Value :=
+                          US.To_Unbounded_String
+                            (if Is_String
+                             then Ada_Expression_UTF8_Hex (Raw)
+                             else Raw);
+                     end if;
                   end if;
                end;
             end if;
          end loop;
-         L ("      else");
-         L ("         return " & Default_Expr & ";");
-         L ("      end if;");
+
+         --  Sorted so the emitted body can bisect on the code.
+         for Outer in 2 .. Count loop
+            declare
+               Current      : constant Currency_Entry := Items (Outer);
+               Current_Code : constant String := S (Current.Code);
+               Probe        : Natural := Outer - 1;
+            begin
+               while Probe >= 1
+                 and then S (Items (Probe).Code) > Current_Code
+               loop
+                  Items (Probe + 1) := Items (Probe);
+                  Probe := Probe - 1;
+               end loop;
+               Items (Probe + 1) := Current;
+            end;
+         end loop;
+
+         --  Pack the index (and, for a String field, the value store).
+         for N in 1 .. Count loop
+            US.Append (Index_Data, S (Items (N).Code));
+            if Is_String then
+               --  Point a repeated value at the copy already packed.
+               for Prior in 1 .. N - 1 loop
+                  if US."=" (Items (Prior).Value, Items (N).Value) then
+                     Items (N).First := Items (Prior).First;
+                     Items (N).Last := Items (Prior).Last;
+                     exit;
+                  end if;
+               end loop;
+
+               if Items (N).First = 0 then
+                  declare
+                     Packed : constant String := S (Items (N).Value);
+                  begin
+                     Items (N).First := US.Length (Values) + 1;
+                     Items (N).Last := US.Length (Values) + Packed'Length;
+                     US.Append (Values, Packed);
+                  end;
+               end if;
+
+               US.Append (Index_Data, To_Base62 (Items (N).First, 5));
+               US.Append (Index_Data, To_Base62 (Items (N).Last, 5));
+            else
+               US.Append
+                 (Index_Data,
+                  To_Base62 (Natural'Value (S (Items (N).Value)), 2));
+            end if;
+         end loop;
+
+         L;
+         L ("   function " & Name & " (Code : String) return " & Return_Type
+            & " is");
+         if Is_String then
+            L ("      Values : constant String :=");
+            Emit_Unit_String_Expression ("        ", S (Values), ";");
+         end if;
+         L ("      Index_Data : constant String :=");
+         Emit_Unit_String_Expression ("        ", S (Index_Data), ";");
+         L ("      Width : constant := " & (if Is_String then "13" else "5")
+            & ";");
+         L ("      Count : constant Natural := Index_Data'Length / Width;");
+         L;
+         L ("      function Key (N : Positive) return String is");
+         L ("        (Index_Data (Index_Data'First + (N - 1) * Width ..");
+         L ("                     Index_Data'First + (N - 1) * Width + 2));");
+         L;
+         if Is_String then
+            L ("      function Value_At (N : Positive) return String is");
+            L ("         Base : constant Natural :=");
+            L ("           Index_Data'First + (N - 1) * Width + 3;");
+            L ("         F : constant Natural :=");
+            L ("           N62 (Index_Data (Base .. Base + 4));");
+            L ("         T : constant Natural :=");
+            L ("           N62 (Index_Data (Base + 5 .. Base + 9));");
+            L ("      begin");
+            L ("         return VB (Values (F .. T));");
+            L ("      end Value_At;");
+         else
+            L ("      function Value_At (N : Positive) return Natural is");
+            L ("         Base : constant Natural :=");
+            L ("           Index_Data'First + (N - 1) * Width + 3;");
+            L ("      begin");
+            L ("         return N62 (Index_Data (Base .. Base + 1));");
+            L ("      end Value_At;");
+         end if;
+         L;
+         L ("      Low : Natural := 1;");
+         L ("      High : Natural := Count;");
+         L ("      Mid : Natural;");
+         L ("   begin");
+         L ("      while Low <= High loop");
+         L ("         Mid := (Low + High) / 2;");
+         L ("         if Key (Mid) = Code then");
+         L ("            return Value_At (Mid);");
+         L ("         elsif Key (Mid) < Code then");
+         L ("            Low := Mid + 1;");
+         L ("         else");
+         L ("            High := Mid - 1;");
+         L ("         end if;");
+         L ("      end loop;");
+         L ("      return " & Default_Expr & ";");
          L ("   end " & Name & ";");
       end Emit_Currency_Field;
 
