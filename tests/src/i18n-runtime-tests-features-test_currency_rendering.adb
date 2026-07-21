@@ -229,6 +229,14 @@ begin
       & ASCII.LF
       & "en.cash = ""{amount, currency, CHF/cash}""" & ASCII.LF
       & "en.cash_slash = ""{amount, currency, CHF/precision-currency/cash}"""
+      & ASCII.LF
+      & "en.reordered_iso_cash = ""{amount, currency, CAD/iso-code-cash}"""
+      & ASCII.LF
+      & "en.reordered_full_cash_acct = "
+      & """{amount, currency, CHF/full-name-cash-accounting}"""
+      & ASCII.LF
+      & "en.reordered_acct_full = "
+      & """{amount, currency, USD/accounting-full-name}"""
       & ASCII.LF,
       Result);
    Assert (Result.Status = I18N.Runtime.Loaded,
@@ -874,4 +882,21 @@ begin
              Args) =
              Rendered (Runtime, "en", "cash_unit_name_accounting", Args),
            "currency slash-composed cash display names singularize after rounding");
+
+   --  Finalized option matrix: the width/accounting/cash words may appear in
+   --  any order and drop the "unit-width" prefix. These orderings were not in
+   --  the old fixed combo table and were rejected before; they must now alias
+   --  the canonical forms exactly.
+   I18N.Arguments.Set (Args, "amount", "1.03");
+   Assert (Rendered (Runtime, "en", "reordered_iso_cash", Args) =
+             Rendered (Runtime, "en", "cad_cash", Args),
+           "currency iso-code-cash matches cash-unit-width-iso-code ordering");
+   I18N.Arguments.Set (Args, "amount", "-1.03");
+   Assert (Rendered (Runtime, "en", "reordered_full_cash_acct", Args) =
+             Rendered (Runtime, "en", "cash_unit_name_accounting", Args),
+           "currency full-name-cash-accounting matches the canonical order");
+   I18N.Arguments.Set (Args, "amount", "-12.3");
+   Assert (Rendered (Runtime, "en", "reordered_acct_full", Args) =
+             Rendered (Runtime, "en", "unit_name_accounting", Args),
+           "currency accounting-full-name drops the unit-width prefix");
 end Test_Currency_Rendering;

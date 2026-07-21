@@ -60,168 +60,66 @@ package body I18N.Currency is
 
       declare
          Variant : constant String := Option (Slash + 1 .. Option'Last);
+         Start   : Positive := Variant'First;
+
+         --  Every option word the currency variant grammar accepts. "unit",
+         --  "width", "full", "code", "precision", "currency", and "standard"
+         --  are structural or name the default; the rest carry a flag.
+         function Known_Word (W : String) return Boolean is
+           (W = "symbol" or else W = "unit" or else W = "width"
+            or else W = "short" or else W = "narrow" or else W = "full"
+            or else W = "name" or else W = "long" or else W = "iso"
+            or else W = "code" or else W = "accounting" or else W = "cash"
+            or else W = "precision" or else W = "currency"
+            or else W = "standard");
+
+         procedure Apply_Word (W : String) is
+         begin
+            if W = "accounting" then
+               Style.Accounting := True;
+            elsif W = "cash" then
+               Style.Cash := True;
+            elsif W = "narrow" then
+               Style.Display := Narrow_Symbol;
+            elsif W = "iso" then
+               Style.Display := ISO_Code_Display;
+            elsif W = "name" or else W = "long" then
+               Style.Display := Name_Display;
+            elsif W = "symbol" or else W = "short" then
+               Style.Display := Symbol;
+            end if;
+         end Apply_Word;
       begin
-         if Variant = "symbol" then
-            null;
-         elsif Variant = "unit-width-short" then
-            null;
-         elsif Variant = "unit-width/short" then
-            null;
-         elsif Variant = "standard" then
-            null;
-         elsif Variant = "precision-currency-standard" then
-            null;
-         elsif Variant = "precision-currency/standard" then
-            null;
-         elsif Variant = "precision/currency-standard" then
-            null;
-         elsif Variant = "narrow" then
-            Style.Display := Narrow_Symbol;
-         elsif Variant = "unit-width-narrow" then
-            Style.Display := Narrow_Symbol;
-         elsif Variant = "unit-width/narrow" then
-            Style.Display := Narrow_Symbol;
-         elsif Variant = "name" then
-            Style.Display := Name_Display;
-         elsif Variant = "unit-width-full-name" then
-            Style.Display := Name_Display;
-         elsif Variant = "unit-width/full-name" then
-            Style.Display := Name_Display;
-         elsif Variant = "unit-width-long" then
-            Style.Display := Name_Display;
-         elsif Variant = "unit-width/long" then
-            Style.Display := Name_Display;
-         elsif Variant = "full-name" then
-            Style.Display := Name_Display;
-         elsif Variant = "unit-width-iso-code" then
-            Style.Display := ISO_Code_Display;
-         elsif Variant = "unit-width/iso-code" then
-            Style.Display := ISO_Code_Display;
-         elsif Variant = "iso-code" then
-            Style.Display := ISO_Code_Display;
-         elsif Variant = "accounting" then
-            Style.Accounting := True;
-         elsif Variant = "cash" then
-            Style.Cash := True;
-         elsif Variant = "precision-currency-cash" then
-            Style.Cash := True;
-         elsif Variant = "precision-currency/cash" then
-            Style.Cash := True;
-         elsif Variant = "precision/currency-cash" then
-            Style.Cash := True;
-         elsif Variant = "cash-accounting" then
-            Style.Cash := True;
-            Style.Accounting := True;
-         elsif Variant = "accounting-cash" then
-            Style.Cash := True;
-            Style.Accounting := True;
-         elsif Variant = "narrow-accounting" then
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "accounting-narrow" then
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "unit-width-narrow-accounting" then
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "unit-width/narrow/accounting" then
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "accounting-unit-width-narrow" then
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "accounting/unit-width/narrow" then
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "name-accounting" then
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "accounting-name" then
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "unit-width-full-name-accounting" then
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "unit-width/full-name/accounting" then
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "accounting-unit-width-full-name" then
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "accounting/unit-width/full-name" then
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "unit-width-iso-code-accounting" then
-            Style.Display := ISO_Code_Display;
-            Style.Accounting := True;
-         elsif Variant = "unit-width/iso-code/accounting" then
-            Style.Display := ISO_Code_Display;
-            Style.Accounting := True;
-         elsif Variant = "accounting-unit-width-iso-code" then
-            Style.Display := ISO_Code_Display;
-            Style.Accounting := True;
-         elsif Variant = "accounting/unit-width/iso-code" then
-            Style.Display := ISO_Code_Display;
-            Style.Accounting := True;
-         elsif Variant = "cash-narrow" then
-            Style.Cash := True;
-            Style.Display := Narrow_Symbol;
-         elsif Variant = "cash-unit-width-narrow" then
-            Style.Cash := True;
-            Style.Display := Narrow_Symbol;
-         elsif Variant = "cash/unit-width/narrow" then
-            Style.Cash := True;
-            Style.Display := Narrow_Symbol;
-         elsif Variant = "cash-name" then
-            Style.Cash := True;
-            Style.Display := Name_Display;
-         elsif Variant = "cash-unit-width-full-name" then
-            Style.Cash := True;
-            Style.Display := Name_Display;
-         elsif Variant = "cash/unit-width/full-name" then
-            Style.Cash := True;
-            Style.Display := Name_Display;
-         elsif Variant = "cash-unit-width-iso-code" then
-            Style.Cash := True;
-            Style.Display := ISO_Code_Display;
-         elsif Variant = "cash/unit-width/iso-code" then
-            Style.Cash := True;
-            Style.Display := ISO_Code_Display;
-         elsif Variant = "cash-narrow-accounting" then
-            Style.Cash := True;
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "cash-unit-width-narrow-accounting" then
-            Style.Cash := True;
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "cash/unit-width/narrow/accounting" then
-            Style.Cash := True;
-            Style.Display := Narrow_Symbol;
-            Style.Accounting := True;
-         elsif Variant = "cash-name-accounting" then
-            Style.Cash := True;
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "cash-unit-width-full-name-accounting" then
-            Style.Cash := True;
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "cash/unit-width/full-name/accounting" then
-            Style.Cash := True;
-            Style.Display := Name_Display;
-            Style.Accounting := True;
-         elsif Variant = "cash-unit-width-iso-code-accounting" then
-            Style.Cash := True;
-            Style.Display := ISO_Code_Display;
-            Style.Accounting := True;
-         elsif Variant = "cash/unit-width/iso-code/accounting" then
-            Style.Cash := True;
-            Style.Display := ISO_Code_Display;
-            Style.Accounting := True;
-         else
+         --  Accept any '-'/'/'-separated run of the known words in any order.
+         --  Width words override left to right (last wins); accounting and
+         --  cash are orthogonal flags. Any unknown word rejects the whole
+         --  variant, so "USD/bogus" and "USD/unit-width-medium" still fail.
+         if Variant'Length = 0 then
             return False;
          end if;
+
+         for Index in Variant'Range loop
+            if Variant (Index) = '-' or else Variant (Index) = '/' then
+               declare
+                  Word : constant String := Variant (Start .. Index - 1);
+               begin
+                  if Word'Length = 0 or else not Known_Word (Word) then
+                     return False;
+                  end if;
+                  Apply_Word (Word);
+               end;
+               Start := Index + 1;
+            end if;
+         end loop;
+
+         declare
+            Word : constant String := Variant (Start .. Variant'Last);
+         begin
+            if Word'Length = 0 or else not Known_Word (Word) then
+               return False;
+            end if;
+            Apply_Word (Word);
+         end;
       end;
 
       return True;
