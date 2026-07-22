@@ -2135,6 +2135,9 @@ package body I18N.Runtime.Tests.Features is
    procedure Test_Emoji_Annotations
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
+   procedure Test_Calendar_Names
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
    ---------------------------------------------------------------------------
    --  9. Compiled / indexed path preservation.
    ---------------------------------------------------------------------------
@@ -2536,6 +2539,9 @@ package body I18N.Runtime.Tests.Features is
       Register_Routine (T, Test_Emoji_Annotations'Access,
                         "CLDR emoji annotations (names + keywords) from "
                         & "per-locale runtime shards");
+      Register_Routine (T, Test_Calendar_Names'Access,
+                        "CLDR non-Gregorian calendar names from per-locale "
+                        & "runtime shards");
       Register_Routine (T, Test_Localized_Select_Plural_Corpus'Access,
         "localized select/plural corpus covers nested formatted arguments");
    end Register_Tests;
