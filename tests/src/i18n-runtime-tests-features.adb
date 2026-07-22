@@ -2144,6 +2144,9 @@ package body I18N.Runtime.Tests.Features is
    procedure Test_Spellout
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
+   procedure Test_Normalization
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
    ---------------------------------------------------------------------------
    --  9. Compiled / indexed path preservation.
    ---------------------------------------------------------------------------
@@ -2554,6 +2557,8 @@ package body I18N.Runtime.Tests.Features is
       Register_Routine (T, Test_Spellout'Access,
                         "RBNF spellout: numbers to words via the recursive "
                         & "rule interpreter");
+      Register_Routine (T, Test_Normalization'Access,
+                        "Unicode normalization (UAX #15): NFC/NFD/NFKC/NFKD");
       Register_Routine (T, Test_Localized_Select_Plural_Corpus'Access,
         "localized select/plural corpus covers nested formatted arguments");
    end Register_Tests;

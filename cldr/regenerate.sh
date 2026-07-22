@@ -52,7 +52,8 @@ build_tools () {
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_annotation_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_calendar_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_personname_data" ] \
-      || [ ! -x "$CLDR_DIR/bin/generate_cldr_rbnf_data" ]; then
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_rbnf_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_ucd_normalization_data" ]; then
       log "building the CLDR tools"
       ( cd "$CLDR_DIR" && alr -n build --profiles='*=development' >/dev/null )
    fi
@@ -93,6 +94,17 @@ generate_runtime_data () {
       build_tools
       log "generating share/i18n/rbnf shards"
       ( cd "$CLDR_DIR" && ./bin/generate_cldr_rbnf_data )
+   fi
+   #  UCD normalization data (from unicode.org, not cldr-json). Fetch the UCD
+   #  files if missing, then generate; best-effort like the rest.
+   if [ ! -f "$CLDR_DIR/../share/i18n/normalization.i18ndata" ]; then
+      [ -f "$CLDR_DIR/upstream/ucd/UnicodeData.txt" ] \
+        || sh "$CLDR_DIR/fetch_ucd.sh" || true
+      if [ -f "$CLDR_DIR/upstream/ucd/UnicodeData.txt" ]; then
+         build_tools
+         log "generating share/i18n/normalization.i18ndata"
+         ( cd "$CLDR_DIR" && ./bin/generate_ucd_normalization_data )
+      fi
    fi
 }
 

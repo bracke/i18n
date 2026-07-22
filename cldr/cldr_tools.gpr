@@ -17,6 +17,7 @@ project CLDR_Tools is
       "generate_cldr_calendar_data.adb",
       "generate_cldr_personname_data.adb",
       "generate_cldr_rbnf_data.adb",
+      "generate_ucd_normalization_data.adb",
       "import_cldr_subset.adb");
 
    package Compiler is
