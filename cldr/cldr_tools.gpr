@@ -13,6 +13,7 @@ project CLDR_Tools is
       "extract_cldr_normalized.adb",
       "generate_cldr_data.adb",
       "generate_cldr_display_data.adb",
+      "generate_cldr_annotation_data.adb",
       "import_cldr_subset.adb");
 
    package Compiler is

@@ -48,23 +48,30 @@ fi
 #  inherits an HTTP stack and a ZIP decoder. Build them on demand.
 build_tools () {
    if [ ! -x "$CLDR_DIR/bin/generate_cldr_data" ] \
-      || [ ! -x "$CLDR_DIR/bin/generate_cldr_display_data" ]; then
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_display_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_annotation_data" ]; then
       log "building the CLDR tools"
       ( cd "$CLDR_DIR" && alr -n build --profiles='*=development' >/dev/null )
    fi
 }
 
-#  Runtime data files for the "heavy/optional" areas (display names, ...) read
-#  upstream cldr-json directly, so they are only generated when the vendored
-#  upstream is present. Best-effort: the library compiles and runs without
+#  Runtime data files for the "heavy/optional" areas read upstream cldr-json
+#  directly, so each is generated only when its vendored upstream is present and
+#  its output is missing. Best-effort: the library compiles and runs without
 #  them, the feature just reports itself unavailable.
 generate_runtime_data () {
-   if [ -d "$CLDR_DIR/upstream/cldr-json/cldr-localenames-full" ]; then
+   UP="$CLDR_DIR/upstream/cldr-json"
+   if [ ! -f "$CLDR_DIR/../share/i18n/display-names.i18ndata" ] \
+      && [ -d "$UP/cldr-localenames-full" ]; then
       build_tools
       log "generating share/i18n/display-names.i18ndata"
       ( cd "$CLDR_DIR" && ./bin/generate_cldr_display_data )
-   else
-      log "no vendored localenames; skipping runtime display-name data"
+   fi
+   if [ ! -d "$CLDR_DIR/../share/i18n/annotations" ] \
+      && [ -d "$UP/cldr-annotations-full" ]; then
+      build_tools
+      log "generating share/i18n/annotations shards"
+      ( cd "$CLDR_DIR" && ./bin/generate_cldr_annotation_data )
    fi
 }
 
@@ -95,7 +102,6 @@ download_upstream () {
    ( cd "$CLDR_DIR" && ./bin/download_cldr_upstream )
 }
 
-RUNTIME_DATA="$CLDR_DIR/../share/i18n/display-names.i18ndata"
 
 #  Step 1 -- the compiled body is already current. "Current" means newer than
 #  the subset it is generated from; without the timestamp test a stale body
@@ -103,7 +109,7 @@ RUNTIME_DATA="$CLDR_DIR/../share/i18n/display-names.i18ndata"
 #  artifacts, so still (re)generate them when they are missing.
 if [ -f "$BODY" ]; then
    if [ ! -f "$SUBSET" ] || [ "$BODY" -nt "$SUBSET" ]; then
-      [ -f "$RUNTIME_DATA" ] || generate_runtime_data
+      generate_runtime_data
       exit 0
    fi
    log "$BODY is older than $SUBSET; regenerating"

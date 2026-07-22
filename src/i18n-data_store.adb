@@ -162,6 +162,7 @@ package body I18N.Data_Store is
    is
       I         : Natural := Content'First;
       Line_Stop : Natural;
+      Is_Header : Boolean;
    begin
       Count := 0;
       while I <= Content'Last loop
@@ -171,7 +172,20 @@ package body I18N.Data_Store is
             Line_Stop := Line_Stop + 1;
          end loop;
 
-         if Content (I) = '@' then
+         --  A section header is "@name|count" -- it has no TAB. A record whose
+         --  key happens to start with '@' (the emoji "@") always has a TAB, so
+         --  the header sentinel does not collide with such keys.
+         Is_Header := Content (I) = '@';
+         if Is_Header then
+            for J in I .. Line_Stop - 1 loop
+               if Content (J) = HT then
+                  Is_Header := False;
+                  exit;
+               end if;
+            end loop;
+         end if;
+
+         if Is_Header then
             --  Close the previous section at the byte before this header line.
             if Count > 0 then
                Sections (Count).Hi := I - 2;   --  drop the preceding LF too
