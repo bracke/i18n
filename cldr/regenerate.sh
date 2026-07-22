@@ -50,7 +50,8 @@ build_tools () {
    if [ ! -x "$CLDR_DIR/bin/generate_cldr_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_display_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_annotation_data" ] \
-      || [ ! -x "$CLDR_DIR/bin/generate_cldr_calendar_data" ]; then
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_calendar_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_personname_data" ]; then
       log "building the CLDR tools"
       ( cd "$CLDR_DIR" && alr -n build --profiles='*=development' >/dev/null )
    fi
@@ -79,6 +80,12 @@ generate_runtime_data () {
       build_tools
       log "generating share/i18n/calendars shards"
       ( cd "$CLDR_DIR" && ./bin/generate_cldr_calendar_data )
+   fi
+   if [ ! -d "$CLDR_DIR/../share/i18n/person-names" ] \
+      && [ -d "$UP/cldr-person-names-full" ]; then
+      build_tools
+      log "generating share/i18n/person-names shards"
+      ( cd "$CLDR_DIR" && ./bin/generate_cldr_personname_data )
    fi
 }
 
