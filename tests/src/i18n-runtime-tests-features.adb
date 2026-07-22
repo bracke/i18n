@@ -2150,6 +2150,9 @@ package body I18N.Runtime.Tests.Features is
    procedure Test_Calendar_Math
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
+   procedure Test_Segmentation
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
    ---------------------------------------------------------------------------
    --  9. Compiled / indexed path preservation.
    ---------------------------------------------------------------------------
@@ -2564,6 +2567,9 @@ package body I18N.Runtime.Tests.Features is
                         "Unicode normalization (UAX #15): NFC/NFD/NFKC/NFKD");
       Register_Routine (T, Test_Calendar_Math'Access,
                         "Calendar arithmetic: date conversion across calendars");
+      Register_Routine (T, Test_Segmentation'Access,
+                        "Text segmentation (UAX #29/#14): grapheme/word/"
+                        & "sentence/line boundaries");
       Register_Routine (T, Test_Localized_Select_Plural_Corpus'Access,
         "localized select/plural corpus covers nested formatted arguments");
    end Register_Tests;
