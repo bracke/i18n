@@ -195,15 +195,47 @@ procedure Generate_UCD_Uprops_Data is
       Close (F);
    end Load_Special_Case;
 
+   --  Script short-code -> long-name aliases (PropertyValueAliases "sc" lines),
+   --  so UnicodeSets written [:sc=Cher:] resolve to the long Scripts.txt names.
+   function Script_Aliases return String is
+      F : File_Type;
+      Out_S : Unbounded_String;
+   begin
+      Open (F, In_File, UCD & "PropertyValueAliases.txt");
+      while not End_Of_File (F) loop
+         declare
+            Line : constant String := Get_Line (F);
+         begin
+            if Line'Length > 3 and then Line (Line'First .. Line'First + 2) = "sc "
+            then
+               declare
+                  Short : constant String := Field (Line, 1);
+                  Long  : constant String := Field (Line, 2);
+               begin
+                  if Short /= "" and then Long /= "" then
+                     if Length (Out_S) > 0 then
+                        Append (Out_S, " ");
+                     end if;
+                     Append (Out_S, Short & ":" & Long);
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+      Close (F);
+      return To_String (Out_S);
+   end Script_Aliases;
+
    Out_F : File_Type;
 begin
    Load_Simple_Case;
    Load_Special_Case;
    Create (Out_F, Out_File, Out_Path);
    Put_Line (Out_F, "I18NDATA|1|16.0.0");
-   Put_Line (Out_F, "@prop|2");
+   Put_Line (Out_F, "@prop|3");
    Put_Line (Out_F, "gc" & HT & Ranges_Of ("DerivedGeneralCategory.txt"));
    Put_Line (Out_F, "script" & HT & Ranges_Of ("Scripts.txt"));
+   Put_Line (Out_F, "scriptalias" & HT & Script_Aliases);
    Put_Line (Out_F, "@case|4");
    Put_Line (Out_F, "lower" & HT & To_String (Lower_S));
    Put_Line (Out_F, "special" & HT & To_String (Special_S));

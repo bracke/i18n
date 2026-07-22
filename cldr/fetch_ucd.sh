@@ -83,7 +83,7 @@ printf 'uca: %s / CLDR %s collation data present\n' "$UCA_VER" "$CLDR_TAG"
 #  transform catalog with its conformance testData (CLDR release-46 = Unicode 16).
 UCD16_DEST="cldr/upstream/ucd16"
 mkdir -p "$UCD16_DEST"
-for f in Scripts.txt SpecialCasing.txt UnicodeData.txt; do
+for f in Scripts.txt SpecialCasing.txt UnicodeData.txt PropertyValueAliases.txt; do
    [ -f "$UCD16_DEST/$f" ] || curl -fsSL -o "$UCD16_DEST/$f" \
      "https://www.unicode.org/Public/16.0.0/ucd/$f"
 done

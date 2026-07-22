@@ -51,6 +51,7 @@ package body I18N.Transliteration is
    end record;
    package PRange_Vec is new Ada.Containers.Vectors (Positive, PRange);
    Script_Ranges, GC_Ranges : PRange_Vec.Vector;
+   Script_Alias  : Unbounded_String;   --  "Short:Long Short:Long ..."
    UProps_Loaded : Boolean := False;
 
    function Hex_Val (S : String) return Natural is
@@ -111,7 +112,39 @@ package body I18N.Transliteration is
       end if;
       Load_PRanges ("script", Script_Ranges);
       Load_PRanges ("gc", GC_Ranges);
+      Script_Alias := To_Unbounded_String
+        (I18N.Data_Store.Lookup ("uprops", "prop", "scriptalias"));
    end Ensure_UProps;
+
+   --  Resolve a script short code (e.g. "Cher") to its long name ("Cherokee");
+   --  returns Name unchanged if it is not a known short code.
+   function Resolve_Script (Name : String) return String is
+      S : constant String := To_String (Script_Alias);
+      I : Natural := S'First;
+   begin
+      while I <= S'Last loop
+         declare
+            J : Natural := I;
+         begin
+            while J <= S'Last and then S (J) /= ' ' loop
+               J := J + 1;
+            end loop;
+            declare
+               Tok : String renames S (I .. J - 1);
+               C   : Natural := Tok'First;
+            begin
+               while C <= Tok'Last and then Tok (C) /= ':' loop
+                  C := C + 1;
+               end loop;
+               if C <= Tok'Last and then Tok (Tok'First .. C - 1) = Name then
+                  return Tok (C + 1 .. Tok'Last);
+               end if;
+            end;
+            I := J + 1;
+         end;
+      end loop;
+      return Name;
+   end Resolve_Script;
 
    --  ------------------------------------------------------------------
    --  Set operations (normalized sorted range vectors)
@@ -207,7 +240,9 @@ package body I18N.Transliteration is
    function Difference (A, B : Range_Vec.Vector) return Range_Vec.Vector is
      (Intersect (A, Complement (B)));
 
-   --  Property set: scan the loaded uprops ranges.
+   --  Property set: scan the loaded uprops ranges. Accepts bare names
+   --  ([:Cherokee:], [:Lu:], [:L:]) and prefixed forms ([:sc=Cher:],
+   --  [:script=Cherokee:], [:gc=Lu:], [:General_Category=L:]).
    function Prop_Set (Name : String) return Range_Vec.Vector is
       V : Range_Vec.Vector;
 
@@ -219,21 +254,36 @@ package body I18N.Transliteration is
             return GC = Q;
          end if;
       end Match_GC;
+
+      --  Strip a "key=" prefix if present.
+      Eq   : Natural := Name'First - 1;
    begin
       Ensure_UProps;
-      --  Try script first, then general category.
-      for R of Script_Ranges loop
-         if To_String (R.Val) = Name then
-            Add_R (V, R.Lo, R.Hi);
+      for K in Name'Range loop
+         if Name (K) = '=' then
+            Eq := K;
+            exit;
          end if;
       end loop;
-      if V.Is_Empty then
-         for R of GC_Ranges loop
-            if Match_GC (To_String (R.Val), Name) then
+      declare
+         Base : constant String :=
+           (if Eq >= Name'First then Name (Eq + 1 .. Name'Last) else Name);
+         Long : constant String := Resolve_Script (Base);
+      begin
+         --  Try script (by long name, resolving a short code) then GC.
+         for R of Script_Ranges loop
+            if To_String (R.Val) = Long or else To_String (R.Val) = Base then
                Add_R (V, R.Lo, R.Hi);
             end if;
          end loop;
-      end if;
+         if V.Is_Empty then
+            for R of GC_Ranges loop
+               if Match_GC (To_String (R.Val), Base) then
+                  Add_R (V, R.Lo, R.Hi);
+               end if;
+            end loop;
+         end if;
+      end;
       Normalize (V);
       return V;
    end Prop_Set;
@@ -1008,8 +1058,16 @@ package body I18N.Transliteration is
          end loop;
          return True;
       end Match_Bwd;
+
+      --  Termination safety net: a pathological rule (a zero-width or backward
+      --  revisit that keeps re-firing) could loop forever; cap the total number
+      --  of rule-application passes so the transform always terminates.
+      Iters : Natural := 0;
+      Max_I : constant Natural := Natural (Buf.Length) * 1000 + 100_000;
    begin
       while I <= Natural (Buf.Length) loop
+         Iters := Iters + 1;
+         exit when Iters > Max_I;
          if Filter_Idx /= 0
            and then not In_Set (T.Sets (Filter_Idx), Buf (I))
          then
@@ -1081,7 +1139,15 @@ package body I18N.Transliteration is
                                  if not Seen_Cur then
                                     Cursor := Natural (Out_C.Length);
                                  end if;
-                                 I := I + Cursor;
+                                 --  Guarantee forward progress: a zero-width,
+                                 --  empty-output match must still advance the
+                                 --  cursor, otherwise it loops forever.
+                                 if KLen = 0 and then Natural (Out_C.Length) = 0
+                                 then
+                                    I := I + 1;
+                                 else
+                                    I := I + Cursor;
+                                 end if;
                                  Applied := True;
                               end;
                            end if;
