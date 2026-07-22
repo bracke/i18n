@@ -15,6 +15,10 @@ package I18N.Normalization is
    --  True when Text is already in the given normal form.
    function Is_Normalized (Text : String; To : Form) return Boolean;
 
+   --  Canonical combining class of a code point (0 for starters). Exposed for
+   --  the collation engine's discontiguous-contraction rule.
+   function Combining_Class (Code_Point : Natural) return Natural;
+
    --  True when the normalization data file is installed and loaded.
    function Available return Boolean;
 

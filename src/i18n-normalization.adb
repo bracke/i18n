@@ -449,6 +449,15 @@ package body I18N.Normalization is
    function Is_Normalized (Text : String; To : Form) return Boolean is
      (Normalize (Text, To) = Text);
 
+   function Combining_Class (Code_Point : Natural) return Natural is
+   begin
+      Ensure_Loaded;
+      if not Have_Data or else Code_Point > 16#10FFFF# then
+         return 0;
+      end if;
+      return CCC_Of (CP (Code_Point));
+   end Combining_Class;
+
    function Available return Boolean is
    begin
       Ensure_Loaded;

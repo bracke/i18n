@@ -42,3 +42,39 @@ done
 fetch emoji-data.txt emoji
 
 printf 'ucd: %s present in %s\n' "$VER" "$DEST"
+
+#  Collation (Phase 7): the UCA DUCET, its conformance tests, the matching
+#  PropList (Unified_Ideograph), and the CLDR locale tailoring rules. UCA and
+#  CLDR trail the UCD by one release, so these pin 16.0.0 / CLDR release-46.
+UCA_VER="16.0.0"
+UCA_DEST="cldr/upstream/uca"
+CLDR_TAG="release-46"
+COL_DEST="cldr/upstream/collation"
+mkdir -p "$UCA_DEST" "$COL_DEST"
+
+if [ ! -f "$UCA_DEST/allkeys.txt" ]; then
+   printf 'uca: fetching allkeys.txt\n'
+   curl -fsSL -o "$UCA_DEST/allkeys.txt" \
+     "https://www.unicode.org/Public/UCA/$UCA_VER/allkeys.txt"
+fi
+if [ ! -f "$UCA_DEST/PropList.txt" ]; then
+   printf 'uca: fetching PropList.txt (%s)\n' "$UCA_VER"
+   curl -fsSL -o "$UCA_DEST/PropList.txt" \
+     "https://www.unicode.org/Public/$UCA_VER/ucd/PropList.txt"
+fi
+if [ ! -f "$UCA_DEST/CollationTest/CollationTest_SHIFTED.txt" ]; then
+   printf 'uca: fetching CollationTest.zip\n'
+   curl -fsSL -o "$UCA_DEST/CollationTest.zip" \
+     "https://www.unicode.org/Public/UCA/$UCA_VER/CollationTest.zip"
+   ( cd "$UCA_DEST" && unzip -o CollationTest.zip >/dev/null 2>&1 ) || true
+fi
+
+#  CLDR standard collation tailorings for locales with non-trivial rules.
+for loc in sv da nb fi is es ca pt et pl cs sk sl hr hu ro tr az lt lv vi; do
+   if [ ! -f "$COL_DEST/$loc.xml" ]; then
+      curl -fsSL -o "$COL_DEST/$loc.xml" \
+        "https://raw.githubusercontent.com/unicode-org/cldr/$CLDR_TAG/common/collation/$loc.xml" \
+        2>/dev/null || rm -f "$COL_DEST/$loc.xml"
+   fi
+done
+printf 'uca: %s / CLDR %s collation data present\n' "$UCA_VER" "$CLDR_TAG"

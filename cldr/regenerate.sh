@@ -54,7 +54,9 @@ build_tools () {
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_personname_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_cldr_rbnf_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_ucd_normalization_data" ] \
-      || [ ! -x "$CLDR_DIR/bin/generate_ucd_segmentation_data" ]; then
+      || [ ! -x "$CLDR_DIR/bin/generate_ucd_segmentation_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_uca_collation_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_collation_tailoring" ]; then
       log "building the CLDR tools"
       ( cd "$CLDR_DIR" && alr -n build --profiles='*=development' >/dev/null )
    fi
@@ -115,6 +117,20 @@ generate_runtime_data () {
          build_tools
          log "generating share/i18n/segmentation.i18ndata"
          ( cd "$CLDR_DIR" && ./bin/generate_ucd_segmentation_data )
+      fi
+   fi
+   #  Collation (UCA DUCET root + CLDR locale tailorings).
+   if [ ! -f "$CLDR_DIR/../share/i18n/collation.i18ndata" ]; then
+      [ -f "$CLDR_DIR/upstream/uca/allkeys.txt" ] \
+        || sh "$CLDR_DIR/fetch_ucd.sh" || true
+      if [ -f "$CLDR_DIR/upstream/uca/allkeys.txt" ]; then
+         build_tools
+         log "generating share/i18n/collation.i18ndata"
+         ( cd "$CLDR_DIR" && ./bin/generate_uca_collation_data )
+         if [ -d "$CLDR_DIR/upstream/collation" ]; then
+            log "generating share/i18n/collation/ tailoring shards"
+            ( cd "$CLDR_DIR" && ./bin/generate_cldr_collation_tailoring )
+         fi
       fi
    fi
 }
