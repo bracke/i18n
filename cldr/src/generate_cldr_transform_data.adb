@@ -97,24 +97,35 @@ procedure Generate_CLDR_Transform_Data is
       end loop;
    end Flatten;
 
-   --  Concatenate every <tRule> CDATA in the file (flattened).
+   --  Concatenate every <tRule> in the file (flattened). A rule body is either
+   --  a <![CDATA[ ... ]]> section or plain text (pure ::-chains use the latter).
    function All_Rules (Xml : String) return String is
       Res : Unbounded_String;
       P   : Natural := Xml'First;
    begin
       loop
          declare
-            Cr : constant Natural := Index (Xml (P .. Xml'Last), "<tRule>");
+            Cr : constant Natural := Index (Xml (P .. Xml'Last), "<tRule");
          begin
             exit when Cr = 0;
             declare
-               C1 : constant Natural := Index (Xml (Cr .. Xml'Last), "[CDATA[");
-               C2 : constant Natural := Index (Xml (Cr .. Xml'Last), "]]>");
+               GT  : constant Natural := Index (Xml (Cr .. Xml'Last), ">");
+               End_T : constant Natural := Index (Xml (Cr .. Xml'Last), "</tRule>");
             begin
-               exit when C1 = 0 or else C2 = 0;
-               Flatten (Xml (C1 + 7 .. C2 - 1), Res);
-               Append (Res, ' ');
-               P := C2 + 3;
+               exit when GT = 0 or else End_T = 0;
+               declare
+                  Inner : String renames Xml (GT + 1 .. End_T - 1);
+                  C1    : constant Natural := Index (Inner, "[CDATA[");
+                  C2    : constant Natural := Index (Inner, "]]>");
+               begin
+                  if C1 /= 0 and then C2 /= 0 then
+                     Flatten (Inner (C1 + 7 .. C2 - 1), Res);
+                  else
+                     Flatten (Inner, Res);
+                  end if;
+                  Append (Res, ' ');
+                  P := End_T + 8;
+               end;
             end;
          end;
       end loop;

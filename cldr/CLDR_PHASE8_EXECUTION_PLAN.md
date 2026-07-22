@@ -117,13 +117,17 @@ hand/loaded rule sets) with the CLDR transform *catalog* as Phase 8b.
 - **Whole catalog generated:** `generate_ucd_uprops_data` + `generate_cldr_
   transform_data` compile the 379-file CLDR catalog into 165 shards + an alias
   index; `fetch_ucd.sh`/`regenerate.sh` wire it.
-- **CONFORMANCE (offline harness over `common/testData/transforms`):** the engine
-  runs the whole suite; **11,883 / 296,989 case lines pass** across the 128
-  transforms whose alias resolves to a single catalog file. Full ICU parity is
-  NOT reached — the remaining tail needs InterIndic chaining for the 160
-  synthesized `und-Xxxx-t-und-yyyy` aliases, more rule-syntax corners, and
-  per-script debugging. This is the documented follow-up; the engine and data
-  pipeline are in place and the harness reports coverage honestly.
+- **CONFORMANCE (offline harness over `common/testData/transforms`):**
+  **218,762 / 296,989 case lines pass (~74%); 92 of 288 files fully pass.** Up
+  from an initial 11,883 after fixing three real bugs: (a) plain `<tRule>` (no
+  CDATA) pure-`::`-chains were dropped by the generator — the InterIndic
+  Script↔Script transforms use these, so all 275 aliases now resolve; (b) the
+  compiled-transform cache passed a vector element to `Run` by reference while
+  recursive sub-transform compiles reallocated the same vector (use-after-realloc)
+  — now copied out; (c) **the shared `I18N.Data_Store` capped cached files at 16**
+  (`Max_Files`), so once a run loaded >16 shards every later `Lookup` returned
+  empty and the transform ran as identity — raised to 1024 with read-through when
+  full. The remaining ~26% is the rule-syntax long tail (per-script debugging).
 
 ## Decisions — LOCKED (maximal scope)
 

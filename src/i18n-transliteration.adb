@@ -1174,6 +1174,11 @@ package body I18N.Transliteration is
    Idx_Names    : Name_Vec.Vector;   --  alias name
    Idx_Files    : Name_Vec.Vector;   --  "basename:D"
 
+   --  Compiled-transform cache, keyed by "basename:D".
+   package Compiled_Vec is new Ada.Containers.Vectors (Positive, Compiled);
+   Cache_Keys : Name_Vec.Vector;
+   Cache_Vals : Compiled_Vec.Vector;
+
    procedure Ensure_Index is
    begin
       if Index_Loaded then
@@ -1244,11 +1249,27 @@ package body I18N.Transliteration is
          declare
             Base : constant String := Spec (Spec'First .. Colon - 1);
             Dir  : constant Boolean := Spec (Spec'Last) = 'R';
-            Rules : constant String :=
-              I18N.Data_Store.Lookup ("transforms/" & Base, "meta", "rules");
-            T : constant Compiled := Compile (Rules, Dir);
          begin
-            return Run (T, Text, Depth);
+            for K in Cache_Keys.First_Index .. Cache_Keys.Last_Index loop
+               if To_String (Cache_Keys (K)) = Spec then
+                  --  Copy out first: Run's recursive sub-transform calls append
+                  --  to the cache and can reallocate it, dangling the element.
+                  declare
+                     TC : constant Compiled := Cache_Vals (K);
+                  begin
+                     return Run (TC, Text, Depth);
+                  end;
+               end if;
+            end loop;
+            declare
+               Rules : constant String :=
+                 I18N.Data_Store.Lookup ("transforms/" & Base, "meta", "rules");
+               T : constant Compiled := Compile (Rules, Dir);
+            begin
+               Cache_Keys.Append (To_Unbounded_String (Spec));
+               Cache_Vals.Append (T);
+               return Run (T, Text, Depth);
+            end;
          end;
       end;
    end Transform_Impl;

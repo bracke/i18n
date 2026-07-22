@@ -20,7 +20,7 @@ package body I18N.Data_Store is
    end record;
    type Section_Array is array (1 .. Max_Sections) of Section_Record;
 
-   Max_Files : constant := 16;
+   Max_Files : constant := 1024;   --  transforms chain through many shards
    type File_Record is record
       Name     : Unbounded_String;
       Content  : String_Access;      --  null when the file was not found
@@ -377,8 +377,22 @@ package body I18N.Data_Store is
          end if;
       end;
 
-      --  Re-read the winning entry (in case another task installed first).
-      Registry.Peek (File, Content, Sections, Count, State);
+      --  Re-read the winning entry (in case another task installed first). If
+      --  the registry is full and could not cache this file, keep the content we
+      --  just loaded (read-through) rather than losing it.
+      declare
+         PC : String_Access;
+         PS : Section_Array;
+         PN : Natural;
+         PState : File_State;
+      begin
+         Registry.Peek (File, PC, PS, PN, PState);
+         if PState /= Unknown then
+            Content := PC;
+            Sections := PS;
+            Count := PN;
+         end if;
+      end;
    end Obtain;
 
    --  ------------------------------------------------------------------

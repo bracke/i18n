@@ -271,7 +271,7 @@ package body I18N.Segmentation is
    function LB_Code (N : String) return Natural is
       type Pair is record K : String (1 .. 2); V : LB; end record;
       Table : constant array (Positive range <>) of Pair :=
-        (("AI", LB_AI), ("AK", LB_AK), ("AL", LB_AL), ("AP", LB_AP),
+        [("AI", LB_AI), ("AK", LB_AK), ("AL", LB_AL), ("AP", LB_AP),
          ("AS", LB_AS), ("B2", LB_B2), ("BA", LB_BA), ("BB", LB_BB),
          ("BK", LB_BK), ("CB", LB_CB), ("CJ", LB_CJ), ("CL", LB_CL),
          ("CM", LB_CM), ("CP", LB_CP), ("CR", LB_CR), ("EB", LB_EB),
@@ -282,7 +282,7 @@ package body I18N.Segmentation is
          ("NS", LB_NS), ("NU", LB_NU), ("OP", LB_OP), ("PO", LB_PO),
          ("PR", LB_PR), ("QU", LB_QU), ("RI", LB_RI), ("SA", LB_SA),
          ("SG", LB_SG), ("SP", LB_SP), ("SY", LB_SY), ("VF", LB_VF),
-         ("VI", LB_VI), ("WJ", LB_WJ), ("ZW", LB_ZW));
+         ("VI", LB_VI), ("WJ", LB_WJ), ("ZW", LB_ZW)];
    begin
       if N'Length = 3 and then N = "ZWJ" then
          return LB'Pos (LB_ZWJ);
@@ -1126,7 +1126,7 @@ package body I18N.Segmentation is
    begin
       Ensure_Loaded;
       if Text'Length = 0 then
-         return (1 => 1);
+         return [1 => 1];
       end if;
       declare
          CPs  : CP_Array (1 .. Text'Length);
@@ -1138,7 +1138,7 @@ package body I18N.Segmentation is
          BN   : Natural;
       begin
          if not Have_Data then
-            return (1 => 1, 2 => Text'Length + 1);
+            return [1 => 1, 2 => Text'Length + 1];
          end if;
          Decode (Text, CPs, Offs, N);
          case Kind is
