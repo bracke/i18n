@@ -2141,6 +2141,9 @@ package body I18N.Runtime.Tests.Features is
    procedure Test_Person_Names
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
+   procedure Test_Spellout
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
    ---------------------------------------------------------------------------
    --  9. Compiled / indexed path preservation.
    ---------------------------------------------------------------------------
@@ -2548,6 +2551,9 @@ package body I18N.Runtime.Tests.Features is
       Register_Routine (T, Test_Person_Names'Access,
                         "CLDR person-name formatting (TR35) from per-locale "
                         & "runtime shards");
+      Register_Routine (T, Test_Spellout'Access,
+                        "RBNF spellout: numbers to words via the recursive "
+                        & "rule interpreter");
       Register_Routine (T, Test_Localized_Select_Plural_Corpus'Access,
         "localized select/plural corpus covers nested formatted arguments");
    end Register_Tests;

@@ -22,6 +22,12 @@ package Cldr_Json is
      (Array_Text : String;
       Process    : not null access procedure (Value : String));
 
+   --  Iterate a JSON array whose elements are 2-element string arrays
+   --  ([["a","b"],...]), calling Process with each pair (unquoted).
+   procedure For_Each_Pair
+     (Array_Text : String;
+      Process    : not null access procedure (A : String; B : String));
+
    --  Decode JSON string escapes (\", \\, \/, \n, \t, \uXXXX incl. surrogate
    --  pairs, ...) to raw UTF-8 bytes.
    function Unescape (Raw : String) return String;

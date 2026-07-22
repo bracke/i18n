@@ -203,6 +203,75 @@ package body Cldr_Json is
       end loop;
    end For_Each_String;
 
+   procedure For_Each_Pair
+     (Array_Text : String;
+      Process    : not null access procedure (A : String; B : String))
+   is
+      I : Natural := Array_Text'First;
+
+      --  Read the string starting at the next '"' at or after I; advance I past
+      --  its closing quote. "" if none.
+      function Read_At return String is
+         First : Natural;
+      begin
+         while I <= Array_Text'Last and then Array_Text (I) /= '"' loop
+            I := I + 1;
+         end loop;
+         if I > Array_Text'Last then
+            return "";
+         end if;
+         I := I + 1;
+         First := I;
+         while I <= Array_Text'Last loop
+            if Array_Text (I) = '\' then
+               I := I + 2;
+            elsif Array_Text (I) = '"' then
+               declare
+                  R : constant String := Array_Text (First .. I - 1);
+               begin
+                  I := I + 1;
+                  return R;
+               end;
+            else
+               I := I + 1;
+            end if;
+         end loop;
+         return "";
+      end Read_At;
+   begin
+      --  Skip to the outer '['.
+      while I <= Array_Text'Last and then Array_Text (I) /= '[' loop
+         I := I + 1;
+      end loop;
+      if I <= Array_Text'Last then
+         I := I + 1;
+      end if;
+
+      loop
+         --  Find the next inner '[' before the outer ']'.
+         while I <= Array_Text'Last
+           and then Array_Text (I) /= '[' and then Array_Text (I) /= ']'
+         loop
+            I := I + 1;
+         end loop;
+         exit when I > Array_Text'Last or else Array_Text (I) = ']';
+         I := I + 1;   --  past the inner '['
+         declare
+            A : constant String := Read_At;
+            B : constant String := Read_At;
+         begin
+            Process (A, B);
+         end;
+         --  Skip to the inner ']'.
+         while I <= Array_Text'Last and then Array_Text (I) /= ']' loop
+            I := I + 1;
+         end loop;
+         if I <= Array_Text'Last then
+            I := I + 1;   --  past inner ']'
+         end if;
+      end loop;
+   end For_Each_Pair;
+
    function Unescape (Raw : String) return String is
       Result : String (1 .. Raw'Length * 2);
       Last   : Natural := 0;
