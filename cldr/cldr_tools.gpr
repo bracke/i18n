@@ -21,6 +21,8 @@ project CLDR_Tools is
       "generate_ucd_segmentation_data.adb",
       "generate_uca_collation_data.adb",
       "generate_cldr_collation_tailoring.adb",
+      "generate_ucd_uprops_data.adb",
+      "generate_cldr_transform_data.adb",
       "import_cldr_subset.adb");
 
    package Compiler is

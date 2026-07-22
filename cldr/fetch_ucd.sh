@@ -78,3 +78,30 @@ for loc in sv da nb fi is es ca pt et pl cs sk sl hr hu ro tr az lt lv vi; do
    fi
 done
 printf 'uca: %s / CLDR %s collation data present\n' "$UCA_VER" "$CLDR_TAG"
+
+#  Transliteration (Phase 8): Unicode 16 property + case data, and the CLDR
+#  transform catalog with its conformance testData (CLDR release-46 = Unicode 16).
+UCD16_DEST="cldr/upstream/ucd16"
+mkdir -p "$UCD16_DEST"
+for f in Scripts.txt SpecialCasing.txt UnicodeData.txt; do
+   [ -f "$UCD16_DEST/$f" ] || curl -fsSL -o "$UCD16_DEST/$f" \
+     "https://www.unicode.org/Public/16.0.0/ucd/$f"
+done
+[ -f "$UCD16_DEST/DerivedGeneralCategory.txt" ] || curl -fsSL \
+  -o "$UCD16_DEST/DerivedGeneralCategory.txt" \
+  "https://www.unicode.org/Public/16.0.0/ucd/extracted/DerivedGeneralCategory.txt"
+
+TX_DEST="cldr/upstream/transforms"; TD_DEST="cldr/upstream/transforms_test"
+mkdir -p "$TX_DEST" "$TD_DEST"
+if [ ! -f "$TX_DEST/Greek-Latin.xml" ]; then
+   printf 'transforms: fetching the CLDR transform catalog + testData\n'
+   api="https://api.github.com/repos/unicode-org/cldr/contents/common"
+   raw="https://raw.githubusercontent.com/unicode-org/cldr/$CLDR_TAG/common"
+   curl -fsSL "$api/transforms?ref=$CLDR_TAG" 2>/dev/null \
+     | grep -oE '"name": "[^"]+\.xml"' | sed 's/"name": "//;s/"//' \
+     | xargs -P 16 -I{} sh -c '[ -f "'"$TX_DEST"'/{}" ] || curl -fsSL -o "'"$TX_DEST"'/{}" "'"$raw"'/transforms/{}" 2>/dev/null'
+   curl -fsSL "$api/testData/transforms?ref=$CLDR_TAG" 2>/dev/null \
+     | grep -oE '"name": "[^"]+\.txt"' | sed 's/"name": "//;s/"//' \
+     | xargs -P 16 -I{} sh -c '[ -f "'"$TD_DEST"'/{}" ] || curl -fsSL -o "'"$TD_DEST"'/{}" "'"$raw"'/testData/transforms/{}" 2>/dev/null'
+fi
+printf 'transliteration data present\n'

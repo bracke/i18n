@@ -56,7 +56,9 @@ build_tools () {
       || [ ! -x "$CLDR_DIR/bin/generate_ucd_normalization_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_ucd_segmentation_data" ] \
       || [ ! -x "$CLDR_DIR/bin/generate_uca_collation_data" ] \
-      || [ ! -x "$CLDR_DIR/bin/generate_cldr_collation_tailoring" ]; then
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_collation_tailoring" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_ucd_uprops_data" ] \
+      || [ ! -x "$CLDR_DIR/bin/generate_cldr_transform_data" ]; then
       log "building the CLDR tools"
       ( cd "$CLDR_DIR" && alr -n build --profiles='*=development' >/dev/null )
    fi
@@ -132,6 +134,22 @@ generate_runtime_data () {
             ( cd "$CLDR_DIR" && ./bin/generate_cldr_collation_tailoring )
          fi
       fi
+   fi
+   #  Transliteration (UCA/UCD 16 properties + CLDR transform catalog).
+   if [ ! -f "$CLDR_DIR/../share/i18n/uprops.i18ndata" ]; then
+      [ -f "$CLDR_DIR/upstream/ucd16/Scripts.txt" ] \
+        || sh "$CLDR_DIR/fetch_ucd.sh" || true
+      if [ -f "$CLDR_DIR/upstream/ucd16/Scripts.txt" ]; then
+         build_tools
+         log "generating share/i18n/uprops.i18ndata"
+         ( cd "$CLDR_DIR" && ./bin/generate_ucd_uprops_data )
+      fi
+   fi
+   if [ ! -f "$CLDR_DIR/../share/i18n/transforms/_index.i18ndata" ] \
+      && [ -d "$CLDR_DIR/upstream/transforms" ]; then
+      build_tools
+      log "generating share/i18n/transforms/ catalog"
+      ( cd "$CLDR_DIR" && ./bin/generate_cldr_transform_data )
    fi
 }
 

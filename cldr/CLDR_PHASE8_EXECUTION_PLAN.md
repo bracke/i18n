@@ -1,0 +1,157 @@
+# CLDR Phase 8 Execution Plan — Transliteration (Transforms)
+
+## Goal
+
+Script conversion and text transforms: the CLDR/ICU transform engine (UTS #35
+Part 3) — a rule-based rewriting system — as `I18N.Transliteration`
+(`Transform (Text, Name)`), reusing Phase-0 normalization for the `::NFx` steps.
+This is the last engine in the programme and the most syntactically complex: the
+transform rules are a full mini-language (cursor, contexts, variables, filters,
+compound calls, bidirectional rules).
+
+## What the data looks like (confirmed)
+
+CLDR `common/transforms/<Name>.xml` holds a `<tRule>` CDATA in ICU syntax, e.g.
+`Greek-Latin.xml`:
+
+- `:: [ filter-set ] ;` — a UnicodeSet limiting which characters are touched.
+- `:: NFD (NFC) ;` — a compound/built-in call (forward NFD, reverse NFC).
+- `$lower = [[:latin:][:greek:] & [:Ll:]] ;` — variables bound to **UnicodeSets**
+  (`[:Greek:]`, `[:M:]`, `[:Ll:]`, script/category properties, `&` intersection,
+  `-` difference, ranges, nesting).
+- `before { X } after → replacement ;` — context-sensitive rules, with `|` revisit,
+  quoting, and `↔`/`←`/`→` directions (`direction="both"`).
+
+Validation data exists: **`common/testData/transforms/*.txt`** (BCP-47-named,
+input/output pairs) — the conformance signal, analogous to CollationTest.
+
+## Why this needs a plan (open, costly decisions)
+
+- **UnicodeSet is itself a sub-project.** Rules lean on `[:Script:]`,
+  `[:General_Category:]`, `[:Ll:]`… so the engine needs a UnicodeSet parser **and**
+  the Unicode property data behind it (Scripts.txt, DerivedGeneralCategory,
+  binary props). That is a data-generation task before any rule runs.
+- **Case mapping is a real dependency.** `::Lower/Upper/Title` appear everywhere;
+  they need simple + full case data (UnicodeData + SpecialCasing) we don't have yet.
+- **The transform set is huge (400+ files)** and ranges from clean script pairs to
+  language-specific romanizations (Han→pinyin) and `Any-*` auto-script-detection.
+  Covering all is out of proportion; the engine + a curated set is the value.
+- **No free lunch on Any-Latin:** it requires detecting the source script per run
+  and dispatching to the right script→Latin transform + chaining.
+
+## Architecture (consistent with prior phases)
+
+- **Runtime data files.** `generate_cldr_transform_data` compiles each chosen
+  transform's rules into `share/i18n/transforms/<name>.i18ndata` (parsed rule list
+  + resolved variables/filter). A shared **property** data file
+  `share/i18n/uprops.i18ndata` (scripts + general category + binary props) backs
+  the UnicodeSet evaluator. `::NFx` reuses `I18N.Normalization`; case built-ins
+  reuse a new small case-mapping table.
+- **Engine `I18N.Transliteration`.** `Transform (Text, Name) return String`,
+  `Available`. Loads the named transform (a pipeline of steps: filter, rule-set,
+  built-in call, or sub-transform), applies the rewriting with a cursor.
+
+## Stages
+
+### Stage A — UnicodeSet + property data  ← the foundation
+- Generate `uprops.i18ndata`: per code point, Script and General_Category, plus
+  the binary properties the transforms use, as sorted ranges (the segmentation
+  pattern). Sources: Scripts.txt, extracted GC, PropList/DerivedCoreProperties.
+- A UnicodeSet parser/evaluator: `[...]` with literals, ranges, `[:prop:]` /
+  `\p{...}`, set ops (`&` `-` union), nesting, string-quoting. Returns a
+  membership test. Validate against a handful of known sets.
+
+### Stage B — the rule engine  ← the core
+- Parse one transform's forward rules: `$var` definitions (bound to UnicodeSets),
+  context rules `pre { key } post → out`, the `|` revisit cursor, quoting/escapes.
+- Apply: scan left to right; at each cursor position try rules in order; on a
+  match (respecting contexts) splice the replacement and move the cursor (or
+  revisit at `|`). Deterministic, first-rule-wins.
+- Validate on a self-contained rule set and one simple CLDR transform.
+
+### Stage C — built-ins, filters, compounds
+- `::[filter]` (only filtered characters are transformed).
+- Built-in calls: `::NFD/NFC/NFKD/NFKC` (Phase 0), `::Lower/Upper/Title` (new case
+  table, Stage C.1), `::Remove`, `::Null`, `::Hex`.
+- Compound transforms: a rule file is a **pipeline** of `::calls` and rule-sets;
+  run them in order. Recursive sub-transform invocation.
+
+### Stage D — direction
+- Bidirectional rules (`↔`), reverse-only (`←`), and inverse transform names
+  (`Greek-Latin` vs `Latin-Greek`): build both directions from `direction="both"`.
+
+### Stage E — curated CLDR transforms + conformance
+- Ship a curated set (clean script pairs — Latin-Greek, Latin-Cyrillic, a couple
+  of Indic, Latin-ASCII, and the functional NFx/case ones). Validate against the
+  matching `common/testData/transforms/*.txt`. Zero-mismatch is the bar where a
+  test file exists.
+
+### Stage F — API, tests, cascade, commit
+- `I18N.Transliteration` (`Transform`, `Available`); self-contained AUnit (hand
+  rules + one CLDR transform) + the offline conformance harness over testData.
+- Wire `fetch_ucd.sh` (transforms + testData + Scripts/SpecialCasing) and
+  `regenerate.sh`; `.gitignore`. Build → test → gnatprove → commit; update memory.
+
+## Recommended v1 scope
+
+**A–D fully** (UnicodeSet + property data, the rule engine, built-ins/filters/
+compounds, bidirectional), **plus E as a curated transform set** validated against
+CLDR testData. **Defer, documented:** the long tail of language-specific
+romanizations, full `Any-*` auto-script-detection (or ship a limited `Any-Latin`
+over the covered scripts), and the most exotic syntax corners. Same "v1 +
+documented deferrals" shape as Phases 4 / 7.
+
+Tighter alternative: **engine + built-ins only** (NFx, case, Remove, and
+hand/loaded rule sets) with the CLDR transform *catalog* as Phase 8b.
+
+## STATUS — IMPLEMENTED (engine + catalog; conformance partial)
+
+- **A–D built:** `I18N.Transliteration` (`Transform`, `Available`) with a full
+  UnicodeSet evaluator (ranges, `[:Script:]`/`[:gc:]` via `uprops.i18ndata`,
+  `&`/`-`/complement, nesting, `\p{}`), the rule engine (variables, before/after
+  contexts, `|` revisit cursor, `()`/`$1` segments, `+`/`*`/`?` quantifiers),
+  `::` filters, built-in calls (NFx via Phase 0, Lower/Upper/Title via the new
+  `I18N.Casing`, Null/Remove), compound chaining and bidirectional rules.
+- **Full case mapping `I18N.Casing`** (simple + SpecialCasing: ß→SS, Final_Sigma,
+  Turkish/Lithuanian) backing the case built-ins. 152/152 AUnit; gnatprove clean.
+- **Whole catalog generated:** `generate_ucd_uprops_data` + `generate_cldr_
+  transform_data` compile the 379-file CLDR catalog into 165 shards + an alias
+  index; `fetch_ucd.sh`/`regenerate.sh` wire it.
+- **CONFORMANCE (offline harness over `common/testData/transforms`):** the engine
+  runs the whole suite; **11,883 / 296,989 case lines pass** across the 128
+  transforms whose alias resolves to a single catalog file. Full ICU parity is
+  NOT reached — the remaining tail needs InterIndic chaining for the 160
+  synthesized `und-Xxxx-t-und-yyyy` aliases, more rule-syntax corners, and
+  per-script debugging. This is the documented follow-up; the engine and data
+  pipeline are in place and the harness reports coverage honestly.
+
+## Decisions — LOCKED (maximal scope)
+
+1. **Breadth: engine + ALL CLDR transforms** (the full `common/transforms`
+   catalog, 400+ files — script pairs, romanizations, functional). Stage E
+   generates a shard per transform; whatever a rule needs (UnicodeSet props,
+   built-ins, sub-transform chaining) must therefore be supported, and coverage
+   is validated file-by-file against `common/testData/transforms`. Transforms
+   whose rules use a still-unsupported construct are generated best-effort and
+   reported, not silently dropped.
+2. **Case mapping: FULL** — UnicodeData simple case **plus SpecialCasing.txt**
+   (one-to-many + context/locale-sensitive: final sigma, German ß, Turkish i,
+   Lithuanian, …). Backs `::Lower/Upper/Title` and is a reusable `I18N.Case`.
+3. **Any-Latin: ship a limited auto-detecting `Any-Latin`** — detect the source
+   script per run and dispatch to the covered script→Latin transforms, chaining
+   as needed. Other `Any-*` targets follow the same mechanism where data exists.
+
+This is the largest phase: the full rule mini-language, a complete UnicodeSet
+evaluator with the property data behind it, full case mapping, the whole CLDR
+catalog, and script-run detection for Any-Latin. Expect it to run longest and to
+lean hardest on file-by-file testData validation.
+
+## Risks
+
+- **The rule mini-language** is the largest risk (cursor + contexts + revisit +
+  variables + quoting); Stage B is the core effort.
+- **UnicodeSet property breadth** — getting the script/category/binary-property
+  data complete and correct is a prerequisite for most real transforms.
+- **Case mapping** is a genuine sub-dependency (new UCD data).
+- **Conformance coverage is uneven** — testData exists per transform ID but not
+  for every rule; validate where it exists and curate known cases elsewhere.

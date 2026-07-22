@@ -2156,6 +2156,12 @@ package body I18N.Runtime.Tests.Features is
    procedure Test_Collation
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
+   procedure Test_Casing
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
+   procedure Test_Transliteration
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+
    ---------------------------------------------------------------------------
    --  9. Compiled / indexed path preservation.
    ---------------------------------------------------------------------------
@@ -2576,6 +2582,10 @@ package body I18N.Runtime.Tests.Features is
       Register_Routine (T, Test_Collation'Access,
                         "Collation (UCA): sort keys, comparison, and locale "
                         & "tailoring");
+      Register_Routine (T, Test_Casing'Access,
+                        "Case mapping: lower/upper/title with SpecialCasing");
+      Register_Routine (T, Test_Transliteration'Access,
+                        "Transliteration: rule engine, contexts, and calls");
       Register_Routine (T, Test_Localized_Select_Plural_Corpus'Access,
         "localized select/plural corpus covers nested formatted arguments");
    end Register_Tests;
