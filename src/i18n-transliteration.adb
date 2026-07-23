@@ -306,6 +306,12 @@ package body I18N.Transliteration is
    function Is_Space (C : Character) return Boolean is
      (C = ' ' or else C = ASCII.HT or else C = ASCII.LF or else C = ASCII.CR);
 
+   --  A character allowed in a variable name: ASCII word chars plus any UTF-8
+   --  lead/continuation byte, so Unicode-script names ($ራብዕ) parse.
+   function Name_Char (C : Character) return Boolean is
+     (C in 'A' .. 'Z' or else C in 'a' .. 'z' or else C in '0' .. '9'
+      or else C = '_' or else Character'Pos (C) >= 16#80#);
+
    --  Decode one code point from a UTF-8 string at I (advances I).
    procedure Next_CP (S : String; I : in out Natural; C : out Code) is
       B  : constant Natural := Character'Pos (S (I));
@@ -501,10 +507,7 @@ package body I18N.Transliteration is
                   Nm : Unbounded_String;
                begin
                   I := I + 1;
-                  while I <= S'Last and then
-                    (S (I) in 'A' .. 'Z' or else S (I) in 'a' .. 'z'
-                     or else S (I) in '0' .. '9' or else S (I) = '_')
-                  loop
+                  while I <= S'Last and then Name_Char (S (I)) loop
                      Append (Nm, S (I)); I := I + 1;
                   end loop;
                   for K in Var_Names.First_Index .. Var_Names.Last_Index loop
@@ -645,20 +648,14 @@ package body I18N.Transliteration is
                   Into.Append (Element'(Kind => E_Ref,
                                 Ref => Character'Pos (S (I)) - 48, others => <>));
                   I := I + 1;
-               elsif I >= Stop or else not
-                 (S (I) in 'A' .. 'Z' or else S (I) in 'a' .. 'z'
-                  or else S (I) in '0' .. '9' or else S (I) = '_')
-               then
+               elsif I >= Stop or else not Name_Char (S (I)) then
                   --  A bare '$' is the start/end-of-text boundary anchor.
                   Into.Append (Element'(Kind => E_Anchor, others => <>));
                else
                   declare
                      Nm : Unbounded_String;
                   begin
-                     while I < Stop and then
-                       (S (I) in 'A' .. 'Z' or else S (I) in 'a' .. 'z'
-                        or else S (I) in '0' .. '9' or else S (I) = '_')
-                     loop
+                     while I < Stop and then Name_Char (S (I)) loop
                         Append (Nm, S (I)); I := I + 1;
                      end loop;
                      for K in Var_Names.First_Index .. Var_Names.Last_Index loop
