@@ -1186,22 +1186,54 @@ package body I18N.Transliteration is
             end loop;
             return Best;
          end Set_Str_Fwd;
+
+         --  Length consumed by one match of E at At_Q: a {string} member (its
+         --  length) or a single code point (1), or 0 if nothing matches. Used by
+         --  the quantifiers so [a{xy}]+ can consume the multi-char member too.
+         function Match_One (E : Element; At_Q : Integer) return Natural is
+            SL : constant Natural :=
+              (if E.Kind = E_Set then Set_Str_Fwd (E.Set_Idx, At_Q) else 0);
+         begin
+            if SL > 0 then
+               return SL;
+            elsif Test (E, At_Q) then
+               return 1;
+            else
+               return 0;
+            end if;
+         end Match_One;
       begin
          for E of Elems loop
             case E.Kind is
                when E_Char | E_Set =>
                   case E.Quant is
                      when '?' =>
-                        if Test (E, Q) then
-                           Q := Q + 1;
-                        end if;
+                        declare
+                           L : constant Natural := Match_One (E, Q);
+                        begin
+                           Q := Q + L;
+                        end;
                      when '*' =>
-                        while Test (E, Q) loop Q := Q + 1; end loop;
+                        loop
+                           declare
+                              L : constant Natural := Match_One (E, Q);
+                           begin
+                              exit when L = 0;
+                              Q := Q + L;
+                           end;
+                        end loop;
                      when '+' =>
-                        if not Test (E, Q) then
+                        if Match_One (E, Q) = 0 then
                            return -1;
                         end if;
-                        while Test (E, Q) loop Q := Q + 1; end loop;
+                        loop
+                           declare
+                              L : constant Natural := Match_One (E, Q);
+                           begin
+                              exit when L = 0;
+                              Q := Q + L;
+                           end;
+                        end loop;
                      when others =>
                         declare
                            SL : constant Natural :=
