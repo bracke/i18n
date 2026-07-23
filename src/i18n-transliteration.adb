@@ -658,8 +658,12 @@ package body I18N.Transliteration is
                      Next_CP (S, I, C1);
                   end if;
                   C2 := C1;
+                  --  '-' is a range operator only between two members; before ']'
+                  --  (set end) or '[' (a following subset/difference) it is a
+                  --  literal dash, e.g. [.-] is the two members '.' and '-'.
                   if I <= S'Last and then S (I) = '-'
-                    and then I + 1 <= S'Last and then S (I + 1) /= '['
+                    and then I + 1 <= S'Last
+                    and then S (I + 1) /= '[' and then S (I + 1) /= ']'
                   then
                      I := I + 1;
                      if S (I) = '\' then
