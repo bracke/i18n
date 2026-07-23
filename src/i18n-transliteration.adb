@@ -599,7 +599,10 @@ package body I18N.Transliteration is
                   end;
                end;
             elsif S (I) = '$' then
-               --  Variable reference: expand its (single-set) sequence.
+               --  A '$name' is a variable reference; a bare '$' is the
+               --  text-boundary anchor. The matcher treats a set that contains
+               --  U+0000 as matching the start/end of text (e.g. [aeiou$] means
+               --  "a vowel or the word edge"), so add U+0000 for the bare form.
                declare
                   Nm : Unbounded_String;
                begin
@@ -607,27 +610,36 @@ package body I18N.Transliteration is
                   while I <= S'Last and then Name_Char (S (I)) loop
                      Append (Nm, S (I)); I := I + 1;
                   end loop;
-                  for K in Var_Names.First_Index .. Var_Names.Last_Index loop
-                     if Var_Names (K) = Nm then
-                        for E of Var_Seqs (K) loop
-                           if E.Kind = E_Set then
-                              if Op = '|' then
-                                 for St of T.Set_Strs (E.Set_Idx) loop
-                                    Strings.Append (St);
-                                 end loop;
+                  if Length (Nm) = 0 then
+                     declare
+                        Bound : Range_Vec.Vector;
+                     begin
+                        Add_R (Bound, 0, 0);
+                        Apply (Bound);
+                     end;
+                  else
+                     for K in Var_Names.First_Index .. Var_Names.Last_Index loop
+                        if Var_Names (K) = Nm then
+                           for E of Var_Seqs (K) loop
+                              if E.Kind = E_Set then
+                                 if Op = '|' then
+                                    for St of T.Set_Strs (E.Set_Idx) loop
+                                       Strings.Append (St);
+                                    end loop;
+                                 end if;
+                                 Apply (T.Sets (E.Set_Idx));
+                              elsif E.Kind = E_Char then
+                                 declare
+                                    One : Range_Vec.Vector;
+                                 begin
+                                    Add_R (One, E.Ch, E.Ch);
+                                    Apply (One);
+                                 end;
                               end if;
-                              Apply (T.Sets (E.Set_Idx));
-                           elsif E.Kind = E_Char then
-                              declare
-                                 One : Range_Vec.Vector;
-                              begin
-                                 Add_R (One, E.Ch, E.Ch);
-                                 Apply (One);
-                              end;
-                           end if;
-                        end loop;
-                     end if;
-                  end loop;
+                           end loop;
+                        end if;
+                     end loop;
+                  end if;
                end;
             else
                --  A character or a range c-c.
