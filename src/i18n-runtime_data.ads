@@ -1,16 +1,22 @@
-with I18N.Diagnostics;
+with Ada.Containers.Indefinite_Vectors;
 
 private package I18N.Runtime_Data is
 
    --  Process-wide deterministic runtime data overrides loaded from external
    --  text. Formatters consult this package before generated CLDR/tzdb data.
 
+   --  Parse errors from Load_Text, each a formatted message. The platform data
+   --  layer reports errors this way rather than depending on the message-layer
+   --  I18N.Diagnostics contract; callers adapt these to their own diagnostics.
+   package Error_Vectors is new Ada.Containers.Indefinite_Vectors
+     (Index_Type => Positive, Element_Type => String);
+
    procedure Clear;
 
    function Load_Text
      (Source_Name : String;
       Text        : String;
-      Diagnostics : in out I18N.Diagnostics.Diagnostic_List)
+      Errors      : in out Error_Vectors.Vector)
       return Boolean;
 
    function Locale_Text

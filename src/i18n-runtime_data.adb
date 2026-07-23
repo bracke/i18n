@@ -2316,17 +2316,14 @@ package body I18N.Runtime_Data is
    end Is_Plural_Rule_Family;
 
    procedure Add_Error
-     (Diagnostics : in out I18N.Diagnostics.Diagnostic_List;
+     (Errors      : in out Error_Vectors.Vector;
       Source_Name : String;
       Line        : Natural;
       Message     : String)
    is
    begin
-      I18N.Diagnostics.Add
-        (List    => Diagnostics,
-         Kind    => I18N.Diagnostics.Parse_Error,
-         Message => Message & " in " & Source_Name & " at line"
-                    & Natural'Image (Line));
+      Errors.Append
+        (Message & " in " & Source_Name & " at line" & Natural'Image (Line));
    end Add_Error;
 
    procedure Store
@@ -3341,7 +3338,7 @@ package body I18N.Runtime_Data is
    function Load_Text
      (Source_Name : String;
       Text        : String;
-      Diagnostics : in out I18N.Diagnostics.Diagnostic_List)
+      Errors      : in out Error_Vectors.Vector)
       return Boolean
    is
       Pending_Locales : String_Maps.Map := Locale_Overrides;
@@ -3469,7 +3466,7 @@ package body I18N.Runtime_Data is
          end Flush_Token;
       begin
          if not Is_Plural_Rule_Family (Kind, Family) then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid LDML plural-rule row");
             Ok := False;
             return;
@@ -3489,7 +3486,7 @@ package body I18N.Runtime_Data is
          Flush_Token;
 
          if not Saw_Locale then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid LDML plural-rule row");
             Ok := False;
          end if;
@@ -3510,7 +3507,7 @@ package body I18N.Runtime_Data is
            or else Category = "other"
            or else not Is_Bounded_Plural_Rule_Text (Rule_Text)
          then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid runtime plural-rule expression row");
             Ok := False;
          else
@@ -3583,7 +3580,7 @@ package body I18N.Runtime_Data is
               or else Before_Time = ""
               or else not Valid_Locale_Field (Field_Name, Value)
             then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid LDML dayPeriodRule row");
                Ok := False;
             else
@@ -3640,7 +3637,7 @@ package body I18N.Runtime_Data is
               or else At_Time = ""
               or else not Valid_Locale_Field (Field_Name, At_Time)
             then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid LDML dayPeriodRule row");
                Ok := False;
             else
@@ -3662,7 +3659,7 @@ package body I18N.Runtime_Data is
          end Flush_Token;
       begin
          if not Is_HH_MM (At_Time) then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid LDML dayPeriodRule row");
             Ok := False;
             return;
@@ -3710,7 +3707,7 @@ package body I18N.Runtime_Data is
            or else not Is_Integer_Text (Start_Text)
            or else not In_Integer_Range (Start_Text)
          then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid normalized CLDR name row");
             Ok := False;
             return;
@@ -3725,7 +3722,7 @@ package body I18N.Runtime_Data is
                   or else Name_Kind = "month_narrow")
               and then (Start_Index /= 1 or else Count /= 12)
             then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid normalized CLDR month row");
                Ok := False;
                return;
@@ -3734,7 +3731,7 @@ package body I18N.Runtime_Data is
                      or else Name_Kind = "quarter_narrow")
               and then (Start_Index /= 1 or else Count /= 4)
             then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid normalized CLDR quarter row");
                Ok := False;
                return;
@@ -3743,7 +3740,7 @@ package body I18N.Runtime_Data is
                      or else Name_Kind = "weekday_narrow")
               and then (Start_Index /= 0 or else Count /= 7)
             then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid normalized CLDR weekday row");
                Ok := False;
                return;
@@ -3755,7 +3752,7 @@ package body I18N.Runtime_Data is
                     Hex_Scalars_To_UTF8 (Field (Items, Index, '~'));
                begin
                   if Item_Text'Length = 0 then
-                     Add_Error (Diagnostics, Source, Line,
+                     Add_Error (Errors, Source, Line,
                                 "invalid normalized CLDR name text");
                      Ok := False;
                      return;
@@ -3801,7 +3798,7 @@ package body I18N.Runtime_Data is
                if Item'Length = 0 then
                   null;
                elsif Sep = 0 or else Sep /= Item'First + 3 then
-                  Add_Error (Diagnostics, Source, Line,
+                  Add_Error (Errors, Source, Line,
                              "invalid normalized CLDR currency-name payload");
                   Ok := False;
                   return;
@@ -3812,7 +3809,7 @@ package body I18N.Runtime_Data is
                   begin
                      if Field_Count (Names, ',') /= 6 then
                         Add_Error
-                          (Diagnostics, Source, Line,
+                          (Errors, Source, Line,
                            "invalid normalized CLDR currency-name categories");
                         Ok := False;
                         return;
@@ -3826,7 +3823,7 @@ package body I18N.Runtime_Data is
                         begin
                            if Value'Length = 0 then
                               Add_Error
-                                (Diagnostics, Source, Line,
+                                (Errors, Source, Line,
                                  "invalid normalized CLDR currency-name text");
                               Ok := False;
                               return;
@@ -3861,12 +3858,12 @@ package body I18N.Runtime_Data is
            or else not Is_Spellout_Kind (Normal_Kind)
            or else Normal_Text'Length = 0
          then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid runtime RBNF spellout row");
             Ok := False;
          elsif Normal_Kind = "decimal_separator" then
             if Value_Text'Length /= 0 then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid runtime RBNF decimal row");
                Ok := False;
             else
@@ -3882,7 +3879,7 @@ package body I18N.Runtime_Data is
                Spellout_Key (Locale, Normal_Kind, Value_Text),
                Normal_Text);
          elsif not In_Integer_Range (Value_Text) then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid runtime RBNF spellout value");
             Ok := False;
          else
@@ -3890,7 +3887,7 @@ package body I18N.Runtime_Data is
                Value : constant Integer := Integer'Value (Value_Text);
             begin
                if Value < -999_999_999 or else Value > 999_999_999 then
-                  Add_Error (Diagnostics, Source, Line,
+                  Add_Error (Errors, Source, Line,
                              "invalid runtime RBNF spellout value");
                   Ok := False;
                else
@@ -3935,13 +3932,13 @@ package body I18N.Runtime_Data is
            or else not (Normal_Kind = "cardinal" or else Normal_Kind = "ordinal")
            or else Normal_Text'Length = 0
          then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid runtime RBNF rule row");
             Ok := False;
          elsif Ada.Strings.Fixed.Index (Normal_Text, "$(") /= 0
            and then not Is_RBNF_Plural_Affix_Pattern (Normal_Text)
          then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid runtime RBNF rule row");
             Ok := False;
          elsif Normal_Base = "negative"
@@ -3950,7 +3947,7 @@ package body I18N.Runtime_Data is
            or else Normal_Base = "integer-decimal"
          then
             if not Is_RBNF_Rule_Pattern (Normal_Text) then
-               Add_Error (Diagnostics, Source, Line,
+               Add_Error (Errors, Source, Line,
                           "invalid runtime RBNF rule row");
                Ok := False;
             else
@@ -3967,7 +3964,7 @@ package body I18N.Runtime_Data is
                if not RBNF_Rule_Descriptor_Values
                         (Normal_Base, Base, Divisor)
                then
-                  Add_Error (Diagnostics, Source, Line,
+                  Add_Error (Errors, Source, Line,
                              "invalid runtime RBNF rule base");
                   Ok := False;
                elsif Is_RBNF_Rule_Pattern (Normal_Text) then
@@ -3987,7 +3984,7 @@ package body I18N.Runtime_Data is
                        (Locale, Normal_Kind, Natural_Text (Base)),
                      Normal_Text);
                else
-                  Add_Error (Diagnostics, Source, Line,
+                  Add_Error (Errors, Source, Line,
                              "invalid runtime RBNF rule row");
                   Ok := False;
                end if;
@@ -4009,7 +4006,7 @@ package body I18N.Runtime_Data is
            or else Value = ""
            or else not Valid_Locale_Field (Name, Value)
          then
-            Add_Error (Diagnostics, Source, Line,
+            Add_Error (Errors, Source, Line,
                        "invalid normalized CLDR locale text row");
             Ok := False;
          else
@@ -4028,7 +4025,7 @@ package body I18N.Runtime_Data is
             if Field_Count (Line) /= 3 or else Field (Line, 2) = ""
               or else Field (Line, 3) = ""
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR symbol row");
                Ok := False;
             else
@@ -4044,7 +4041,7 @@ package body I18N.Runtime_Data is
          elsif Kind = "digits_codepoints" then
             if Field_Count (Line) /= 3 or else Field_Count (Field (Line, 3), ',') /= 10
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR digits row");
                Ok := False;
             else
@@ -4055,7 +4052,7 @@ package body I18N.Runtime_Data is
                          (Field (Field (Line, 3), Digit + 1, ','));
                   begin
                      if Value'Length = 0 then
-                        Add_Error (Diagnostics, Source, Number,
+                        Add_Error (Errors, Source, Number,
                                    "invalid normalized CLDR digit");
                         Ok := False;
                         return;
@@ -4072,7 +4069,7 @@ package body I18N.Runtime_Data is
             end if;
          elsif Kind = "names_hex" then
             if Field_Count (Line) /= 5 then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR names row");
                Ok := False;
             else
@@ -4082,7 +4079,7 @@ package body I18N.Runtime_Data is
             end if;
          elsif Kind = "locale_text" then
             if Field_Count (Line) /= 4 then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR locale text row");
                Ok := False;
             else
@@ -4096,7 +4093,7 @@ package body I18N.Runtime_Data is
               or else not In_Integer_Range (Field (Line, 3))
               or else not In_Integer_Range (Field (Line, 4))
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR currency row");
                Ok := False;
             else
@@ -4129,7 +4126,7 @@ package body I18N.Runtime_Data is
               or else not Is_Plural_Rule_Family
                 (Field (Line, 2), Field (Line, 4))
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR plural-rule row");
                Ok := False;
             else
@@ -4140,7 +4137,7 @@ package body I18N.Runtime_Data is
             end if;
          elsif Kind = "plural_rule_text" then
             if Field_Count (Line) /= 5 then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR plural-rule expression row");
                Ok := False;
             else
@@ -4154,7 +4151,7 @@ package body I18N.Runtime_Data is
             end if;
          elsif Kind = "rbnf_text" then
             if Field_Count (Line) /= 5 then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR RBNF row");
                Ok := False;
             else
@@ -4173,7 +4170,7 @@ package body I18N.Runtime_Data is
             end if;
          elsif Kind = "rbnf_rule_text" then
             if Field_Count (Line) /= 5 then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid normalized CLDR RBNF rule row");
                Ok := False;
             else
@@ -4194,7 +4191,7 @@ package body I18N.Runtime_Data is
             if Field_Count (Line) >= 2 and then Field (Line, 2) = "indian_grouping"
             then
                if Field_Count (Line) /= 4 then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid normalized CLDR grouping row");
                   Ok := False;
                else
@@ -4213,7 +4210,7 @@ package body I18N.Runtime_Data is
               and then Field (Line, 2) = "day_month_year"
             then
                if Field_Count (Line) /= 3 then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid normalized CLDR date-order row");
                   Ok := False;
                else
@@ -4223,7 +4220,7 @@ package body I18N.Runtime_Data is
               and then Field (Line, 2) = "symbol_first"
             then
                if Field_Count (Line) /= 3 then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid normalized CLDR symbol-first row");
                   Ok := False;
                else
@@ -4234,7 +4231,7 @@ package body I18N.Runtime_Data is
                           or else Field (Line, 2) = "ordinal")
             then
                if Field_Count (Line) /= 4 then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid normalized CLDR plural-family row");
                   Ok := False;
                else
@@ -4245,7 +4242,7 @@ package body I18N.Runtime_Data is
               and then Field (Line, 2) = "currency_name_payload"
             then
                if Field_Count (Line) /= 4 then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid normalized CLDR currency-name row");
                   Ok := False;
                else
@@ -4253,12 +4250,12 @@ package body I18N.Runtime_Data is
                     (Field (Line, 3), Field (Line, 4), Source, Number);
                end if;
             else
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "unsupported normalized CLDR raw row");
                Ok := False;
             end if;
          else
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "unsupported normalized CLDR row");
             Ok := False;
          end if;
@@ -5142,13 +5139,13 @@ package body I18N.Runtime_Data is
       is
       begin
          if Locale = "" then
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "invalid LDML number-symbol row");
             Ok := False;
          elsif not Should_Apply_Symbol_Row (Locale, Number_System) then
             null;
          elsif Value = "" then
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "invalid LDML number-symbol row");
             Ok := False;
          else
@@ -5185,13 +5182,13 @@ package body I18N.Runtime_Data is
                  Attribute_Value (Line, "accountingSuffix");
             begin
                if Locale = "" then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML symbols row");
                   Ok := False;
                elsif not Should_Apply_Symbol_Row (Locale, Number_System) then
                   null;
                elsif Decimal = "" or else Group = "" then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML symbols row");
                   Ok := False;
                else
@@ -5253,7 +5250,7 @@ package body I18N.Runtime_Data is
                  or else not Valid_Locale_Field
                    ("default_numbering_system", Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML default numbering-system row");
                   Ok := False;
                else
@@ -5350,7 +5347,7 @@ package body I18N.Runtime_Data is
                  or else Value = ""
                  or else not In_Integer_Range (Index_Text)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML name row");
                   Ok := False;
                else
@@ -5364,7 +5361,7 @@ package body I18N.Runtime_Data is
                        or else
                          (Base = "weekday" and then Name_Index not in 0 .. 6)
                      then
-                        Add_Error (Diagnostics, Source, Number,
+                        Add_Error (Errors, Source, Number,
                                    "invalid LDML name index");
                         Ok := False;
                         return;
@@ -5381,7 +5378,7 @@ package body I18N.Runtime_Data is
                end if;
             exception
                when Constraint_Error =>
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML name index");
                   Ok := False;
             end;
@@ -5399,7 +5396,7 @@ package body I18N.Runtime_Data is
                  or else Value = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML day-period row");
                   Ok := False;
                else
@@ -5421,12 +5418,12 @@ package body I18N.Runtime_Data is
                   else Locale);
             begin
                if Element_Text (Line) /= "" then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML dayPeriodRule row");
                   Ok := False;
                elsif At_Time /= "" then
                   if From /= "" or else Before /= "" then
-                     Add_Error (Diagnostics, Source, Number,
+                     Add_Error (Errors, Source, Number,
                                 "invalid LDML dayPeriodRule row");
                      Ok := False;
                   else
@@ -5454,7 +5451,7 @@ package body I18N.Runtime_Data is
                  or else Era = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML era row");
                   Ok := False;
                else
@@ -5476,7 +5473,7 @@ package body I18N.Runtime_Data is
                  or else Calendar = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML era-separator row");
                   Ok := False;
                else
@@ -5533,7 +5530,7 @@ package body I18N.Runtime_Data is
                  or else Field_Name = Zone
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML zone-name row");
                   Ok := False;
                else
@@ -5556,7 +5553,7 @@ package body I18N.Runtime_Data is
                  or else Zone = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML zone-exemplar row");
                   Ok := False;
                else
@@ -5590,7 +5587,7 @@ package body I18N.Runtime_Data is
                  or else Zone = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML short-zone row");
                   Ok := False;
                else
@@ -5631,7 +5628,7 @@ package body I18N.Runtime_Data is
                  or else Zone = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML CLDR zone-name row");
                   Ok := False;
                else
@@ -5667,7 +5664,7 @@ package body I18N.Runtime_Data is
                  or else Occurrence_Count (Value, "{0}") /= 1
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML " & Row_Name & " row");
                   Ok := False;
                else
@@ -5707,7 +5704,7 @@ package body I18N.Runtime_Data is
                  or else not Pattern_OK
                  or else not Valid_Locale_Field (Field_Name, Field_Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML " & Row_Name & " row");
                   Ok := False;
                else
@@ -5738,7 +5735,7 @@ package body I18N.Runtime_Data is
                  or else not Is_Plural_Category (Category)
                  or else Value = ""
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML currency-name row");
                   Ok := False;
                else
@@ -5802,7 +5799,7 @@ package body I18N.Runtime_Data is
                           and then
                             not Valid_Locale_Field (Field_Name, Value))
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML unit row");
                   Ok := False;
                else
@@ -5845,7 +5842,7 @@ package body I18N.Runtime_Data is
                  or else not Valid_Pattern
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML compound-unit-pattern row");
                   Ok := False;
                else
@@ -5871,7 +5868,7 @@ package body I18N.Runtime_Data is
                  or else not Is_Supported_Relative_Unit (Unit)
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML relative-period row");
                   Ok := False;
                else
@@ -5910,7 +5907,7 @@ package body I18N.Runtime_Data is
                  or else not Is_Integer_Text (Offset)
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML relative row");
                   Ok := False;
                else
@@ -5936,7 +5933,7 @@ package body I18N.Runtime_Data is
                  or else not Is_CLDR_Count_Name (Count)
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML relative-unit row");
                   Ok := False;
                else
@@ -6005,7 +6002,7 @@ package body I18N.Runtime_Data is
                              or else not Valid_Suffix
                              or else (Prefix = "" and then Suffix = "")))
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML relative-pattern row");
                   Ok := False;
                else
@@ -6049,7 +6046,7 @@ package body I18N.Runtime_Data is
                  or else not Valid_Pattern
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML list-pattern row");
                   Ok := False;
                else
@@ -6108,7 +6105,7 @@ package body I18N.Runtime_Data is
                           and then Style /= "long"
                           and then Style /= "full")
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML date/time format row");
                   Ok := False;
                else
@@ -6133,7 +6130,7 @@ package body I18N.Runtime_Data is
                  or else Value = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML available-format row");
                   Ok := False;
                else
@@ -6161,7 +6158,7 @@ package body I18N.Runtime_Data is
                           and then Request /= "timezone")
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML append-item row");
                   Ok := False;
                else
@@ -6205,7 +6202,7 @@ package body I18N.Runtime_Data is
                if Locale = ""
                  or else not Valid_Locale_Field (Field_Name, Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML locale preference row");
                   Ok := False;
                else
@@ -6228,7 +6225,7 @@ package body I18N.Runtime_Data is
                           and then not Valid_Locale_Field
                             ("first_week_min_days", Min_Days))
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML week-data row");
                   Ok := False;
                else
@@ -6251,7 +6248,7 @@ package body I18N.Runtime_Data is
                if Locale = ""
                  or else not Valid_Locale_Field ("first_day_of_week", Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML first-day row");
                   Ok := False;
                else
@@ -6268,7 +6265,7 @@ package body I18N.Runtime_Data is
                if Locale = ""
                  or else not Valid_Locale_Field ("first_week_min_days", Value)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML minimum-days row");
                   Ok := False;
                else
@@ -6333,7 +6330,7 @@ package body I18N.Runtime_Data is
                                 and then Raw_Date_Time_Style /= "long"
                                 and then Raw_Date_Time_Style /= "full")
                      then
-                        Add_Error (Diagnostics, Source, Number,
+                        Add_Error (Errors, Source, Number,
                                    "invalid LDML date/time pattern row");
                         Ok := False;
                      else
@@ -6366,7 +6363,7 @@ package body I18N.Runtime_Data is
                                   ("currency_accounting_suffix",
                                    To_String (Accounting_Suffix))))
                   then
-                     Add_Error (Diagnostics, Source, Number,
+                     Add_Error (Errors, Source, Number,
                                 "invalid LDML currency pattern row");
                      Ok := False;
                   else
@@ -6406,7 +6403,7 @@ package body I18N.Runtime_Data is
                  or else To_String (LDML_Context_Currency_Spacing) = ""
                  or else Value = ""
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML currency-spacing match row");
                   Ok := False;
                end if;
@@ -6461,7 +6458,7 @@ package body I18N.Runtime_Data is
                             ("currency_accounting_suffix",
                              Accounting_Suffix))
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML " & Row_Name & " row");
                   Ok := False;
                else
@@ -6495,7 +6492,7 @@ package body I18N.Runtime_Data is
                   end if;
 
                   if not Saw_Field then
-                     Add_Error (Diagnostics, Source, Number,
+                     Add_Error (Errors, Source, Number,
                                 "invalid LDML " & Row_Name & " row");
                      Ok := False;
                   end if;
@@ -6528,7 +6525,7 @@ package body I18N.Runtime_Data is
                  or else (Minor /= "" and then not In_Integer_Range (Minor))
                  or else (Cash /= "" and then not In_Integer_Range (Cash))
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML currency row");
                   Ok := False;
                else
@@ -6559,7 +6556,7 @@ package body I18N.Runtime_Data is
                   end if;
 
                   if not Saw_Field then
-                     Add_Error (Diagnostics, Source, Number,
+                     Add_Error (Errors, Source, Number,
                                 "invalid LDML currency row");
                      Ok := False;
                   end if;
@@ -6585,7 +6582,7 @@ package body I18N.Runtime_Data is
                  or else (Alt /= "" and then Alt /= "standard"
                           and then Alt /= "narrow")
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML currency-symbol row");
                   Ok := False;
                else
@@ -6609,7 +6606,7 @@ package body I18N.Runtime_Data is
                  or else not Is_Plural_Category (Category)
                  or else Value = ""
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML currency-name row");
                   Ok := False;
                else
@@ -6636,7 +6633,7 @@ package body I18N.Runtime_Data is
                   Store_Plural_Category_Rule_List
                     (Kind, Locales, Category, Rule_Text, Source, Number);
                elsif Locales = "" then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML plural-rule row");
                   Ok := False;
                else
@@ -6702,7 +6699,7 @@ package body I18N.Runtime_Data is
             begin
                if Zone = "" or else not Parse_Offset_Minutes (Offset, Minutes)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "invalid LDML time-zone row");
                   Ok := False;
                else
@@ -6713,7 +6710,7 @@ package body I18N.Runtime_Data is
                end if;
             end;
          else
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "unsupported LDML row");
             Ok := False;
          end if;
@@ -7369,7 +7366,7 @@ package body I18N.Runtime_Data is
            or else not Parts.Contains ("8")
            or else not Parts.Contains ("9")
          then
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "invalid tzdb Rule row");
             Ok := False;
             return;
@@ -7397,7 +7394,7 @@ package body I18N.Runtime_Data is
               or else not Parse_TZDB_Time (At_Text, Hour, Minute, Second)
               or else not Parse_Offset_Seconds (Save_Text, Save_Seconds)
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "unsupported tzdb Rule row");
                Ok := False;
                return;
@@ -7439,7 +7436,7 @@ package body I18N.Runtime_Data is
                    (Check_To_Year, Check_To_Month, Check_To_Day,
                     Check_To_Hour, Minute, Second)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "unsupported tzdb Rule row");
                   Ok := False;
                else
@@ -7454,7 +7451,7 @@ package body I18N.Runtime_Data is
          end;
       exception
          when Constraint_Error =>
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "invalid tzdb Rule row");
             Ok := False;
       end Parse_TZDB_Rule_Row;
@@ -7771,7 +7768,7 @@ package body I18N.Runtime_Data is
               or else Parts.Element ("1") /= "Zone"
               or else not Parse_Offset_Seconds (Parts.Element ("3"), Seconds)
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid tzdb Zone row");
                Ok := False;
             else
@@ -7803,7 +7800,7 @@ package body I18N.Runtime_Data is
                        (Parts, Count, 6,
                         Seconds, Effective_Seconds, Until_Key)
                      then
-                        Add_Error (Diagnostics, Source, Number,
+                        Add_Error (Errors, Source, Number,
                                    "invalid tzdb Zone until fields");
                         Ok := False;
                      else
@@ -7840,7 +7837,7 @@ package body I18N.Runtime_Data is
               or else not Parts.Contains ("1")
               or else not Parse_Offset_Seconds (Parts.Element ("1"), Seconds)
             then
-               Add_Error (Diagnostics, Source, Number,
+               Add_Error (Errors, Source, Number,
                           "invalid tzdb Zone continuation row");
                Ok := False;
             else
@@ -7870,7 +7867,7 @@ package body I18N.Runtime_Data is
                        (Parts, Count, 4,
                         Seconds, Effective_Seconds, Until_Key)
                      then
-                        Add_Error (Diagnostics, Source, Number,
+                        Add_Error (Errors, Source, Number,
                                    "invalid tzdb Zone continuation until fields");
                         Ok := False;
                         TZDB_Pending_Zone := Null_Unbounded_String;
@@ -7900,7 +7897,7 @@ package body I18N.Runtime_Data is
            or else not Parts.Contains ("1")
            or else Parts.Element ("1") /= "Link"
          then
-            Add_Error (Diagnostics, Source, Number,
+            Add_Error (Errors, Source, Number,
                        "invalid tzdb Link row");
             Ok := False;
          else
@@ -7918,7 +7915,7 @@ package body I18N.Runtime_Data is
                if not Pending_Zones.Contains (Target_Minutes_Key)
                  and then not Pending_Zones.Contains (Target_Seconds_Key)
                then
-                  Add_Error (Diagnostics, Source, Number,
+                  Add_Error (Errors, Source, Number,
                              "tzdb Link target has no loaded fixed offset");
                   Ok := False;
                else
@@ -7976,7 +7973,7 @@ package body I18N.Runtime_Data is
            and then To_String (TZDB_Pending_Zone) /= "";
       end Is_TZDB_Continuation_Row;
    begin
-      I18N.Diagnostics.Clear (Diagnostics);
+      Errors.Clear;
 
       while Start <= Text'Last loop
          declare
@@ -8004,12 +8001,12 @@ package body I18N.Runtime_Data is
                then
                   if LDML_Block_Open then
                      Add_Error
-                       (Diagnostics, Source_Name, Line_No,
+                       (Errors, Source_Name, Line_No,
                         "nested LDML container inside multi-line row");
                      Ok := False;
                   elsif LDML_Container_Depth = Max_LDML_Container_Depth then
                      Add_Error
-                       (Diagnostics, Source_Name, Line_No,
+                       (Errors, Source_Name, Line_No,
                         "LDML container nesting too deep");
                      Ok := False;
                   else
@@ -8222,14 +8219,14 @@ package body I18N.Runtime_Data is
                then
                   if LDML_Container_Depth = 0 then
                      Add_Error
-                       (Diagnostics, Source_Name, Line_No,
+                       (Errors, Source_Name, Line_No,
                         "unmatched LDML container close");
                      Ok := False;
                   elsif To_String (LDML_Containers (LDML_Container_Depth))
                     /= XML_Element_Name (Line)
                   then
                      Add_Error
-                       (Diagnostics, Source_Name, Line_No,
+                       (Errors, Source_Name, Line_No,
                         "mismatched LDML container close");
                      Ok := False;
                   else
@@ -8325,12 +8322,12 @@ package body I18N.Runtime_Data is
                   begin
                      if LDML_Context_Open then
                         Add_Error
-                          (Diagnostics, Source_Name, Line_No,
+                          (Errors, Source_Name, Line_No,
                            "nested LDML locale context");
                         Ok := False;
                      elsif Context_Locale = "" and then Line /= "<ldml>" then
                         Add_Error
-                          (Diagnostics, Source_Name, Line_No,
+                          (Errors, Source_Name, Line_No,
                            "missing LDML locale context");
                         Ok := False;
                      else
@@ -8367,13 +8364,13 @@ package body I18N.Runtime_Data is
                         end;
                      elsif Is_LDML_Block_Close (Line) then
                         Add_Error
-                          (Diagnostics, Source_Name, Line_No,
+                          (Errors, Source_Name, Line_No,
                            "mismatched multi-line LDML closing tag");
                         Ok := False;
                         Reset_LDML_Block;
                      elsif Is_LDML_Block_Start (Line) then
                         Add_Error
-                          (Diagnostics, Source_Name, Line_No,
+                          (Errors, Source_Name, Line_No,
                            "nested multi-line LDML row");
                         Ok := False;
                         Reset_LDML_Block;
@@ -8381,7 +8378,7 @@ package body I18N.Runtime_Data is
                        + Line'Length > 4096
                      then
                         Add_Error
-                          (Diagnostics, Source_Name, Line_No,
+                          (Errors, Source_Name, Line_No,
                            "multi-line LDML row too long");
                         Ok := False;
                         Reset_LDML_Block;
@@ -8423,7 +8420,7 @@ package body I18N.Runtime_Data is
                         Parse_TZDB_Link_Row
                           (Logical_Line, Source_Name, Line_No);
                      elsif Eq = 0 then
-                        Add_Error (Diagnostics, Source_Name, Line_No,
+                        Add_Error (Errors, Source_Name, Line_No,
                                    "missing '=' in runtime data");
                         Ok := False;
                      else
@@ -8446,7 +8443,7 @@ package body I18N.Runtime_Data is
                               begin
                                  if Sep = 0 or else Sep = Rest_First then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid locale runtime data key");
                                     Ok := False;
                                  else
@@ -8460,7 +8457,7 @@ package body I18N.Runtime_Data is
                                                 (Field, Value)
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "unsupported locale runtime data field");
                                           Ok := False;
                                        else
@@ -8499,14 +8496,14 @@ package body I18N.Runtime_Data is
                                            (Raw_Key, Parsed_Key)
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid timezone transition key");
                                           Ok := False;
                                        elsif not Is_Integer_Text (Value)
                                          or else not In_Integer_Range (Value)
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid timezone transition value");
                                           Ok := False;
                                        else
@@ -8516,7 +8513,7 @@ package body I18N.Runtime_Data is
                                           begin
                                              if Seconds not in -86_400 .. 86_400 then
                                                 Add_Error
-                                                  (Diagnostics, Source_Name, Line_No,
+                                                  (Errors, Source_Name, Line_No,
                                                    "timezone transition value out of range");
                                                 Ok := False;
                                              else
@@ -8533,7 +8530,7 @@ package body I18N.Runtime_Data is
                                     end;
                                  elsif Sep = 0 or else Sep <= Rest_First then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid timezone runtime data key");
                                     Ok := False;
                                  elsif Key (Sep + 1 .. Key'Last)
@@ -8542,17 +8539,17 @@ package body I18N.Runtime_Data is
                                      /= "base_offset_seconds"
                                  then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "unsupported timezone runtime data field");
                                     Ok := False;
                                  elsif not Is_Integer_Text (Value) then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid timezone offset value");
                                     Ok := False;
                                  elsif not In_Integer_Range (Value) then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "timezone offset value out of range");
                                     Ok := False;
                                  else
@@ -8567,14 +8564,14 @@ package body I18N.Runtime_Data is
                                            -86_400 .. 86_400
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "timezone offset value out of range");
                                           Ok := False;
                                        elsif Field = "base_offset_minutes"
                                          and then Offset not in -1_440 .. 1_440
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "timezone offset value out of range");
                                           Ok := False;
                                        else
@@ -8597,7 +8594,7 @@ package body I18N.Runtime_Data is
                               begin
                                  if Sep = 0 or else Sep /= Rest_First + 3 then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid currency runtime data key");
                                     Ok := False;
                                  else
@@ -8611,7 +8608,7 @@ package body I18N.Runtime_Data is
                                          or else Field'Length = 0
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid currency runtime data key");
                                           Ok := False;
                                        elsif Field = "minor_units"
@@ -8621,7 +8618,7 @@ package body I18N.Runtime_Data is
                                             or else Integer'Value (Value) < 0
                                           then
                                              Add_Error
-                                               (Diagnostics, Source_Name, Line_No,
+                                               (Errors, Source_Name, Line_No,
                                                 "invalid currency numeric metadata");
                                              Ok := False;
                                           else
@@ -8642,7 +8639,7 @@ package body I18N.Runtime_Data is
                                        then
                                           if Value'Length = 0 then
                                              Add_Error
-                                               (Diagnostics, Source_Name, Line_No,
+                                               (Errors, Source_Name, Line_No,
                                                 "empty currency text metadata");
                                              Ok := False;
                                           else
@@ -8653,7 +8650,7 @@ package body I18N.Runtime_Data is
                                           end if;
                                        else
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "unsupported currency runtime data field");
                                           Ok := False;
                                        end if;
@@ -8683,7 +8680,7 @@ package body I18N.Runtime_Data is
                                          or else Kind_Stop = Key'Last
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid plural rule-family key");
                                           Ok := False;
                                        else
@@ -8697,7 +8694,7 @@ package body I18N.Runtime_Data is
                                                (Kind, Value)
                                              then
                                                 Add_Error
-                                                  (Diagnostics, Source_Name, Line_No,
+                                                  (Errors, Source_Name, Line_No,
                                                    "invalid plural rule-family value");
                                                 Ok := False;
                                              else
@@ -8728,7 +8725,7 @@ package body I18N.Runtime_Data is
                                          or else Category_Start = Key'Last
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid plural rule-expression key");
                                           Ok := False;
                                        else
@@ -8744,7 +8741,7 @@ package body I18N.Runtime_Data is
                                     end;
                                  elsif Kind_End = 0 or else Kind_End = Rest_First then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid plural runtime data key");
                                     Ok := False;
                                  else
@@ -8762,19 +8759,19 @@ package body I18N.Runtime_Data is
                                          or else Value_Start = Key'Last
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid plural runtime data key");
                                           Ok := False;
                                        elsif not In_Long_Long_Integer_Range
                                          (Key (Value_Start + 1 .. Key'Last))
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid plural override value");
                                           Ok := False;
                                        elsif not Is_Plural_Category (Value) then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid plural override category");
                                           Ok := False;
                                        else
@@ -8786,7 +8783,7 @@ package body I18N.Runtime_Data is
                                           begin
                                              if Operand < 0 then
                                                 Add_Error
-                                                  (Diagnostics, Source_Name, Line_No,
+                                                  (Errors, Source_Name, Line_No,
                                                    "negative plural override value");
                                                 Ok := False;
                                              else
@@ -8817,7 +8814,7 @@ package body I18N.Runtime_Data is
                                    or else Locale_End = Key'Last
                                  then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid RBNF runtime data key");
                                     Ok := False;
                                  else
@@ -8845,7 +8842,7 @@ package body I18N.Runtime_Data is
                                                or else Value_Start = Rest'Last
                                              then
                                                 Add_Error
-                                                  (Diagnostics, Source_Name, Line_No,
+                                                  (Errors, Source_Name, Line_No,
                                                    "invalid RBNF runtime data key");
                                                 Ok := False;
                                              else
@@ -8876,7 +8873,7 @@ package body I18N.Runtime_Data is
                                    or else Locale_End = Key'Last
                                  then
                                     Add_Error
-                                      (Diagnostics, Source_Name, Line_No,
+                                      (Errors, Source_Name, Line_No,
                                        "invalid RBNF rule runtime data key");
                                     Ok := False;
                                  else
@@ -8893,7 +8890,7 @@ package body I18N.Runtime_Data is
                                          or else Base_Start = Rest'Last
                                        then
                                           Add_Error
-                                            (Diagnostics, Source_Name, Line_No,
+                                            (Errors, Source_Name, Line_No,
                                              "invalid RBNF rule runtime data key");
                                           Ok := False;
                                        else
@@ -8910,7 +8907,7 @@ package body I18N.Runtime_Data is
                               end;
                            else
                               Add_Error
-                                (Diagnostics, Source_Name, Line_No,
+                                (Errors, Source_Name, Line_No,
                                  "unsupported runtime data key");
                               Ok := False;
                            end if;
@@ -8932,7 +8929,7 @@ package body I18N.Runtime_Data is
 
       if LDML_Block_Open then
          Add_Error
-           (Diagnostics, Source_Name, LDML_Block_Start_Line,
+           (Errors, Source_Name, LDML_Block_Start_Line,
             "unterminated multi-line LDML row");
          Ok := False;
          Reset_LDML_Block;
@@ -8940,7 +8937,7 @@ package body I18N.Runtime_Data is
 
       if LDML_Context_Open then
          Add_Error
-           (Diagnostics, Source_Name, LDML_Context_Start_Line,
+           (Errors, Source_Name, LDML_Context_Start_Line,
             "unterminated LDML locale context");
          Ok := False;
          Reset_LDML_Identity_Context;
@@ -8948,7 +8945,7 @@ package body I18N.Runtime_Data is
 
       if LDML_Container_Depth > 0 then
          Add_Error
-           (Diagnostics, Source_Name,
+           (Errors, Source_Name,
             LDML_Container_Lines (LDML_Container_Depth),
             "unterminated LDML container");
          Ok := False;

@@ -2659,16 +2659,25 @@ package body I18N.Runtime is
       return Data_Load_Result
    is
       Result : Data_Load_Result;
+      Errors : I18N.Runtime_Data.Error_Vectors.Vector;
    begin
       if I18N.Runtime_Data.Load_Text
            (Source_Name => Source_Name,
             Text        => Text,
-            Diagnostics => Result.Diagnostics)
+            Errors      => Errors)
       then
          Result.Status := Data_Loaded;
       else
          Result.Status := Invalid_Data;
       end if;
+
+      --  Adapt the platform data layer's parse errors to message diagnostics.
+      for Message of Errors loop
+         I18N.Diagnostics.Add
+           (List    => Result.Diagnostics,
+            Kind    => I18N.Diagnostics.Parse_Error,
+            Message => Message);
+      end loop;
 
       return Result;
    exception
