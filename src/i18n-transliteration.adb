@@ -1108,6 +1108,28 @@ package body I18N.Transliteration is
          Process_Statement (Rules (Start .. Rules'Last));
       end if;
       Flush_Rules;
+      if Reverse_Dir then
+         --  The inverse of a compound A ; B ; C is C⁻¹ ; B⁻¹ ; A⁻¹: each step is
+         --  already inverted (rule direction, ::X(Y) picking Y), but the pipeline
+         --  order must also reverse — otherwise a reverse ::NFD(NFC) … ::NFC(NFD)
+         --  ends on NFD and leaves the output decomposed. A leading global filter
+         --  ::[set] stays first (it gates the input in either direction).
+         declare
+            Rev_Steps : Step_Vec.Vector;
+            First     : Positive := T.Steps.First_Index;
+         begin
+            while First <= T.Steps.Last_Index
+              and then T.Steps (First).Kind = S_Filter
+            loop
+               Rev_Steps.Append (T.Steps (First));
+               First := First + 1;
+            end loop;
+            for K in reverse First .. T.Steps.Last_Index loop
+               Rev_Steps.Append (T.Steps (K));
+            end loop;
+            T.Steps := Rev_Steps;
+         end;
+      end if;
       return T;
    end Compile;
 
