@@ -145,11 +145,28 @@ hand/loaded rule sets) with the CLDR transform *catalog* as Phase 8b.
   10. Zero-width insertion rules (empty key with a before/after context,
       `a { } b → X`) are kept, not dropped at parse time — syllable-dot /
       epenthesis insertion (my-fonipa and friends).
-- **Remaining ~2.5% is per-language phonology long tail**, not engine bugs:
-  Burmese syllabification/schwa (my-fonipa), Amharic IPA glides/affricates and the
-  `am-t-*` chains, Uyghur/Welsh IPA, the Ethiopic-Morse second pass, Han→pinyin.
-  These need transform-by-transform rule work that replicates ICU's exact
-  cursor/context/ordering for specific complex rules, with real regression risk.
+- **Third wave (scoped "implement the medium/easy, defer the hard"):** brought it
+  to **290,440 / 296,989 (~97.8%); 241 of 288 files.** Fixed: the Ethiopic-Morse
+  second pass (`-` before `]` is a literal dash, not a range that ate the `]` —
+  d0-morse 0→613); `<!-- -->` XML-comment blocks in tRule CDATA are stripped so
+  their prose apostrophes stop truncating shards (Indic→Tamil/Oriya); `[:Lowercase:]
+  /:Uppercase:/:Cased:]` binary properties from DerivedCoreProperties (BGN
+  title-casing, ru-bgn); `::Any-X` falls back to `Latin-X` and whitespace inside a
+  `{string}` set member is skipped (de-ASCII 10→19); and `(…)` segments in the
+  **before-context** are captured for `$n` (Persian gemination, fa-fonipa
+  2447→2547).
+- **Deferred as agreed (the "hard" tail, ~out of scope):** Amharic IPA glides and
+  the `am_FONIPA-am` hub feeding the ~21 `am-t-*` chains (some glides have no rule
+  in the CLDR data — ICU makes them by iterative cursor re-application); Burmese
+  syllabification/schwa (my-fonipa + the `*-t-my` chains); Uyghur IPA. These need
+  ICU-engine-level semantics we don't replicate.
+- **Also documented, not engine bugs:** the ka-bgn-2009 apostrophe (transform
+  emits U+2019, testData wants U+02BC — a within-release data skew); the
+  alaloc/sera glottal (identical rules, contradictory testData); the InterIndic→
+  Arabic independent-vowel alif carrier (ICU drops it after a vowel via a
+  mechanism absent from the rule data). Small per-transform tails (a few Japanese
+  romanization pairs, Welsh stress/length, X-SAMPA, Zawgyi) remain, each 1–12
+  cases, individually per-language.
 
 ## Decisions — LOCKED (maximal scope)
 
