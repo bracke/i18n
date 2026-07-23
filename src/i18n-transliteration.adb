@@ -725,10 +725,19 @@ package body I18N.Transliteration is
               and then not Into.Is_Empty
             then
                declare
-                  L : Element := Into.Last_Element;
+                  --  A quantifier after ')' applies to the group, not the ')'
+                  --  marker (which the matcher ignores). Put it on the last
+                  --  quantifiable element inside the group so (X)* repeats X.
+                  Idx : Integer := Into.Last_Index;
+                  L   : Element;
                begin
+                  if Into (Idx).Kind = E_Seg_Close and then Idx > Into.First_Index
+                  then
+                     Idx := Idx - 1;
+                  end if;
+                  L := Into (Idx);
                   L.Quant := S (I);
-                  Into.Replace_Element (Into.Last_Index, L);
+                  Into.Replace_Element (Idx, L);
                end;
                I := I + 1;
             elsif S (I) = '[' then
