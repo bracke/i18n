@@ -1021,7 +1021,13 @@ package body I18N.Transliteration is
                      begin
                         Parse_Seq (Out_S, OI, Out_S'Last + 1, R.Output);
                      end;
-                     if not R.Key.Is_Empty then
+                     --  Keep a rule with a non-empty key, and also a zero-width
+                     --  insertion rule (empty key) that is anchored by a before
+                     --  or after context, e.g. a { } b → X inserts X between them.
+                     if not R.Key.Is_Empty
+                       or else not R.Before.Is_Empty
+                       or else not R.After.Is_Empty
+                     then
                         Cur_Rules.Append (R);
                      end if;
                   end;
