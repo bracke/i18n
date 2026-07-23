@@ -896,12 +896,29 @@ package body I18N.Transliteration is
                         while P <= Body_S'Last and then Is_Space (Body_S (P)) loop
                            P := P + 1;
                         end loop;
-                        while P <= Body_S'Last loop
-                           if not Is_Space (Body_S (P)) then
-                              Append (Nm, Body_S (P));
-                           end if;
-                           P := P + 1;
-                        end loop;
+                        declare
+                           Fwd, Rev : Unbounded_String;
+                           In_Paren : Boolean := False;
+                        begin
+                           --  The name may carry an (inverse), e.g. Lower() —
+                           --  outside the parens is the forward name.
+                           while P <= Body_S'Last loop
+                              if Body_S (P) = '(' then
+                                 In_Paren := True;
+                              elsif Body_S (P) = ')' then
+                                 In_Paren := False;
+                              elsif not Is_Space (Body_S (P)) then
+                                 if In_Paren then
+                                    Append (Rev, Body_S (P));
+                                 else
+                                    Append (Fwd, Body_S (P));
+                                 end if;
+                              end if;
+                              P := P + 1;
+                           end loop;
+                           Nm := (if Reverse_Dir and then Length (Rev) > 0 then Rev
+                                  else Fwd);
+                        end;
                         if Length (Nm) = 0 then
                            T.Steps.Append
                              (Step'(Kind => S_Filter,
