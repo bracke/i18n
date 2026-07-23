@@ -540,16 +540,23 @@ package body I18N.Transliteration is
                begin
                   I := I + 1;
                   while I <= S'Last and then S (I) /= '}' loop
-                     declare
-                        C : Code;
-                     begin
-                        if S (I) = '\' then
-                           I := I + 1; Parse_Escape (S, I, C);
-                        else
-                           Next_CP (S, I, C);
-                        end if;
-                        Seq.Append (C);
-                     end;
+                     if Is_Space (S (I)) then
+                        --  Whitespace between members of a {string} is not part
+                        --  of the string (e.g. {A ̈} is A followed by the
+                        --  combining diaeresis, two code points, no space).
+                        I := I + 1;
+                     else
+                        declare
+                           C : Code;
+                        begin
+                           if S (I) = '\' then
+                              I := I + 1; Parse_Escape (S, I, C);
+                           else
+                              Next_CP (S, I, C);
+                           end if;
+                           Seq.Append (C);
+                        end;
+                     end if;
                   end loop;
                   if I <= S'Last then
                      I := I + 1;   --  past '}'
@@ -1720,6 +1727,17 @@ package body I18N.Transliteration is
                exit;
             end if;
          end loop;
+      end if;
+      if Length (File_Spec) = 0
+        and then Name'Length > 4
+        and then Eq_Ci (Name (Name'First .. Name'First + 3), "Any-")
+      then
+         --  An Any-X transform (from any script to X) coincides with Latin-X on
+         --  Latin input; fall back to it when the Any-* form is not catalogued
+         --  (e.g. de-ASCII's ::Any-ASCII → Latin-ASCII). Latin-X not resolving
+         --  just yields identity, same as before.
+         return Transform_Impl
+           (Text, "Latin-" & Name (Name'First + 4 .. Name'Last), Depth);
       end if;
       if Length (File_Spec) = 0 then
          return Text;   --  unknown transform: pass through
