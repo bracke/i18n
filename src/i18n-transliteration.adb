@@ -846,12 +846,33 @@ package body I18N.Transliteration is
                         Strs : StrList.Vector;
                         Rng  : constant Range_Vec.Vector :=
                           Parse_Set (Body_S, P, Strs);
+                        Nm   : Unbounded_String;
                      begin
-                        T.Steps.Append
-                          (Step'(Kind => S_Filter,
-                             Set_Idx => Add_Set (Rng, Strs),
-                             Rules => Rule_Vec.Empty_Vector,
-                             Call => Null_Unbounded_String));
+                        --  A name after the set (::[set] Name) is a filtered
+                        --  transform call: apply Name only to that set, without
+                        --  changing the pipeline's global filter. Bare ::[set];
+                        --  is the global filter.
+                        while P <= Body_S'Last and then Is_Space (Body_S (P)) loop
+                           P := P + 1;
+                        end loop;
+                        while P <= Body_S'Last loop
+                           if not Is_Space (Body_S (P)) then
+                              Append (Nm, Body_S (P));
+                           end if;
+                           P := P + 1;
+                        end loop;
+                        if Length (Nm) = 0 then
+                           T.Steps.Append
+                             (Step'(Kind => S_Filter,
+                                Set_Idx => Add_Set (Rng, Strs),
+                                Rules => Rule_Vec.Empty_Vector,
+                                Call => Null_Unbounded_String));
+                        else
+                           T.Steps.Append
+                             (Step'(Kind => S_Call, Call => Nm,
+                                Set_Idx => Add_Set (Rng, Strs),
+                                Rules => Rule_Vec.Empty_Vector));
+                        end if;
                      end;
                   else
                      --  Name, or Name (Inverse).
@@ -1509,8 +1530,43 @@ package body I18N.Transliteration is
                   --  Filtering is already handled by the partition above.
                   Apply_Rules (T, T.Steps (K).Rules, 0, Cur);
                when S_Call =>
-                  Cur := Decode_All
-                    (Do_Step (To_String (T.Steps (K).Call), Encode_All (Cur)));
+                  declare
+                     Nm : constant String := To_String (T.Steps (K).Call);
+                     Fi : constant Natural := T.Steps (K).Set_Idx;
+                  begin
+                     if Fi = 0 then
+                        Cur := Decode_All (Do_Step (Nm, Encode_All (Cur)));
+                     else
+                        --  Filtered call ::[set] Name: apply Name only to maximal
+                        --  runs of characters in the set, leaving the rest.
+                        declare
+                           Out_V : Code_Vec.Vector;
+                           I     : Natural := Cur.First_Index;
+                        begin
+                           while I <= Cur.Last_Index loop
+                              if In_Set (T.Sets (Fi), Cur (I)) then
+                                 declare
+                                    Run_V : Code_Vec.Vector;
+                                 begin
+                                    while I <= Cur.Last_Index
+                                      and then In_Set (T.Sets (Fi), Cur (I))
+                                    loop
+                                       Run_V.Append (Cur (I)); I := I + 1;
+                                    end loop;
+                                    for C of Decode_All
+                                      (Do_Step (Nm, Encode_All (Run_V)))
+                                    loop
+                                       Out_V.Append (C);
+                                    end loop;
+                                 end;
+                              else
+                                 Out_V.Append (Cur (I)); I := I + 1;
+                              end if;
+                           end loop;
+                           Cur := Out_V;
+                        end;
+                     end if;
+                  end;
             end case;
          end loop;
          return Cur;
