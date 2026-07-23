@@ -155,18 +155,29 @@ hand/loaded rule sets) with the CLDR transform *catalog* as Phase 8b.
   `{string}` set member is skipped (de-ASCII 10→19); and `(…)` segments in the
   **before-context** are captured for `$n` (Persian gemination, fa-fonipa
   2447→2547).
-- **Deferred as agreed (the "hard" tail, ~out of scope):** Amharic IPA glides and
-  the `am_FONIPA-am` hub feeding the ~21 `am-t-*` chains (some glides have no rule
-  in the CLDR data — ICU makes them by iterative cursor re-application); Burmese
-  syllabification/schwa (my-fonipa + the `*-t-my` chains); Uyghur IPA. These need
-  ICU-engine-level semantics we don't replicate.
-- **Also documented, not engine bugs:** the ka-bgn-2009 apostrophe (transform
-  emits U+2019, testData wants U+02BC — a within-release data skew); the
-  alaloc/sera glottal (identical rules, contradictory testData); the InterIndic→
-  Arabic independent-vowel alif carrier (ICU drops it after a vowel via a
-  mechanism absent from the rule data). Small per-transform tails (a few Japanese
-  romanization pairs, Welsh stress/length, X-SAMPA, Zawgyi) remain, each 1–12
-  cases, individually per-language.
+- **Fourth wave — the "hard" tail was engine bugs, not phonology.** Every cluster
+  earlier deferred as hard turned out to be a fixable engine defect, taking it to
+  **296,700 / 296,989 (~99.9%); 267 of 288 files.** Fixes:
+  1. **Inverse-compound step order:** the inverse of `A ; B ; C` is
+     `C⁻¹ ; B⁻¹ ; A⁻¹` — Compile inverted each step but kept file order, so a
+     reverse `::NFD(NFC) … ::NFC(NFD)` ended on NFD and reverse chains ran
+     out of sequence. Reversing the step order (leading global filter kept first)
+     fixed the whole `am-t-*` / Amharic hub (+20 files at once).
+  2. **LRM/RLM in rules:** CLDR sprinkles U+200E/200F into rule text for RTL
+     readability; they were matched literally, so Arabic keys (`ب‎`) failed and
+     LRMs leaked to output. Skipping them fixed Uyghur (ug-fonipa 1251→2000).
+  3. **Quantifier on a group:** `(X)*` put the quantifier on the `)` marker, which
+     the matcher ignored, so a group always matched exactly once, never zero. This
+     was the real Burmese "syllabification" bug (my-fonipa 160→1226).
+  4. **Filtered call with empty inverse:** `::[set] Lower()` kept the parens in the
+     step name, so nothing lowercased (ru-t-ja-Latn 26→33).
+- **Genuinely remaining (~290 cases, none an engine bug):** the ka-bgn-2009
+  apostrophe (transform emits U+2019, testData wants U+02BC — a within-release
+  data skew, not faithfully fixable) is 215 of them; the rest are small
+  per-transform tails — the InterIndic→Arabic alif carrier and alaloc/sera glottal
+  (ICU behaviours absent from / inconsistent with the rule data), and a handful of
+  per-language rules (Korean word-initial voicing, Polish/Romanian, Welsh stress,
+  Zawgyi), each 1–19 cases.
 
 ## Decisions — LOCKED (maximal scope)
 
