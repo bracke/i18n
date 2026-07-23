@@ -1,4 +1,4 @@
-private package I18N.Currency is
+package I18N.Currency is
 
    Max_Formatted_Length : constant := 160;
 

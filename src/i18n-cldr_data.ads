@@ -1,4 +1,4 @@
-private package I18N.CLDR_Data is
+package I18N.CLDR_Data is
    pragma Preelaborate;
 
    --  Generated-data boundary for the deterministic CLDR subset shipped with

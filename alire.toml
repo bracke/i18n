@@ -1,5 +1,5 @@
 name = "i18n"
-description = "Message-formatting library for a strict, deterministic subset of ICU"
+description = "Native Ada Unicode/CLDR internationalization platform"
 version = "1.1.0"
 authors = ["Bent Bracke"]
 maintainers = ["Bent Bracke <bent@bracke.dk>"]

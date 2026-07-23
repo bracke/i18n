@@ -1,6 +1,6 @@
 with Ada.Containers.Indefinite_Vectors;
 
-private package I18N.Runtime_Data is
+package I18N.Runtime_Data is
 
    --  Process-wide deterministic runtime data overrides loaded from external
    --  text. Formatters consult this package before generated CLDR/tzdb data.

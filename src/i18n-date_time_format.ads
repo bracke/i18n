@@ -1,4 +1,4 @@
-private package I18N.Date_Time_Format is
+package I18N.Date_Time_Format is
 
    Max_Formatted_Length : constant := 256;
 

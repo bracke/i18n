@@ -1,4 +1,4 @@
-private package I18N.Number_Format is
+package I18N.Number_Format is
 
    Max_Formatted_Length : constant := 160;
 
