@@ -7,6 +7,8 @@ with Ada.Strings.Hash;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
+with Project_Tools.Files;
+
 procedure Import_CLDR_Subset is
    package US renames Ada.Strings.Unbounded;
    package String_Sets is new Ada.Containers.Indefinite_Hashed_Sets
@@ -1411,6 +1413,12 @@ procedure Import_CLDR_Subset is
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
       Emit_Header;
 
+      if not Project_Tools.Files.File_Exists (Source_Path) then
+         Ada.Text_IO.Close (Output);
+         Add_Error ("missing CLDR import source: " & Source_Path);
+         return "";
+      end if;
+
       Ada.Text_IO.Open (Input, Ada.Text_IO.In_File, Source_Path);
       while not Ada.Text_IO.End_Of_File (Input) loop
          declare
@@ -1451,7 +1459,9 @@ begin
          Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          return;
       elsif Has_Argument ("--check") then
-         if File_Equals_File (Generated_Path, Target_Path) then
+         if Project_Tools.Files.File_Exists (Target_Path)
+           and then File_Equals_File (Generated_Path, Target_Path)
+         then
             Ada.Text_IO.Put_Line ("CLDR subset import is current");
          else
             Ada.Text_IO.Put_Line
