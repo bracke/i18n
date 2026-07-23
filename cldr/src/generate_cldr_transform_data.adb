@@ -77,6 +77,19 @@ procedure Generate_CLDR_Transform_Data is
                   Append (Into, Cdata (I + 1));
                end if;
                I := I + 2;
+            elsif C = '<' and then I + 3 <= Cdata'Last
+              and then Cdata (I .. I + 3) = "<!--"
+            then
+               --  An <!-- ... --> block (CLDR disables rules this way, and the
+               --  prose inside can hold stray apostrophes/newlines): skip it
+               --  whole, or its ' would open a quote that swallows real rules.
+               I := I + 4;
+               while I + 2 <= Cdata'Last
+                 and then Cdata (I .. I + 2) /= "-->"
+               loop
+                  I := I + 1;
+               end loop;
+               I := Natural'Min (I + 3, Cdata'Last + 1);   --  past "-->"
             elsif C = ''' and then Depth = 0 then
                --  Only top-level '...' quotes text; a ' inside a [set] (e.g. the
                --  literal apostrophe in a filter [...'"...]) is an ordinary set
