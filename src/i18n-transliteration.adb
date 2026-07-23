@@ -1207,18 +1207,18 @@ package body I18N.Transliteration is
                                 (if E.Kind = E_Set then Set_Str_Bwd (E.Set_Idx, Q)
                                  else 0);
                            begin
-                           if SL > 0 then
-                              Q := Q - SL;      --  matched a {string} member
-                           --  Start-of-text satisfies a boundary/complement set.
-                           elsif E.Kind = E_Set and then Q < 1
-                             and then In_Set (T.Sets (E.Set_Idx), 0)
-                           then
-                              null;
-                           elsif not Test (E, Q) then
-                              return False;
-                           else
-                              Q := Q - 1;
-                           end if;
+                              if SL > 0 then
+                                 Q := Q - SL;      --  matched a {string} member
+                              --  Start-of-text satisfies a boundary/complement set.
+                              elsif E.Kind = E_Set and then Q < 1
+                                and then In_Set (T.Sets (E.Set_Idx), 0)
+                              then
+                                 null;
+                              elsif not Test (E, Q) then
+                                 return False;
+                              else
+                                 Q := Q - 1;
+                              end if;
                            end;
                      end case;
                   when E_Anchor =>
@@ -1354,6 +1354,33 @@ package body I18N.Transliteration is
       return True;
    end Eq_Ci;
 
+   --  ICU transform-id equality: case-insensitive and ignoring '_' and spaces,
+   --  so a compound step "Ethiopic-Latin/BetaMetsehaf" matches the registered
+   --  alias "Ethiopic-Latin/Beta_Metsehaf".
+   function Eq_Id (A, B : String) return Boolean is
+      function Lc (C : Character) return Character is
+        (if C in 'A' .. 'Z' then
+           Character'Val (Character'Pos (C) + 32) else C);
+      IA : Natural := A'First;
+      IB : Natural := B'First;
+   begin
+      loop
+         while IA <= A'Last and then (A (IA) = '_' or else A (IA) = ' ') loop
+            IA := IA + 1;
+         end loop;
+         while IB <= B'Last and then (B (IB) = '_' or else B (IB) = ' ') loop
+            IB := IB + 1;
+         end loop;
+         exit when IA > A'Last or else IB > B'Last;
+         if Lc (A (IA)) /= Lc (B (IB)) then
+            return False;
+         end if;
+         IA := IA + 1;
+         IB := IB + 1;
+      end loop;
+      return IA > A'Last and then IB > B'Last;
+   end Eq_Id;
+
    function Run (T : Compiled; Text : String; Depth : Natural) return String is
       Buf : Code_Vec.Vector := Decode_All (Text);
       Cur_Filter : Natural := 0;
@@ -1476,6 +1503,25 @@ package body I18N.Transliteration is
             exit;
          end if;
       end loop;
+      if Length (File_Spec) = 0 then
+         --  Case-insensitive fallback: BCP-47 transform ids are case-insensitive
+         --  (testData uses "und-Latn-t-und-ethi-…", aliases "und-latn-t-und-Ethi-…").
+         for K in Idx_Names.First_Index .. Idx_Names.Last_Index loop
+            if Eq_Ci (To_String (Idx_Names (K)), Name) then
+               File_Spec := Idx_Files (K);
+               exit;
+            end if;
+         end loop;
+      end if;
+      if Length (File_Spec) = 0 then
+         --  ICU-id equality (ignores '_' and spaces) for compound step names.
+         for K in Idx_Names.First_Index .. Idx_Names.Last_Index loop
+            if Eq_Id (To_String (Idx_Names (K)), Name) then
+               File_Spec := Idx_Files (K);
+               exit;
+            end if;
+         end loop;
+      end if;
       if Length (File_Spec) = 0 then
          return Text;   --  unknown transform: pass through
       end if;

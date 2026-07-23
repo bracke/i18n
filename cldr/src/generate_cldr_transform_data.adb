@@ -156,6 +156,56 @@ procedure Generate_CLDR_Transform_Data is
       end loop;
    end Register;
 
+   --  A T-extension transform id "A-t-B-m0-mech" (the file basename) is addressed
+   --  by testData in inverted form "B-t-A-m0-mech" with '_' -> '-'. CLDR's own
+   --  alias= attribute sometimes abbreviates the mechanism (beta_metsehaf ->
+   --  betamets, ies_jes -> iesjes), so it does not always match the testData
+   --  name; derive the inverted id straight from the basename to cover them all.
+   function Invert_Id (Base : String) return String is
+      T : constant Natural := Index (Base, "-t-");
+      --  Index in S of the first tfield-key subtag (2 chars, 2nd a digit).
+      function Field_Start (S : String) return Natural is
+         I : Natural := S'First;
+      begin
+         loop
+            declare
+               J : Natural := I;
+            begin
+               while J <= S'Last and then S (J) /= '-' loop
+                  J := J + 1;
+               end loop;
+               if J - I = 2 and then S (I + 1) in '0' .. '9' then
+                  return I;
+               end if;
+               exit when J > S'Last;
+               I := J + 1;
+            end;
+         end loop;
+         return 0;
+      end Field_Start;
+   begin
+      if T = 0 then
+         return "";
+      end if;
+      declare
+         Lang1  : constant String := Base (Base'First .. T - 1);
+         Rest   : constant String := Base (T + 3 .. Base'Last);
+         FS     : constant Natural := Field_Start (Rest);
+         Lang2  : constant String :=
+           (if FS = 0 then Rest else Rest (Rest'First .. FS - 2));
+         Fields : constant String :=
+           (if FS = 0 then "" else "-" & Rest (FS .. Rest'Last));
+         Result : String := Lang2 & "-t-" & Lang1 & Fields;
+      begin
+         for K in Result'Range loop
+            if Result (K) = '_' then
+               Result (K) := '-';
+            end if;
+         end loop;
+         return Result;
+      end;
+   end Invert_Id;
+
    Search : Search_Type;
    Item   : Directory_Entry_Type;
    Count  : Natural := 0;
@@ -188,6 +238,7 @@ begin
             end;
             --  The file basename and Source-Target are forward names too.
             Register (Base, Base, 'F');
+            Register (Invert_Id (Base), Base, 'F');
             if Src /= "" and then Tgt /= "" then
                Register (Src & "-" & Tgt, Base, 'F');
             end if;
