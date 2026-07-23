@@ -97,6 +97,46 @@ procedure Generate_UCD_Uprops_Data is
       return To_String (Out_S);
    end Ranges_Of;
 
+   --  Ranges of one binary property (e.g. "Lowercase") from a
+   --  "START..END ; Property" file such as DerivedCoreProperties.txt. Each range
+   --  is tagged with Prop so the loader can filter by property name.
+   function Prop_Ranges (Name, Prop : String) return String is
+      F   : File_Type;
+      Out_S : Unbounded_String;
+   begin
+      Open (F, In_File, UCD & Name);
+      while not End_Of_File (F) loop
+         declare
+            Line : constant String := Get_Line (F);
+            Hash : constant Natural :=
+              (if Index (Line, "#") = 0 then Line'Last + 1 else Index (Line, "#"));
+            Bdy  : constant String := Line (Line'First .. Hash - 1);
+            Semi : constant Natural := Index (Bdy, ";");
+         begin
+            if Semi /= 0 then
+               declare
+                  CPs  : constant String := Trim (Bdy (Bdy'First .. Semi - 1), Both);
+                  Val  : constant String := Trim (Bdy (Semi + 1 .. Bdy'Last), Both);
+                  Dots : constant Natural := Index (CPs, "..");
+                  Lo   : constant Natural :=
+                    (if Dots = 0 then Hex (CPs) else Hex (CPs (CPs'First .. Dots - 1)));
+                  Hi   : constant Natural :=
+                    (if Dots = 0 then Lo else Hex (CPs (Dots + 2 .. CPs'Last)));
+               begin
+                  if Val = Prop then
+                     if Length (Out_S) > 0 then
+                        Append (Out_S, " ");
+                     end if;
+                     Append (Out_S, H6 (Lo) & ":" & H6 (Hi) & ":" & Prop);
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+      Close (F);
+      return To_String (Out_S);
+   end Prop_Ranges;
+
    --  Simple case mappings from UnicodeData (fields 12 upper, 13 lower, 14 title).
    Lower_S, Upper_S, Title_S : Unbounded_String;
    procedure Load_Simple_Case is
@@ -232,7 +272,15 @@ begin
    Load_Special_Case;
    Create (Out_F, Out_File, Out_Path);
    Put_Line (Out_F, "I18NDATA|1|16.0.0");
-   Put_Line (Out_F, "@prop|3");
+   --  Records within a section must be in sorted key order for the loader's
+   --  bisection: Cased < Lowercase < Uppercase < gc < script < scriptalias.
+   Put_Line (Out_F, "@prop|6");
+   Put_Line (Out_F, "Cased" & HT
+             & Prop_Ranges ("DerivedCoreProperties.txt", "Cased"));
+   Put_Line (Out_F, "Lowercase" & HT
+             & Prop_Ranges ("DerivedCoreProperties.txt", "Lowercase"));
+   Put_Line (Out_F, "Uppercase" & HT
+             & Prop_Ranges ("DerivedCoreProperties.txt", "Uppercase"));
    Put_Line (Out_F, "gc" & HT & Ranges_Of ("DerivedGeneralCategory.txt"));
    Put_Line (Out_F, "script" & HT & Ranges_Of ("Scripts.txt"));
    Put_Line (Out_F, "scriptalias" & HT & Script_Aliases);

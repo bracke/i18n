@@ -60,6 +60,9 @@ package body I18N.Transliteration is
    end record;
    package PRange_Vec is new Ada.Containers.Vectors (Positive, PRange);
    Script_Ranges, GC_Ranges : PRange_Vec.Vector;
+   --  Binary properties (Lowercase / Uppercase / Cased), each range tagged with
+   --  its property name in Val — used by [:Lowercase:] etc.
+   Binprop_Ranges : PRange_Vec.Vector;
    Script_Alias  : Unbounded_String;   --  "Short:Long Short:Long ..."
    UProps_Loaded : Boolean := False;
 
@@ -121,6 +124,9 @@ package body I18N.Transliteration is
       end if;
       Load_PRanges ("script", Script_Ranges);
       Load_PRanges ("gc", GC_Ranges);
+      Load_PRanges ("Cased", Binprop_Ranges);
+      Load_PRanges ("Lowercase", Binprop_Ranges);
+      Load_PRanges ("Uppercase", Binprop_Ranges);
       Script_Alias := To_Unbounded_String
         (I18N.Data_Store.Lookup ("uprops", "prop", "scriptalias"));
    end Ensure_UProps;
@@ -307,6 +313,14 @@ package body I18N.Transliteration is
          if V.Is_Empty then
             for R of GC_Ranges loop
                if Match_GC (To_String (R.Val), Base) then
+                  Add_R (V, R.Lo, R.Hi);
+               end if;
+            end loop;
+         end if;
+         if V.Is_Empty then
+            --  Binary properties: [:Lowercase:] / [:Uppercase:] / [:Cased:].
+            for R of Binprop_Ranges loop
+               if Eq_Ci (To_String (R.Val), Base) then
                   Add_R (V, R.Lo, R.Hi);
                end if;
             end loop;
