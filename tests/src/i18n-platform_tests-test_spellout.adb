@@ -6,7 +6,7 @@ with I18N.Spellout;
 --  Self-contained: writes a tiny English-like spellout ruleset and exercises the
 --  interpreter -- quotient/remainder substitution, the optional [...], recursion,
 --  and the negative rule -- independently of the real RBNF data.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Spellout
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

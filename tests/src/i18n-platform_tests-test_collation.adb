@@ -8,7 +8,7 @@ with I18N.Collation;  use I18N.Collation;
 --  ordering, and that the tailoring overrides the root. The exhaustive UCA
 --  conformance is validated separately by the offline harness. ASCII inputs
 --  need no normalization data (NFD is identity).
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Collation
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

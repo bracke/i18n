@@ -9,7 +9,7 @@ with I18N.Measurement;
 --  points the loader at it, and exercises the full stack (bisection, parent
 --  walk, composition, fallbacks) against those known values -- so the test does
 --  not depend on the multi-megabyte generated file or the runner's directory.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Display_Names
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

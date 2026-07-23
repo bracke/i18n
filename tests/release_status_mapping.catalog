@@ -1,4 +1,0 @@
-default_locale = en
-en.welcome = "Welcome, {name}!"
-en.items = "{count, plural, one {One item} other {# items}}"
-

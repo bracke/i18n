@@ -1,5 +1,5 @@
 name = "tests"
-description = "Tests for i18n library"
+description = "Platform engine tests for the i18n library"
 version = "0.1.0-dev"
 
 authors = ["Bent Bracke"]

@@ -6,7 +6,7 @@ with I18N.Segmentation;  use I18N.Segmentation;
 --  Self-contained: writes a tiny break-property table (just the code points the
 --  cases below touch) and checks one boundary of each kind. The exhaustive UCD
 --  conformance is validated separately by the offline test harness.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Segmentation
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

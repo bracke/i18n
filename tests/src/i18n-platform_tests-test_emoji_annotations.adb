@@ -8,7 +8,7 @@ with I18N.Emoji;
 --  keyword splitter, parent-locale fallback, the derived tree, and the '@'
 --  emoji key (which collides with the section-header sentinel and so proves the
 --  loader's header/record disambiguation).
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Emoji_Annotations
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

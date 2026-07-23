@@ -6,7 +6,7 @@ with I18N.Transliteration;  use I18N.Transliteration;
 --  Self-contained: writes a tiny transform (index + one shard with a couple of
 --  context rules) and checks the rule engine. Exhaustive CLDR-catalog coverage
 --  is validated separately by the offline testData harness.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Transliteration
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

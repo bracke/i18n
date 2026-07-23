@@ -7,7 +7,7 @@ with I18N.Person_Names;
 --  checks field substitution, the -initial modifier, missing-field/literal
 --  removal, addressing/informal selection, and order derivation from the name's
 --  own locale.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Person_Names
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

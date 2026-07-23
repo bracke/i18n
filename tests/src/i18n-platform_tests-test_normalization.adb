@@ -6,7 +6,7 @@ with I18N.Normalization;  use I18N.Normalization;
 --  Self-contained: writes a small normalization table (é, a reordering pair, the
 --  fi ligature) and checks NFC/NFD/NFKC/NFKD plus algorithmic Hangul, without
 --  the full generated data file.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Normalization
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

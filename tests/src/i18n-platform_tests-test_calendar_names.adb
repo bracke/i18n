@@ -6,7 +6,7 @@ with I18N.Calendars;  use I18N.Calendars;
 --  Self-contained: writes a small calendar shard with known content and checks
 --  month/era lookup, width fallback (narrow -> wide), and parent-locale
 --  fallback.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Calendar_Names
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

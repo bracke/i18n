@@ -1,7 +1,7 @@
 with I18N.Calendar_Math;  use I18N.Calendar_Math;
 
 --  Pure algorithm, no data file: known cross-calendar dates plus round-trips.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Calendar_Math
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is

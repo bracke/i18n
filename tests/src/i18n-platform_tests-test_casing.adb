@@ -3,7 +3,7 @@ with I18N.Casing;
 
 --  Uses the generated uprops.i18ndata (built into share/i18n). Points the loader
 --  at the real data directory relative to the tests crate.
-separate (I18N.Runtime.Tests.Features)
+separate (I18N.Platform_Tests)
 procedure Test_Casing
   (T : in out AUnit.Test_Cases.Test_Case'Class)
 is
