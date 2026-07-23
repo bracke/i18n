@@ -16,6 +16,14 @@ package body I18N.Transliteration is
    package Set_Vec is new Ada.Containers.Vectors (Positive, Range_Vec.Vector,
                                                   Range_Vec."=");
 
+   --  A UnicodeSet may also contain multi-character strings ([{ng}{ny}a-z]);
+   --  each set carries a (usually empty) list of such code-point sequences.
+   package Code_Vectors is new Ada.Containers.Vectors (Positive, Code);
+   package StrList is new Ada.Containers.Vectors
+     (Positive, Code_Vectors.Vector, Code_Vectors."=");
+   package SetStr_Vec is new Ada.Containers.Vectors
+     (Positive, StrList.Vector, StrList."=");
+
    --  Elements of a rule pattern / output.
    type Elem_Kind is
      (E_Char, E_Set, E_Cursor, E_Seg_Open, E_Seg_Close, E_Ref, E_Anchor);
@@ -295,6 +303,7 @@ package body I18N.Transliteration is
 
    type Compiled is record
       Sets      : Set_Vec.Vector;
+      Set_Strs  : SetStr_Vec.Vector;   --  parallel: strings per set
       Steps     : Step_Vec.Vector;
       OK        : Boolean := True;   --  False if an unsupported construct hit
    end record;
@@ -417,15 +426,20 @@ package body I18N.Transliteration is
       Var_Names  : Name_Vec.Vector;
       Var_Seqs   : Seq_Vec.Vector;
 
-      --  Add a set to the table, return its index.
-      function Add_Set (V : Range_Vec.Vector) return Natural is
+      --  Add a set (ranges + strings) to the table, return its index.
+      function Add_Set (V : Range_Vec.Vector; Strs : StrList.Vector)
+         return Natural is
       begin
          T.Sets.Append (V);
+         T.Set_Strs.Append (Strs);
          return T.Sets.Last_Index;
       end Add_Set;
 
-      --  Parse a UnicodeSet starting at S(I) = '['. Advances I past ']'.
-      function Parse_Set (S : String; I : in out Natural) return Range_Vec.Vector
+      --  Parse a UnicodeSet starting at S(I) = '['. Advances I past ']'. Any
+      --  {string} members are collected into Strings.
+      function Parse_Set
+        (S : String; I : in out Natural; Strings : out StrList.Vector)
+         return Range_Vec.Vector
       is
          Acc    : Range_Vec.Vector;   --  accumulated result
          Op     : Character := '|';   --  pending operator: | & -
@@ -445,6 +459,7 @@ package body I18N.Transliteration is
             Op := '|';
          end Apply;
       begin
+         Strings := StrList.Empty_Vector;
          I := I + 1;  --  past '['
          if I <= S'Last and then S (I) = '^' then
             Negate := True; I := I + 1;
@@ -459,8 +474,45 @@ package body I18N.Transliteration is
                         or else S (I + 1) = ':')
             then
                Op := '-'; I := I + 1;
+            elsif S (I) = '{' then
+               --  A multi-character string member {abc}.
+               declare
+                  Seq : Code_Vectors.Vector;
+               begin
+                  I := I + 1;
+                  while I <= S'Last and then S (I) /= '}' loop
+                     declare
+                        C : Code;
+                     begin
+                        if S (I) = '\' then
+                           I := I + 1; Parse_Escape (S, I, C);
+                        else
+                           Next_CP (S, I, C);
+                        end if;
+                        Seq.Append (C);
+                     end;
+                  end loop;
+                  if I <= S'Last then
+                     I := I + 1;   --  past '}'
+                  end if;
+                  if not Seq.Is_Empty and then Op = '|' then
+                     Strings.Append (Seq);
+                  end if;
+                  Op := '|';
+               end;
             elsif S (I) = '[' then
-               Apply (Parse_Set (S, I));
+               declare
+                  Sub_Str : StrList.Vector;
+                  Sub     : constant Range_Vec.Vector :=
+                    Parse_Set (S, I, Sub_Str);
+               begin
+                  if Op = '|' then
+                     for St of Sub_Str loop
+                        Strings.Append (St);
+                     end loop;
+                  end if;
+                  Apply (Sub);
+               end;
             elsif S (I) = ':' or else
               (S (I) = '\' and then I + 1 <= S'Last
                and then (S (I + 1) = 'p' or else S (I + 1) = 'P'))
@@ -514,6 +566,11 @@ package body I18N.Transliteration is
                      if Var_Names (K) = Nm then
                         for E of Var_Seqs (K) loop
                            if E.Kind = E_Set then
+                              if Op = '|' then
+                                 for St of T.Set_Strs (E.Set_Idx) loop
+                                    Strings.Append (St);
+                                 end loop;
+                              end if;
                               Apply (T.Sets (E.Set_Idx));
                            elsif E.Kind = E_Char then
                               declare
@@ -590,8 +647,13 @@ package body I18N.Transliteration is
                end;
                I := I + 1;
             elsif S (I) = '[' then
-               Into.Append (Element'(Kind => E_Set, Set_Idx => Add_Set (Parse_Set (S, I)),
-                             others => <>));
+               declare
+                  Strs : StrList.Vector;
+                  Rng  : constant Range_Vec.Vector := Parse_Set (S, I, Strs);
+               begin
+                  Into.Append (Element'(Kind => E_Set,
+                               Set_Idx => Add_Set (Rng, Strs), others => <>));
+               end;
             elsif S (I) = '{' or else S (I) = '}' then
                I := I + 1;   --  context braces handled by the caller's split
             elsif S (I) = '|' then
@@ -720,11 +782,17 @@ package body I18N.Transliteration is
                      P := P + 1;
                   end loop;
                   if P <= Body_S'Last and then Body_S (P) = '[' then
-                     T.Steps.Append
-                       (Step'(Kind => S_Filter,
-                         Set_Idx => Add_Set (Parse_Set (Body_S, P)),
-                         Rules => Rule_Vec.Empty_Vector,
-                         Call => Null_Unbounded_String));
+                     declare
+                        Strs : StrList.Vector;
+                        Rng  : constant Range_Vec.Vector :=
+                          Parse_Set (Body_S, P, Strs);
+                     begin
+                        T.Steps.Append
+                          (Step'(Kind => S_Filter,
+                             Set_Idx => Add_Set (Rng, Strs),
+                             Rules => Rule_Vec.Empty_Vector,
+                             Call => Null_Unbounded_String));
+                     end;
                   else
                      --  Name, or Name (Inverse).
                      declare
@@ -1000,6 +1068,31 @@ package body I18N.Transliteration is
                          when E_Char => Buf (At_Q) = E.Ch,
                          when E_Set  => In_Set (T.Sets (E.Set_Idx), Buf (At_Q)),
                          when others => False));
+
+         --  Longest {string} member of set Idx matching Buf forward at At_Q.
+         function Set_Str_Fwd (Idx : Natural; At_Q : Integer) return Natural is
+            Best : Natural := 0;
+         begin
+            for St of T.Set_Strs (Idx) loop
+               declare
+                  Len : constant Natural := Natural (St.Length);
+                  Ok  : Boolean := Len > Best
+                    and then At_Q + Len - 1 <= Natural (Buf.Length);
+               begin
+                  if Ok then
+                     for M in 1 .. Len loop
+                        if Buf (At_Q + M - 1) /= St (M) then
+                           Ok := False; exit;
+                        end if;
+                     end loop;
+                     if Ok then
+                        Best := Len;
+                     end if;
+                  end if;
+               end;
+            end loop;
+            return Best;
+         end Set_Str_Fwd;
       begin
          for E of Elems loop
             case E.Kind is
@@ -1017,18 +1110,24 @@ package body I18N.Transliteration is
                         end if;
                         while Test (E, Q) loop Q := Q + 1; end loop;
                      when others =>
-                        --  End-of-text satisfies a boundary/complement set
-                        --  (one containing U+0000) without consuming.
-                        if E.Kind = E_Set
-                          and then Q > Natural (Buf.Length)
-                          and then In_Set (T.Sets (E.Set_Idx), 0)
-                        then
-                           null;
-                        elsif not Test (E, Q) then
-                           return -1;
-                        else
-                           Q := Q + 1;
-                        end if;
+                        declare
+                           SL : constant Natural :=
+                             (if E.Kind = E_Set then Set_Str_Fwd (E.Set_Idx, Q)
+                              else 0);
+                        begin
+                           if SL > 0 then
+                              Q := Q + SL;      --  matched a {string} member
+                           elsif E.Kind = E_Set
+                             and then Q > Natural (Buf.Length)
+                             and then In_Set (T.Sets (E.Set_Idx), 0)
+                           then
+                              null;             --  boundary/complement set
+                           elsif not Test (E, Q) then
+                              return -1;
+                           else
+                              Q := Q + 1;
+                           end if;
+                        end;
                   end case;
                when E_Seg_Open =>
                   Seg_N := Seg_N + 1;
@@ -1059,6 +1158,30 @@ package body I18N.Transliteration is
                          when E_Char => Buf (At_Q) = E.Ch,
                          when E_Set  => In_Set (T.Sets (E.Set_Idx), Buf (At_Q)),
                          when others => False));
+
+         --  Longest {string} member of set Idx ending at Buf (At_Q) backward.
+         function Set_Str_Bwd (Idx : Natural; At_Q : Integer) return Natural is
+            Best : Natural := 0;
+         begin
+            for St of T.Set_Strs (Idx) loop
+               declare
+                  Len : constant Natural := Natural (St.Length);
+                  Ok  : Boolean := Len > Best and then At_Q - Len + 1 >= 1;
+               begin
+                  if Ok then
+                     for M in 1 .. Len loop
+                        if Buf (At_Q - Len + M) /= St (M) then
+                           Ok := False; exit;
+                        end if;
+                     end loop;
+                     if Ok then
+                        Best := Len;
+                     end if;
+                  end if;
+               end;
+            end loop;
+            return Best;
+         end Set_Str_Bwd;
       begin
          for K in reverse Elems.First_Index .. Elems.Last_Index loop
             declare
@@ -1079,8 +1202,15 @@ package body I18N.Transliteration is
                            end if;
                            while Test (E, Q) loop Q := Q - 1; end loop;
                         when others =>
+                           declare
+                              SL : constant Natural :=
+                                (if E.Kind = E_Set then Set_Str_Bwd (E.Set_Idx, Q)
+                                 else 0);
+                           begin
+                           if SL > 0 then
+                              Q := Q - SL;      --  matched a {string} member
                            --  Start-of-text satisfies a boundary/complement set.
-                           if E.Kind = E_Set and then Q < 1
+                           elsif E.Kind = E_Set and then Q < 1
                              and then In_Set (T.Sets (E.Set_Idx), 0)
                            then
                               null;
@@ -1089,6 +1219,7 @@ package body I18N.Transliteration is
                            else
                               Q := Q - 1;
                            end if;
+                           end;
                      end case;
                   when E_Anchor =>
                      if Q >= 1 then   --  must be the start of text
