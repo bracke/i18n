@@ -1438,54 +1438,85 @@ package body I18N.Transliteration is
    end Eq_Id;
 
    function Run (T : Compiled; Text : String; Depth : Natural) return String is
-      Buf : Code_Vec.Vector := Decode_All (Text);
-      Cur_Filter : Natural := 0;
       use type I18N.Normalization.Form;
+
+      --  Apply one built-in / sub-transform to a string.
+      function Do_Step (Name, Src : String) return String is
+      begin
+         if Eq_Ci (Name, "NFD") then
+            return I18N.Normalization.Normalize (Src, I18N.Normalization.NFD);
+         elsif Eq_Ci (Name, "NFC") then
+            return I18N.Normalization.Normalize (Src, I18N.Normalization.NFC);
+         elsif Eq_Ci (Name, "NFKD") then
+            return I18N.Normalization.Normalize (Src, I18N.Normalization.NFKD);
+         elsif Eq_Ci (Name, "NFKC") then
+            return I18N.Normalization.Normalize (Src, I18N.Normalization.NFKC);
+         elsif Eq_Ci (Name, "Lower") or else Eq_Ci (Name, "Any-Lower") then
+            return I18N.Casing.To_Lower (Src);
+         elsif Eq_Ci (Name, "Upper") or else Eq_Ci (Name, "Any-Upper") then
+            return I18N.Casing.To_Upper (Src);
+         elsif Eq_Ci (Name, "Title") or else Eq_Ci (Name, "Any-Title") then
+            return I18N.Casing.To_Title (Src);
+         elsif Eq_Ci (Name, "Null") then
+            return Src;
+         elsif Eq_Ci (Name, "Remove") then
+            return "";
+         elsif Depth < 16 then
+            return Transform_Impl (Src, Name, Depth + 1);
+         else
+            return Src;
+         end if;
+      end Do_Step;
+
+      --  Run steps [Start .. last] over Buf. A global filter (::[set]) hides
+      --  unfiltered characters from the whole remaining pipeline, so on hitting
+      --  one we split Buf into maximal in-filter runs, run the rest of the steps
+      --  on each run, and leave the unfiltered characters untouched in place.
+      function Apply_Steps (Start : Positive; Buf : Code_Vec.Vector)
+        return Code_Vec.Vector
+      is
+         Cur : Code_Vec.Vector := Buf;
+      begin
+         for K in Start .. T.Steps.Last_Index loop
+            case T.Steps (K).Kind is
+               when S_Filter =>
+                  declare
+                     Fi    : constant Natural := T.Steps (K).Set_Idx;
+                     Out_V : Code_Vec.Vector;
+                     I     : Natural := Cur.First_Index;
+                  begin
+                     while I <= Cur.Last_Index loop
+                        if In_Set (T.Sets (Fi), Cur (I)) then
+                           declare
+                              Run_V : Code_Vec.Vector;
+                           begin
+                              while I <= Cur.Last_Index
+                                and then In_Set (T.Sets (Fi), Cur (I))
+                              loop
+                                 Run_V.Append (Cur (I)); I := I + 1;
+                              end loop;
+                              for C of Apply_Steps (K + 1, Run_V) loop
+                                 Out_V.Append (C);
+                              end loop;
+                           end;
+                        else
+                           Out_V.Append (Cur (I)); I := I + 1;
+                        end if;
+                     end loop;
+                     return Out_V;   --  the tail was consumed by the recursion
+                  end;
+               when S_Rules =>
+                  --  Filtering is already handled by the partition above.
+                  Apply_Rules (T, T.Steps (K).Rules, 0, Cur);
+               when S_Call =>
+                  Cur := Decode_All
+                    (Do_Step (To_String (T.Steps (K).Call), Encode_All (Cur)));
+            end case;
+         end loop;
+         return Cur;
+      end Apply_Steps;
    begin
-      for S of T.Steps loop
-         case S.Kind is
-            when S_Filter =>
-               Cur_Filter := S.Set_Idx;
-            when S_Rules =>
-               Apply_Rules (T, S.Rules, Cur_Filter, Buf);
-            when S_Call =>
-               declare
-                  Name : constant String := To_String (S.Call);
-                  Cur  : constant String := Encode_All (Buf);
-                  Res  : Unbounded_String;
-               begin
-                  if Eq_Ci (Name, "NFD") then
-                     Res := To_Unbounded_String
-                       (I18N.Normalization.Normalize (Cur, I18N.Normalization.NFD));
-                  elsif Eq_Ci (Name, "NFC") then
-                     Res := To_Unbounded_String
-                       (I18N.Normalization.Normalize (Cur, I18N.Normalization.NFC));
-                  elsif Eq_Ci (Name, "NFKD") then
-                     Res := To_Unbounded_String
-                       (I18N.Normalization.Normalize (Cur, I18N.Normalization.NFKD));
-                  elsif Eq_Ci (Name, "NFKC") then
-                     Res := To_Unbounded_String
-                       (I18N.Normalization.Normalize (Cur, I18N.Normalization.NFKC));
-                  elsif Eq_Ci (Name, "Lower") or else Eq_Ci (Name, "Any-Lower") then
-                     Res := To_Unbounded_String (I18N.Casing.To_Lower (Cur));
-                  elsif Eq_Ci (Name, "Upper") or else Eq_Ci (Name, "Any-Upper") then
-                     Res := To_Unbounded_String (I18N.Casing.To_Upper (Cur));
-                  elsif Eq_Ci (Name, "Title") or else Eq_Ci (Name, "Any-Title") then
-                     Res := To_Unbounded_String (I18N.Casing.To_Title (Cur));
-                  elsif Eq_Ci (Name, "Null") then
-                     Res := To_Unbounded_String (Cur);
-                  elsif Eq_Ci (Name, "Remove") then
-                     Res := Null_Unbounded_String;
-                  elsif Depth < 16 then
-                     Res := To_Unbounded_String (Transform_Impl (Cur, Name, Depth + 1));
-                  else
-                     Res := To_Unbounded_String (Cur);
-                  end if;
-                  Buf := Decode_All (To_String (Res));
-               end;
-         end case;
-      end loop;
-      return Encode_All (Buf);
+      return Encode_All (Apply_Steps (T.Steps.First_Index, Decode_All (Text)));
    end Run;
 
    --  ------------------------------------------------------------------
