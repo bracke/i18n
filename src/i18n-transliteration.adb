@@ -17,7 +17,8 @@ package body I18N.Transliteration is
                                                   Range_Vec."=");
 
    --  Elements of a rule pattern / output.
-   type Elem_Kind is (E_Char, E_Set, E_Cursor, E_Seg_Open, E_Seg_Close, E_Ref);
+   type Elem_Kind is
+     (E_Char, E_Set, E_Cursor, E_Seg_Open, E_Seg_Close, E_Ref, E_Anchor);
    type Element is record
       Kind    : Elem_Kind := E_Char;
       Ch      : Code := 0;      --  E_Char
@@ -627,6 +628,12 @@ package body I18N.Transliteration is
                   Into.Append (Element'(Kind => E_Ref,
                                 Ref => Character'Pos (S (I)) - 48, others => <>));
                   I := I + 1;
+               elsif I >= Stop or else not
+                 (S (I) in 'A' .. 'Z' or else S (I) in 'a' .. 'z'
+                  or else S (I) in '0' .. '9' or else S (I) = '_')
+               then
+                  --  A bare '$' is the start/end-of-text boundary anchor.
+                  Into.Append (Element'(Kind => E_Anchor, others => <>));
                else
                   declare
                      Nm : Unbounded_String;
@@ -996,10 +1003,18 @@ package body I18N.Transliteration is
                         end if;
                         while Test (E, Q) loop Q := Q + 1; end loop;
                      when others =>
-                        if not Test (E, Q) then
+                        --  End-of-text satisfies a boundary/complement set
+                        --  (one containing U+0000) without consuming.
+                        if E.Kind = E_Set
+                          and then Q > Natural (Buf.Length)
+                          and then In_Set (T.Sets (E.Set_Idx), 0)
+                        then
+                           null;
+                        elsif not Test (E, Q) then
                            return -1;
+                        else
+                           Q := Q + 1;
                         end if;
-                        Q := Q + 1;
                   end case;
                when E_Seg_Open =>
                   Seg_N := Seg_N + 1;
@@ -1009,6 +1024,10 @@ package body I18N.Transliteration is
                when E_Seg_Close =>
                   if Seg_N <= 9 and then Seg_N >= 1 then
                      Seg_Hi (Seg_N) := Q - 1;
+                  end if;
+               when E_Anchor =>
+                  if Q <= Natural (Buf.Length) then   --  must be end of text
+                     return -1;
                   end if;
                when others =>
                   null;
@@ -1046,11 +1065,21 @@ package body I18N.Transliteration is
                            end if;
                            while Test (E, Q) loop Q := Q - 1; end loop;
                         when others =>
-                           if not Test (E, Q) then
+                           --  Start-of-text satisfies a boundary/complement set.
+                           if E.Kind = E_Set and then Q < 1
+                             and then In_Set (T.Sets (E.Set_Idx), 0)
+                           then
+                              null;
+                           elsif not Test (E, Q) then
                               return False;
+                           else
+                              Q := Q - 1;
                            end if;
-                           Q := Q - 1;
                      end case;
+                  when E_Anchor =>
+                     if Q >= 1 then   --  must be the start of text
+                        return False;
+                     end if;
                   when others =>
                      null;
                end case;
@@ -1063,7 +1092,7 @@ package body I18N.Transliteration is
       --  revisit that keeps re-firing) could loop forever; cap the total number
       --  of rule-application passes so the transform always terminates.
       Iters : Natural := 0;
-      Max_I : constant Natural := Natural (Buf.Length) * 1000 + 100_000;
+      Max_I : constant Natural := Natural (Buf.Length) * 64 + 8000;
    begin
       while I <= Natural (Buf.Length) loop
          Iters := Iters + 1;
