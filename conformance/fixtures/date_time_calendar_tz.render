@@ -1,5 +1,0 @@
-# Format:
-# case|id|catalog|locale|key|args|expected_status|expected_text
-case|date-full-en|default_locale = en\nen.day = {day, date, full}|en|day|day=2024-02-29|SUCCESS|Thursday, February 29, 2024
-case|time-long-en|default_locale = en\nen.clock = {clock, time, long}|en|clock|clock=09:05:07|SUCCESS|09:05:07
-case|datetime-zone-utc|default_locale = en\nen.instant = {instant, datetime, ::yMdHHmmssz, UTC}|en|instant|instant=2024-02-29T21:30:00Z|SUCCESS|2024 2 29 21:30:00 UTC

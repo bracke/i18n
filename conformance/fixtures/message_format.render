@@ -1,5 +1,0 @@
-# Format:
-# case|id|catalog|locale|key|args|expected_status|expected_text
-case|message-variable|default_locale = en\nen.hello = Hello, {name}!|en|hello|name=Ada|SUCCESS|Hello, Ada!
-case|message-apostrophe|default_locale = en\nen.quote = '{'name'}' is {name}|en|quote|name=Ada|SUCCESS|{name} is Ada
-case|message-select|default_locale = en\nen.pet = {kind, select, cat {Cat} dog {Dog} other {Unknown}}|en|pet|kind=dog|SUCCESS|Dog

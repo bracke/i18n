@@ -6,7 +6,7 @@ maintainers = ["Bent Bracke <bent@bracke.dk>"]
 maintainers-logins = ["bracke"]
 licenses = "MIT"
 website = "https://github.com/bracke/i18n"
-tags = ["messages","i18n","locales"]
+tags = ["i18n","unicode","cldr","locales"]
 project-files = ["i18n.gpr"]
 
 [configuration.variables]
@@ -28,4 +28,4 @@ command = ["sh", "cldr/regenerate.sh"]
 
 [[actions]]
 type = "test"
-command = ["sh", "-c", "cd check_i18n && alr build && ./bin/check_i18n --skip-alr-test"]
+command = ["sh", "-c", "cd tests && alr -n build && ./bin/tests"]

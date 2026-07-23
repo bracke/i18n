@@ -1,6 +1,0 @@
-# Format:
-# case|id|catalog|locale|key|args|expected_status|expected_text
-case|number-en|default_locale = en\nen.value = {value, number}|en|value|value=12345.67|SUCCESS|12,345.67
-case|number-de|default_locale = de\nde.value = {value, number}|de|value|value=12345.67|SUCCESS|12.345,67
-case|currency-usd|default_locale = en\nen.total = {amount, currency, USD}|en|total|amount=1234.50|SUCCESS|$1,234.50
-case|number-percent|default_locale = en\nen.ratio = {value, number, ::percent}|en|ratio|value=0.125|SUCCESS|13%

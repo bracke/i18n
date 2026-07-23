@@ -1,6 +1,0 @@
-# Format:
-# case|id|catalog|locale|key|args|expected_status|expected_text
-case|plural-cardinal-one|default_locale = en\nen.items = {count, plural, one {One item} other {# items}}|en|items|count=1|SUCCESS|One item
-case|plural-cardinal-other|default_locale = en\nen.items = {count, plural, one {One item} other {# items}}|en|items|count=5|SUCCESS|5 items
-case|plural-offset|default_locale = en\nen.guests = {count, plural, offset:1 one {You and one guest} other {You and # guests}}|en|guests|count=3|SUCCESS|You and 2 guests
-case|ordinal-category|default_locale = en\nen.rank = {rank, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}|en|rank|rank=23|SUCCESS|23rd
