@@ -1,5 +1,13 @@
 # i18n Completion Milestones
 
+> **Historical note.** This roadmap was written before the message-formatting
+> layer was split into the sibling `messages` crate. The Parser & Validation and
+> ICU-runtime slices below (files `src/i18n-parser.*`, `i18n-ast.*`,
+> `i18n-validation.*`, `i18n-runtime.*`, and the `i18n-runtime-tests-*` suites)
+> were realized in that crate and now live there as `Messages.*`. The
+> number/currency/date, CLDR, locale, plural, and Unicode-algorithm milestones
+> remain the platform's own. File paths below reflect the pre-split layout.
+
 This roadmap turns the completion work into concrete implementation passes by
 subsystem with file-level slices and test coverage obligations.
 

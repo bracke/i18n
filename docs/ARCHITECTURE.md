@@ -1,83 +1,65 @@
 # Architecture
 
-The release architecture has one application-facing production path:
+For the ICU message-formatting architecture (the two-phase catalog → compile →
+render engine), see the `messages` crate's docs/ARCHITECTURE.md.
 
-```text
-text catalog -> deterministic catalog validation -> locale/key lookup -> public ICU evaluation -> public render result
-```
+`i18n` is the native Ada Unicode/CLDR internationalization platform. Its
+architecture has three cooperating layers: Unicode text algorithms, CLDR
+formatters, and a generated CLDR data layer that both of the first two consume.
 
-Initialization is the only operation allowed to read text catalog files and populate public catalog state. Catalog entries retain normalized locale/key/source identity for deterministic lookup. Public rendering resolves a catalog entry by locale/key fallback and evaluates the stored source through the public catalog render path. Internal regression paths exercise parser, validator, compiler, cache, and fixed-buffer execution components for internal invariants, but public callers never receive parser objects, compiled handles, cache objects, or buffer internals.
+## Engine layering
 
-## Runtime structure
+Unicode text algorithms operate on UTF-8 text and do not depend on catalog or
+message state:
 
-```text
-I18N.Runtime.Instance
-  catalog entries: normalized locale + key + source identity
-  default locale
-  initialization validity state
-  compatibility single-message state for regression tests
+* `I18N.Normalization` — bounded canonical composition/decomposition (NFC/NFD);
+* `I18N.Casing` — deterministic locale-sensitive case transforms;
+* `I18N.Segmentation` — grapheme, word, sentence, and hard-line segmentation;
+* `I18N.Collation` — sort keys, comparison, equivalence, and search;
+* `I18N.Transliteration` — bounded deterministic ASCII transliteration.
 
-Parser -> Validator -> Compiler -> Compiled Message / Cache
-                                         |
-                                         v
-                                Execution Engine
-                                         |
-                                         v
-                               I18N.Result.Render_Result
-```
+CLDR formatters render locale-aware values against the data layer:
 
-The source tree contains private compatibility entry points and white-box test packages. They exist to preserve regression coverage and semantic continuity. They are not part of the application-facing v1.1.0 compatibility contract.
+* `I18N.Number_Format`, `I18N.Currency`, `I18N.Measurement`, `I18N.Spellout`;
+* `I18N.Date_Time_Format`, `I18N.Calendars`, `I18N.Calendar_Math`;
+* `I18N.Display_Names`, `I18N.Emoji`, `I18N.Delimiters`, `I18N.Person_Names`.
 
-## Public/internal boundary
-
-Public packages:
-
-* `I18N`
-* `I18N.Runtime`
-* `I18N.Result`
-* `I18N.Diagnostics`
-* `I18N.Arguments`
-* `I18N.Locales`
-* `I18N.Plurals`
-
-Internal or compatibility-only packages:
-
-* parser and AST packages
-* validation packages
-* compiler and compiled-message packages
-* cache packages
-* buffer and fast-render packages
-* lower-level renderer packages
-* fuzz/corpus harness packages
-
-Application examples for the frozen API must compile without importing internal packages.
+Locale identity (`I18N.Locales`) and plural classification (`I18N.Plurals`) sit
+alongside these engines. `I18N.Locales` provides canonicalization, BCP-47
+component extraction, likely-subtag maximization/minimization, and fallback that
+the formatters resolve against; `I18N.Plurals` provides the CLDR cardinal and
+ordinal categories the formatters use for plural-sensitive output.
 
 ## Data ownership
 
-The runtime owns catalog metadata and initialization validity state. Catalog entries are lookup records containing normalized locale/key/source data, not public compiled-message handles. Public render calls accept a limited argument map and do not expose ownership of internal parser, cache, or compiled structures.
+CLDR-derived runtime data is centralized in the private `I18N.CLDR_Data`
+generated-data boundary. Number, currency, and date/time formatters consume that
+internal package for locale symbols, numbering digits, grouping policy, date
+ordering, style patterns and separators, localized date/time names, zone display
+data, number/currency affixes, unit/list separators, unit labels, currency
+metadata, and plural rule-family mappings. `I18N.Data_Store` provides the
+lookup structures the generated image is organized into, and `I18N.Runtime_Data`
+holds the process-wide override tables that take precedence over generated
+fallback data.
 
-## Diagnostics
+## CLDR data pipeline
 
-Diagnostics are optional and observational. Enabling callbacks or storing diagnostic detail must not change message selection, output text, result status, cache contents, runtime contents, or IR contents. Callback exceptions are contained.
+The checked-in `I18N.CLDR_Data` body is the deterministic curated data image for
+this release. The staged CLDR import tooling regenerates that package from a
+checked source subset without changing the public API: it emits normalized rows
+(number symbols, digit sets, month/weekday/quarter names, currency metadata,
+plural rule families, tzdb transition tables, and so on) that are compiled into
+the generated image.
 
-## Release cleanup rule
-
-No application-facing release feature may require parser cursors, cache maps, IR arrays, VM/codegen experiments, prototype packages, or non-public AST execution paths. Those may remain only when needed as implementation details or regression-test support, and they must stay out of public examples and v1.1.0 documentation examples.
-
+Runtime data loaded through `I18N.Runtime_Data` may override selected locale,
+currency, fixed-zone, and exact plural-category values before the generated
+fallback data is consulted. These process-wide overrides accept the same
+key/value and normalized LDML/tzdb import rows the pipeline produces, so the
+formatters see a single merged view of override-then-generated data.
 
 ## Release verification boundary
 
-The release boundary is verified by the project-tools-based `check_i18n` guard launched by `alr test`: the core library build, test project build, AUnit runner, example project build and output checks, CLDR data-boundary checks, Alire build/test checks, render benchmark smoke checks, GNATdoc, and GNATprove must pass for the intended release channel.
-
-## CLDR data boundary
-
-CLDR-derived runtime data is centralized in the private `I18N.CLDR_Data`
-generated-data boundary. Number, currency, and date/time formatters consume
-that internal package for locale symbols, numbering digits, grouping policy,
-date ordering, style patterns and separators, localized date/time names, zone
-display data, number/currency affixes, unit/list separators, unit labels,
-currency metadata, and plural rule-family mappings. Runtime data loaded through
-`I18N.Runtime` may override selected locale, currency, fixed-zone, and exact
-plural-category values before generated fallback data is used. The checked-in
-body is the deterministic curated data image for this release; the staged CLDR
-import tooling regenerates that package without changing the public API.
+The platform release boundary is verified by the project-tools-based `check_i18n`
+guard: the core library build, GNAT style/warning checks, the data-boundary
+checks that keep generated CLDR data behind `I18N.CLDR_Data`, GNATdoc, and
+GNATprove must pass for the intended release channel.

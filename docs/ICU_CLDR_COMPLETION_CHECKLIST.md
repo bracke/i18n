@@ -16,17 +16,18 @@ Target baseline:
 3. ICU behavior baseline: ICU 78.3.
 4. Verification mode: local Ada tooling through Alire; no standalone scripts.
 
-Required local gate before any completion claim:
+Required local gate before any completion claim (the platform crate):
 
 1. `alr build`.
 2. `cd tests && alr exec -- gprbuild -P tests.gpr`.
-3. `cd tests && alr exec -- ./bin/tests`.
-4. `alr exec -- gprbuild -P examples/examples.gpr -j1`.
-5. Run every public example binary checked by `check_i18n`.
-6. `alr exec -- gprbuild -P benchmarks/benchmarks.gpr -j1`.
-7. `alr exec -- ./benchmarks/bin/render_benchmarks --smoke`.
-8. `cd check_i18n && alr exec -- ./bin/check_i18n --skip-alr-test`.
-9. `alr test`.
+3. `cd tests && alr exec -- ./bin/tests` — the `I18N.Platform_Tests` suite.
+4. The CLDR data-boundary `--check` pipeline built from `cldr/cldr_tools.gpr`.
+5. `cd check_i18n && alr exec -- ./bin/check_i18n` (also runs GNATprove/GNATdoc).
+6. `alr test`.
+
+The ICU **message-formatting** examples, benchmarks, and their output checks
+moved with the message engine into the sibling `messages` crate; see its
+`check_messages` gate.
 
 The checklist is intentionally unchecked until the implementation and
 conformance gates exist and pass. `check_i18n` rejects a completion claim while
@@ -124,11 +125,9 @@ any `- [ ]` item remains.
 
 ## 12. Message Formatting
 
-1. - [ ] Implement ICU MessageFormat behavior, escaping, apostrophes, offsets,
-   nested selectors, formatted arguments, errors, and parsing compatibility.
-2. - [ ] Implement any newer ICU message-format behavior selected for the target
-   baseline.
-3. - [ ] Verify against ICU message conformance and differential render tests.
+ICU MessageFormat is no longer part of this platform crate — it moved to the
+sibling `messages` crate, which owns the catalog/render engine and its own
+completion tracking. This section is retained only as a pointer.
 
 ## 13. RBNF
 
