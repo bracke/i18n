@@ -118,16 +118,38 @@ hand/loaded rule sets) with the CLDR transform *catalog* as Phase 8b.
   transform_data` compile the 379-file CLDR catalog into 165 shards + an alias
   index; `fetch_ucd.sh`/`regenerate.sh` wire it.
 - **CONFORMANCE (offline harness over `common/testData/transforms`):**
-  **218,762 / 296,989 case lines pass (~74%); 92 of 288 files fully pass.** Up
-  from an initial 11,883 after fixing three real bugs: (a) plain `<tRule>` (no
-  CDATA) pure-`::`-chains were dropped by the generator — the InterIndic
-  Script↔Script transforms use these, so all 275 aliases now resolve; (b) the
-  compiled-transform cache passed a vector element to `Run` by reference while
-  recursive sub-transform compiles reallocated the same vector (use-after-realloc)
-  — now copied out; (c) **the shared `I18N.Data_Store` capped cached files at 16**
-  (`Max_Files`), so once a run loaded >16 shards every later `Lookup` returned
-  empty and the transform ran as identity — raised to 1024 with read-through when
-  full. The remaining ~26% is the rule-syntax long tail (per-script debugging).
+  **289,564 / 296,989 case lines pass (~97.5%); 234 of 288 files fully pass.**
+  Earlier baseline was 218,762 / 92 after three foundational fixes (plain-`<tRule>`
+  `::`-chains dropped by the generator; a use-after-realloc in the compiled-cache;
+  the `Data_Store` `Max_Files=16` starvation). A second wave of systematic engine
+  and parser fixes closed most of the remaining gap — each verified with the full
+  harness (no regressions), 152/152 AUnit, gnatprove clean:
+  1. `{string}` UnicodeSet members (`[a-z{ng}{ny}]`) matched literally.
+  2. Transform-id resolution made case-/underscore-insensitive (BCP-47 + ICU ids),
+     plus deriving the inverted-basename alias so testData names resolve
+     (`beta-metsehaf`/`ies-jes`, and the no-source-lang `d0-morse-t-am-Ethi`).
+  3. ASCII rule operators `>` `<` `<>` (Arrow_At only knew the Unicode → ← ↔),
+     so whole transforms (Myanmar-Latin) no longer run as identity.
+  4. `[:block=Script:]` and case-folded script-name matching (BGN romanizers).
+  5. Set/rule parsing robustness: a literal `:` inside a set (`[_:;,]`) is not a
+     property start (only a leading `[:` is); a `'` inside a `[set]` is a member,
+     not a quote — in both the engine splitter and the generator's flattener.
+  6. A bare `$` in a set is the text-boundary anchor (`[aeiou$]` = vowel-or-edge),
+     via the existing U+0000 boundary convention — +34 files (es-fonipa et al.).
+  7. A global filter `::[set]` gates the *whole* remaining pipeline including
+     sub-transform and NFx steps (per-filtered-run), not just direct rules — the
+     seven `und-*-t-und-mlym` (Malayalam chillu pass-through).
+  8. `::[set] Name` is a filtered call (apply Name to the set), not a global
+     filter that also dropped the Name (Japanese hrkt romanizers).
+  9. Quantified sets match `{string}` members too (`[ij{i̯}]+`) — es→ja diphthongs.
+  10. Zero-width insertion rules (empty key with a before/after context,
+      `a { } b → X`) are kept, not dropped at parse time — syllable-dot /
+      epenthesis insertion (my-fonipa and friends).
+- **Remaining ~2.5% is per-language phonology long tail**, not engine bugs:
+  Burmese syllabification/schwa (my-fonipa), Amharic IPA glides/affricates and the
+  `am-t-*` chains, Uyghur/Welsh IPA, the Ethiopic-Morse second pass, Han→pinyin.
+  These need transform-by-transform rule work that replicates ICU's exact
+  cursor/context/ordering for specific complex rules, with real regression risk.
 
 ## Decisions — LOCKED (maximal scope)
 
