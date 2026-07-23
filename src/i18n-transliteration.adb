@@ -601,18 +601,35 @@ package body I18N.Transliteration is
                Into.Append (Element'(Kind => E_Seg_Close, others => <>));
                I := I + 1;
             elsif S (I) = ''' then
-               --  Quoted literal run.
-               I := I + 1;
-               while I < Stop and then S (I) /= ''' loop
-                  declare
-                     C : Code;
-                  begin
-                     Next_CP (S, I, C);
-                     Into.Append (Element'(Kind => E_Char, Ch => C, others => <>));
-                  end;
-               end loop;
-               if I < Stop then
+               if I + 1 < Stop and then S (I + 1) = ''' then
+                  --  '' is a literal apostrophe (ICU escaped quote).
+                  Into.Append
+                    (Element'(Kind => E_Char, Ch => 16#27#, others => <>));
+                  I := I + 2;
+               else
+                  --  Quoted literal run; '' inside stays a literal apostrophe.
                   I := I + 1;
+                  loop
+                     exit when I >= Stop;
+                     if S (I) = ''' then
+                        if I + 1 < Stop and then S (I + 1) = ''' then
+                           Into.Append (Element'(Kind => E_Char, Ch => 16#27#,
+                                        others => <>));
+                           I := I + 2;
+                        else
+                           I := I + 1;   --  closing quote
+                           exit;
+                        end if;
+                     else
+                        declare
+                           C : Code;
+                        begin
+                           Next_CP (S, I, C);
+                           Into.Append (Element'(Kind => E_Char, Ch => C,
+                                        others => <>));
+                        end;
+                     end if;
+                  end loop;
                end if;
             elsif S (I) = '\' then
                I := I + 1;
