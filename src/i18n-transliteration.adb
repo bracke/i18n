@@ -787,7 +787,12 @@ package body I18N.Transliteration is
                   C : Code;
                begin
                   Parse_Escape (S, I, C);
-                  Into.Append (Element'(Kind => E_Char, Ch => C, others => <>));
+                  --  LRM/RLM (U+200E/200F) are bidi display marks the CLDR rule
+                  --  files sprinkle in for readability; they are never part of a
+                  --  key or output, so drop them.
+                  if C /= 16#200E# and then C /= 16#200F# then
+                     Into.Append (Element'(Kind => E_Char, Ch => C, others => <>));
+                  end if;
                end;
             elsif S (I) = '$' then
                I := I + 1;
@@ -819,7 +824,9 @@ package body I18N.Transliteration is
                   C : Code;
                begin
                   Next_CP (S, I, C);
-                  Into.Append (Element'(Kind => E_Char, Ch => C, others => <>));
+                  if C /= 16#200E# and then C /= 16#200F# then
+                     Into.Append (Element'(Kind => E_Char, Ch => C, others => <>));
+                  end if;
                end;
             end if;
          end loop;
