@@ -1306,8 +1306,15 @@ package body I18N.Transliteration is
       end Match_Fwd;
 
       --  Match Elems (a context) against Buf ending just before P (backward).
-      function Match_Bwd (Elems : Elem_Vec.Vector; P : Positive) return Boolean is
+      --  Match Elems as a before-context ending just before P. Segments (...) in
+      --  the before-context are captured into Seg_Lo/Seg_Hi with indices 1 .. Nseg
+      --  (left to right), so a rule like ([c]){x} → $1 can reference them.
+      function Match_Bwd
+        (Elems : Elem_Vec.Vector; P : Positive;
+         Seg_Lo, Seg_Hi : in out Seg_Array; Nseg : Natural) return Boolean
+      is
          Q : Integer := P - 1;
+         Cur_Seg : Natural := Nseg;   --  filled rightmost-first going backward
          function Test (E : Element; At_Q : Integer) return Boolean is
            (At_Q >= 1
             and then (case E.Kind is
@@ -1381,6 +1388,16 @@ package body I18N.Transliteration is
                      if Q >= 1 then   --  must be the start of text
                         return False;
                      end if;
+                  when E_Seg_Close =>
+                     --  Rightmost boundary of the current (rightmost) segment.
+                     if Cur_Seg in 1 .. 9 then
+                        Seg_Hi (Cur_Seg) := Q;
+                     end if;
+                  when E_Seg_Open =>
+                     if Cur_Seg in 1 .. 9 then
+                        Seg_Lo (Cur_Seg) := Q + 1;
+                        Cur_Seg := Cur_Seg - 1;
+                     end if;
                   when others =>
                      null;
                end case;
@@ -1409,10 +1426,19 @@ package body I18N.Transliteration is
                for R of Rules loop
                   declare
                      Seg_Lo, Seg_Hi : Seg_Array := [others => 0];
-                     Seg_N : Natural := 0;
-                     KLen  : constant Integer :=
-                       Match_Fwd (R.Key, I, Seg_Lo, Seg_Hi, Seg_N);
+                     --  Before-context segments take indices 1 .. Nb; the key's
+                     --  segments continue from Nb + 1.
+                     Nb : Natural := 0;
+                     Seg_N : Natural;
+                     KLen  : Integer;
                   begin
+                     for E of R.Before loop
+                        if E.Kind = E_Seg_Open then
+                           Nb := Nb + 1;
+                        end if;
+                     end loop;
+                     Seg_N := Nb;
+                     KLen := Match_Fwd (R.Key, I, Seg_Lo, Seg_Hi, Seg_N);
                      if KLen >= 0 then
                         declare
                            After_Dummy_Lo, After_Dummy_Hi :
@@ -1422,7 +1448,9 @@ package body I18N.Transliteration is
                              Match_Fwd (R.After, I + KLen, After_Dummy_Lo,
                                         After_Dummy_Hi, After_N);
                         begin
-                           if ALen >= 0 and then Match_Bwd (R.Before, I) then
+                           if ALen >= 0
+                             and then Match_Bwd (R.Before, I, Seg_Lo, Seg_Hi, Nb)
+                           then
                               --  Build the output.
                               declare
                                  Out_C  : Code_Vec.Vector;
