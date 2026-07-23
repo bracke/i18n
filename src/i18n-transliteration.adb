@@ -366,8 +366,12 @@ package body I18N.Transliteration is
    end Parse_Escape;
 
    --  Arrows (UTF-8): → E2 86 92, ← E2 86 90, ↔ E2 86 94.
+   --  Rule operators come in a Unicode form (→ ← ↔, 3 UTF-8 bytes) and an
+   --  equivalent ASCII form (> < <>). Arrow_At classifies the token at S (I);
+   --  Arrow_Len gives its byte width so the right-hand side can be sliced.
    function Arrow_At (S : String; I : Natural) return Character is
-      --  Returns 'F' (forward →), 'R' (reverse ←), 'B' (both ↔), or ' '.
+      --  Returns 'F' (forward → or >), 'R' (reverse ← or <),
+      --  'B' (both ↔ or <>), or ' '.
    begin
       if I + 2 <= S'Last and then Character'Pos (S (I)) = 16#E2#
         and then Character'Pos (S (I + 1)) = 16#86#
@@ -378,9 +382,28 @@ package body I18N.Transliteration is
             when 16#94# => return 'B';
             when others => return ' ';
          end case;
+      elsif S (I) = '>' then
+         return 'F';
+      elsif S (I) = '<' then
+         return (if I < S'Last and then S (I + 1) = '>' then 'B' else 'R');
       end if;
       return ' ';
    end Arrow_At;
+
+   function Arrow_Len (S : String; I : Natural) return Natural is
+   begin
+      if I + 2 <= S'Last and then Character'Pos (S (I)) = 16#E2#
+        and then Character'Pos (S (I + 1)) = 16#86#
+        and then Character'Pos (S (I + 2)) in 16#90# | 16#92# | 16#94#
+      then
+         return 3;
+      elsif S (I) = '>' then
+         return 1;
+      elsif S (I) = '<' then
+         return (if I < S'Last and then S (I + 1) = '>' then 2 else 1);
+      end if;
+      return 0;
+   end Arrow_Len;
 
    --  First occurrence of Ch outside single quotes and outside '[' brackets.
    function Index_Non_Quoted (S : String; Ch : Character) return Natural is
@@ -860,6 +883,7 @@ package body I18N.Transliteration is
                   Ar_Pos : Natural := 0;
                   Ar     : Character := ' ';
                   P      : Natural := Body_S'First;
+                  BDepth : Natural := 0;   --  inside [...] a raw </> is a literal
                begin
                   while P <= Body_S'Last loop
                      if Body_S (P) = ''' then
@@ -870,11 +894,18 @@ package body I18N.Transliteration is
                         P := P + 1;   --  past the closing quote
                      elsif Body_S (P) = '\' then
                         P := P + 2;
+                     elsif Body_S (P) = '[' then
+                        BDepth := BDepth + 1; P := P + 1;
+                     elsif Body_S (P) = ']' then
+                        if BDepth > 0 then
+                           BDepth := BDepth - 1;
+                        end if;
+                        P := P + 1;
                      else
                         declare
                            A : constant Character := Arrow_At (Body_S, P);
                         begin
-                           if A /= ' ' then
+                           if A /= ' ' and then BDepth = 0 then
                               Ar_Pos := P; Ar := A; exit;
                            end if;
                         end;
@@ -894,7 +925,7 @@ package body I18N.Transliteration is
                      Left_S  : constant String :=
                        Body_S (Body_S'First .. Ar_Pos - 1);
                      Right_S : constant String :=
-                       Body_S (Ar_Pos + 3 .. Body_S'Last);
+                       Body_S (Ar_Pos + Arrow_Len (Body_S, Ar_Pos) .. Body_S'Last);
                      --  For reverse, swap the two sides.
                      Pat_S   : constant String :=
                        (if Reverse_Dir then
