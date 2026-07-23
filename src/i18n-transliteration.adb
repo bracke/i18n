@@ -249,9 +249,26 @@ package body I18N.Transliteration is
    function Difference (A, B : Range_Vec.Vector) return Range_Vec.Vector is
      (Intersect (A, Complement (B)));
 
+   function Eq_Ci (A, B : String) return Boolean is
+      function Lc (C : Character) return Character is
+        (if C in 'A' .. 'Z' then
+           Character'Val (Character'Pos (C) + 32) else C);
+   begin
+      if A'Length /= B'Length then
+         return False;
+      end if;
+      for K in 0 .. A'Length - 1 loop
+         if Lc (A (A'First + K)) /= Lc (B (B'First + K)) then
+            return False;
+         end if;
+      end loop;
+      return True;
+   end Eq_Ci;
+
    --  Property set: scan the loaded uprops ranges. Accepts bare names
    --  ([:Cherokee:], [:Lu:], [:L:]) and prefixed forms ([:sc=Cher:],
-   --  [:script=Cherokee:], [:gc=Lu:], [:General_Category=L:]).
+   --  [:script=Cherokee:], [:gc=Lu:], [:General_Category=L:]). A block=<script>
+   --  value (e.g. [:block=Thaana:]) resolves to the matching script's ranges.
    function Prop_Set (Name : String) return Range_Vec.Vector is
       V : Range_Vec.Vector;
 
@@ -281,7 +298,9 @@ package body I18N.Transliteration is
       begin
          --  Try script (by long name, resolving a short code) then GC.
          for R of Script_Ranges loop
-            if To_String (R.Val) = Long or else To_String (R.Val) = Base then
+            if Eq_Ci (To_String (R.Val), Long)
+              or else Eq_Ci (To_String (R.Val), Base)
+            then
                Add_R (V, R.Lo, R.Hi);
             end if;
          end loop;
@@ -1368,22 +1387,6 @@ package body I18N.Transliteration is
          end if;
       end loop;
    end Apply_Rules;
-
-   function Eq_Ci (A, B : String) return Boolean is
-      function Lc (C : Character) return Character is
-        (if C in 'A' .. 'Z' then
-           Character'Val (Character'Pos (C) + 32) else C);
-   begin
-      if A'Length /= B'Length then
-         return False;
-      end if;
-      for K in 0 .. A'Length - 1 loop
-         if Lc (A (A'First + K)) /= Lc (B (B'First + K)) then
-            return False;
-         end if;
-      end loop;
-      return True;
-   end Eq_Ci;
 
    --  ICU transform-id equality: case-insensitive and ignoring '_' and spaces,
    --  so a compound step "Ethiopic-Latin/BetaMetsehaf" matches the registered
