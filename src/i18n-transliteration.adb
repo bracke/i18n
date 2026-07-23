@@ -486,6 +486,9 @@ package body I18N.Transliteration is
          Acc    : Range_Vec.Vector;   --  accumulated result
          Op     : Character := '|';   --  pending operator: | & -
          Negate : Boolean := False;
+         --  [:Name:] is a property set only as the very first element; a bare
+         --  ':' appearing later in the set (e.g. [_:;,]) is a literal colon.
+         First  : Boolean := True;
 
          procedure Apply (Cur : Range_Vec.Vector) is
          begin
@@ -555,7 +558,7 @@ package body I18N.Transliteration is
                   end if;
                   Apply (Sub);
                end;
-            elsif S (I) = ':' or else
+            elsif (S (I) = ':' and then First) or else
               (S (I) = '\' and then I + 1 <= S'Last
                and then (S (I + 1) = 'p' or else S (I + 1) = 'P'))
             then
@@ -656,6 +659,9 @@ package body I18N.Transliteration is
                   Add_R (One, C1, C2);
                   Apply (One);
                end;
+            end if;
+            if not Is_Space (S (I - 1)) then
+               First := False;   --  only a leading ':' can open a [:property:]
             end if;
          end loop;
          if I <= S'Last then
@@ -1008,7 +1014,11 @@ package body I18N.Transliteration is
                I := I + 1;
             elsif C = '\' then
                I := I + 2;
-            elsif C = ''' then
+            elsif C = ''' and then Depth = 0 then
+               --  Only a top-level '...' quotes text; a ' inside a [set] (e.g.
+               --  the literal apostrophe in a filter [...'"...]) is an ordinary
+               --  set member. Toggling on it would swallow every ';' up to the
+               --  next ', merging statements and dropping their rules.
                In_Q := True; I := I + 1;
             elsif C = '#' then
                --  comment to end of line

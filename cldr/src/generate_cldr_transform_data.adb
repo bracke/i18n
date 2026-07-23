@@ -77,7 +77,11 @@ procedure Generate_CLDR_Transform_Data is
                   Append (Into, Cdata (I + 1));
                end if;
                I := I + 2;
-            elsif C = ''' then
+            elsif C = ''' and then Depth = 0 then
+               --  Only top-level '...' quotes text; a ' inside a [set] (e.g. the
+               --  literal apostrophe in a filter [...'"...]) is an ordinary set
+               --  member, not a quote — otherwise it would swallow every rule up
+               --  to the next ' and they would be lost as non-first data lines.
                In_Q := True; Append (Into, C); I := I + 1;
             elsif C = '#' and then Depth = 0 then
                while I <= Cdata'Last and then Cdata (I) /= ASCII.LF loop
@@ -195,7 +199,13 @@ procedure Generate_CLDR_Transform_Data is
            (if FS = 0 then Rest else Rest (Rest'First .. FS - 2));
          Fields : constant String :=
            (if FS = 0 then "" else "-" & Rest (FS .. Rest'Last));
-         Result : String := Lang2 & "-t-" & Lang1 & Fields;
+         --  With a source language (A-t-B-fields) the tlang subtags swap and the
+         --  fields stay in the t-extension: B-t-A-fields. With no source language
+         --  (A-t-fields, e.g. am-Ethi-t-d0-morse) the whole field group moves to
+         --  the front: fields-t-A (-> d0-morse-t-am-Ethi).
+         Result : String :=
+           (if Lang2 = "" then Rest & "-t-" & Lang1
+            else Lang2 & "-t-" & Lang1 & Fields);
       begin
          for K in Result'Range loop
             if Result (K) = '_' then
