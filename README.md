@@ -103,6 +103,32 @@ a consumer that links with `-Wl,--gc-sections` also drops the platform code it
 never calls, so an application that uses only part of the API does not carry the
 rest.
 
+## Loading locale data at runtime
+
+Compile-time narrowing has a runtime counterpart. `I18N.Runtime_Data` loads
+locale and tzdb data from external text, and **formatters consult it before the
+generated tables**. So an application can ship a minimal compiled core (via the
+`locales` value above) and hydrate — or override — additional locales at startup
+without recompiling:
+
+```ada
+Errors : I18N.Runtime_Data.Error_Vectors.Vector;
+Loaded : constant Boolean :=
+  I18N.Runtime_Data.Load_Text ("fr", Text, Errors);
+--  I18N.Runtime_Data.Clear removes all loaded overrides.
+```
+
+The input is deterministic key/value and normalized-CLDR-import text covering
+locale symbols and digits, month/weekday/quarter and day-period names, plural
+and RBNF/spellout rules, currency metadata, list/unit/relative patterns, and
+tzdb transition offsets; see `docs/ICU_SUBSET.md` for the full grammar. Loads are
+transactional — malformed input is rejected and leaves the previous overrides
+intact.
+
+Message-formatting consumers use the `messages` crate's wrappers rather than the
+platform layer directly: `Messages.Runtime.Load_Data_File (Path)`,
+`Load_Data_Text (Name, Text)`, and `Clear_Runtime_Data`.
+
 ## Alire package metadata
 
 The crate name is `i18n`, the primary project file is `i18n.gpr`, and it declares
