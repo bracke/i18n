@@ -1173,6 +1173,33 @@ procedure Generate_CLDR_Data is
                (if Kind = "day_period_hex" then Hex_Bytes_To_String (D)
                 else Ada_Expression_UTF8_Bytes (D)),
                Sub => C & ":" & B);
+         elsif Kind = "relative_current" and then not Locale_Wanted (A) then
+            --  A=locale, B=base, C=width, D=name.
+            Add_Format
+              ("relative_current", A, Ada_Expression_UTF8_Bytes (D),
+               Sub => B & ":" & C);
+         elsif Kind = "relative_offset" and then not Locale_Wanted (A) then
+            --  A=locale, B=tense (future/past), C=prefix, D=suffix.
+            Add_Format
+              ("relative_offset_prefix", A, Ada_Expression_UTF8_Bytes (C),
+               Sub => B);
+            Add_Format
+              ("relative_offset_suffix", A, Ada_Expression_UTF8_Bytes (D),
+               Sub => B);
+         elsif Kind = "relative_unit_category"
+           and then not Locale_Wanted (A)
+         then
+            --  A=locale, B=base, C=category, D=name.
+            Add_Format
+              ("relative_unit_category", A, Ada_Expression_UTF8_Bytes (D),
+               Sub => B & ":" & C);
+         elsif Kind = "relative_time_pattern"
+           and then not Locale_Wanted (A)
+         then
+            --  A=locale, B=base, C=width, D=tense, E=category, F=pattern.
+            Add_Format
+              ("relative_time_pattern", A, Ada_Expression_UTF8_Bytes (F),
+               Sub => B & ":" & C & ":" & D & ":" & E);
          end if;
       end if;
 
