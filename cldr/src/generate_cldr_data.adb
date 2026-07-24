@@ -26,6 +26,7 @@ procedure Generate_CLDR_Data is
    --  I18N.Locale_Data can still serve it on the fly. With --locales=all
    --  (the default) nothing is narrowed out and the file is not written.
    Formats_Target : constant String := "../share/i18n/formats.i18ndata";
+   Units_Dir      : constant String := "../share/i18n/units";
 
    --  The two largest lookup functions are emitted as subunits: inline they made the
    --  single body file exceed GitHub's 100 MB per-file limit, so each goes in its own
@@ -88,6 +89,15 @@ procedure Generate_CLDR_Data is
    Format_Entries : constant Format_Entry_Array_Access :=
      new Format_Entry_Array (1 .. Max_Format_Entries);
    Format_Count   : Natural := 0;
+
+   --  Unit display names are far larger than everything else combined, so they
+   --  are sharded one file per locale (units/<locale>.i18ndata) rather than
+   --  bloating formats.i18ndata. Here Section holds the shard locale and Key
+   --  the "base:width:category" record key.
+   Max_Unit_Entries : constant := 1_000_000;
+   Unit_Entries : constant Format_Entry_Array_Access :=
+     new Format_Entry_Array (1 .. Max_Unit_Entries);
+   Unit_Count   : Natural := 0;
 
    use type US.Unbounded_String;
    function Format_Less (L, R : Format_Entry) return Boolean is
@@ -1016,6 +1026,28 @@ procedure Generate_CLDR_Data is
          Value   => US.To_Unbounded_String (Value));
    end Add_Format;
 
+   --  Capture one narrowed-out unit display name for its locale's shard.
+   procedure Unit_Add (Locale : String; Key : String; Value : String) is
+   begin
+      if Locale'Length = 0 or else Key'Length = 0 or else Value'Length = 0 then
+         return;
+      end if;
+      for C of Value loop
+         if C = ASCII.HT or else C = ASCII.LF then
+            return;
+         end if;
+      end loop;
+      if Unit_Count = Max_Unit_Entries then
+         Add_Error ("too many narrowed-out unit rows");
+         return;
+      end if;
+      Unit_Count := Unit_Count + 1;
+      Unit_Entries (Unit_Count) :=
+        (Section => US.To_Unbounded_String (To_Store_Locale (Locale)),
+         Key     => US.To_Unbounded_String (Key),
+         Value   => US.To_Unbounded_String (Value));
+   end Unit_Add;
+
    --  Store index (month/weekday/quarter number) as its bare decimal image.
    function Index_Sub (N : Integer) return String is
       Image : constant String := Integer'Image (N);
@@ -1200,6 +1232,10 @@ procedure Generate_CLDR_Data is
             Add_Format
               ("relative_time_pattern", A, Ada_Expression_UTF8_Bytes (F),
                Sub => B & ":" & C & ":" & D & ":" & E);
+         elsif Kind = "unit_name" and then not Locale_Wanted (A) then
+            --  A=locale, B=base, C=width, D=category, E=name; sharded per
+            --  locale into units/<locale>.i18ndata, keyed "base:width:category".
+            Unit_Add (A, B & ":" & C & ":" & D, Ada_Expression_UTF8_Bytes (E));
          end if;
       end if;
 
@@ -12374,6 +12410,55 @@ procedure Generate_CLDR_Data is
       Ada.Text_IO.Close (Out_F);
    end Emit_Formats_File;
 
+   --  Write the captured narrowed-out unit names as one Data_Store file per
+   --  locale under Dir, or clear a stale directory when nothing was narrowed.
+   procedure Emit_Unit_Shards (Dir : String) is
+      procedure Sort is new Ada.Containers.Generic_Array_Sort
+        (Index_Type   => Positive,
+         Element_Type => Format_Entry,
+         Array_Type   => Format_Entry_Array,
+         "<"          => Format_Less);
+      Out_F : Ada.Text_IO.File_Type;
+      I     : Positive := 1;
+   begin
+      --  Always start clean so a locale narrowed out last time but compiled in
+      --  now does not keep a stale shard.
+      if Ada.Directories.Exists (Dir) then
+         Ada.Directories.Delete_Tree (Dir);
+      end if;
+      if Unit_Count = 0 then
+         return;
+      end if;
+
+      Sort (Unit_Entries (1 .. Unit_Count));
+      Ada.Directories.Create_Path (Dir);
+
+      while I <= Unit_Count loop
+         declare
+            Locale : constant String := S (Unit_Entries (I).Section);
+            J      : Positive := I;
+         begin
+            while J <= Unit_Count
+              and then S (Unit_Entries (J).Section) = Locale
+            loop
+               J := J + 1;
+            end loop;
+            Ada.Text_IO.Create
+              (Out_F, Ada.Text_IO.Out_File, Dir & "/" & Locale & ".i18ndata");
+            Ada.Text_IO.Put_Line (Out_F, "I18NDATA|1|" & CLDR_Version);
+            Ada.Text_IO.Put_Line (Out_F, "@unit|" & Trim (Natural'Image (J - I)));
+            for K in I .. J - 1 loop
+               Ada.Text_IO.Put_Line
+                 (Out_F,
+                  S (Unit_Entries (K).Key) & ASCII.HT
+                  & S (Unit_Entries (K).Value));
+            end loop;
+            Ada.Text_IO.Close (Out_F);
+            I := J;
+         end;
+      end loop;
+   end Emit_Unit_Shards;
+
 begin
    Read_Wanted_Locales;
    if Has_Argument ("--help") then
@@ -12417,6 +12502,7 @@ begin
          Ada.Directories.Copy_File (Currency_Sub_Generated, Currency_Sub_Target);
          Ada.Directories.Copy_File (Unit_Sub_Generated, Unit_Sub_Target);
          Emit_Formats_File (Formats_Target);
+         Emit_Unit_Shards (Units_Dir);
          Ada.Text_IO.Put_Line ("generated src/i18n-cldr_data.adb");
       end if;
    end;

@@ -98,4 +98,57 @@ package body I18N.Locale_Data is
 
       return Compiled (Locale);
    end Field;
+
+   function Shard_Lookup
+     (Dir     : String;
+      Section : String;
+      Locale  : String;
+      Key     : String;
+      Found   : out Boolean)
+      return String
+   is
+      Base : constant String := To_Store_Locale (Locale);
+      Cut  : Natural := Base'Last;
+
+      function Try (Loc : String) return String is
+        (if I18N.Data_Store.Available (Dir & "/" & Loc)
+         then I18N.Data_Store.Lookup (Dir & "/" & Loc, Section, Key)
+         else "");
+   begin
+      Found := False;
+
+      declare
+         Exact : constant String := Try (Base);
+      begin
+         if Exact /= "" then
+            Found := True;
+            return Exact;
+         end if;
+      end;
+
+      while Cut > Base'First loop
+         if Base (Cut) = '-' then
+            declare
+               Parent : constant String := Try (Base (Base'First .. Cut - 1));
+            begin
+               if Parent /= "" then
+                  Found := True;
+                  return Parent;
+               end if;
+            end;
+         end if;
+         Cut := Cut - 1;
+      end loop;
+
+      declare
+         Root : constant String := Try ("root");
+      begin
+         if Root /= "" then
+            Found := True;
+            return Root;
+         end if;
+      end;
+
+      return "";
+   end Shard_Lookup;
 end I18N.Locale_Data;

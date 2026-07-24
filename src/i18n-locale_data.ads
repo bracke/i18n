@@ -29,4 +29,17 @@ private package I18N.Locale_Data is
       Locale   : String;
       Compiled : not null access function (L : String) return String)
       return String;
+
+   --  Look Key up in a per-locale shard file Dir/<locale>.i18ndata (the layout
+   --  used for large data such as units), walking exact -> parent -> root shard
+   --  by shard so only the locales actually touched are loaded. Section is the
+   --  shard's section name. Found is False (and "" returned) when no installed
+   --  shard supplies a value.
+   function Shard_Lookup
+     (Dir     : String;
+      Section : String;
+      Locale  : String;
+      Key     : String;
+      Found   : out Boolean)
+      return String;
 end I18N.Locale_Data;
