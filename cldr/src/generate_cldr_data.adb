@@ -319,6 +319,28 @@ procedure Generate_CLDR_Data is
    end Hex_Bytes_To_Base64;
 
    --  Rows that arrive as four hex digits a code point.
+   --  One Unicode code point as raw UTF-8 bytes.
+   function Code_Point_UTF8 (Point : Natural) return String is
+      Bytes : US.Unbounded_String;
+   begin
+      if Point <= 16#7F# then
+         US.Append (Bytes, Character'Val (Point));
+      elsif Point <= 16#7FF# then
+         US.Append (Bytes, Character'Val (16#C0# + Point / 64));
+         US.Append (Bytes, Character'Val (16#80# + Point mod 64));
+      elsif Point <= 16#FFFF# then
+         US.Append (Bytes, Character'Val (16#E0# + Point / 4096));
+         US.Append (Bytes, Character'Val (16#80# + (Point / 64) mod 64));
+         US.Append (Bytes, Character'Val (16#80# + Point mod 64));
+      else
+         US.Append (Bytes, Character'Val (16#F0# + Point / 262144));
+         US.Append (Bytes, Character'Val (16#80# + (Point / 4096) mod 64));
+         US.Append (Bytes, Character'Val (16#80# + (Point / 64) mod 64));
+         US.Append (Bytes, Character'Val (16#80# + Point mod 64));
+      end if;
+      return S (Bytes);
+   end Code_Point_UTF8;
+
    --  Decode a run of four-hex-digit BMP code points to raw UTF-8. (The packed
    --  name sets are BMP-only; astral names arrive through the U (16#...#)
    --  override rows instead.)
@@ -327,21 +349,7 @@ procedure Generate_CLDR_Data is
       Index : Natural := Hex'First;
    begin
       while Index + 3 <= Hex'Last loop
-         declare
-            Point : constant Natural := Hex_Value (Hex (Index .. Index + 3));
-         begin
-            if Point <= 16#7F# then
-               US.Append (Bytes, Character'Val (Point));
-            elsif Point <= 16#7FF# then
-               US.Append (Bytes, Character'Val (16#C0# + Point / 64));
-               US.Append (Bytes, Character'Val (16#80# + Point mod 64));
-            else
-               US.Append (Bytes, Character'Val (16#E0# + Point / 4096));
-               US.Append
-                 (Bytes, Character'Val (16#80# + (Point / 64) mod 64));
-               US.Append (Bytes, Character'Val (16#80# + Point mod 64));
-            end if;
-         end;
+         US.Append (Bytes, Code_Point_UTF8 (Hex_Value (Hex (Index .. Index + 3))));
          Index := Index + 4;
       end loop;
 
@@ -1030,6 +1038,16 @@ procedure Generate_CLDR_Data is
    function Name_Set_Item_UTF8 (Items : String; N : Positive) return String is
      (Hex_Points_To_UTF8 (Expr_Item (Items, N)));
 
+   --  Decode the Nth comma-separated "16#NNN#" code point of a digits row.
+   function Digit_Item_UTF8 (List : String; N : Positive) return String is
+      Item  : constant String := Field (List, N, ',');
+      Inner : constant String :=
+        (if Item'Length > 4 and then Item (Item'First .. Item'First + 2) = "16#"
+         then Item (Item'First + 3 .. Item'Last - 1) else Item);
+   begin
+      return Code_Point_UTF8 (Hex_Value (Inner));
+   end Digit_Item_UTF8;
+
    procedure Add_Rule
      (Kind : String;
       A    : String := "";
@@ -1123,6 +1141,14 @@ procedure Generate_CLDR_Data is
             Add_Format
               ("date_style_pattern", A, Ada_Expression_UTF8_Bytes (D),
                Sub => B & ":" & C);
+         elsif Kind = "digits" and then not Locale_Wanted (A) then
+            --  A=locale, B=ten comma-separated "16#NNN#" native digit points,
+            --  keyed by the Latin digit they replace (0 .. 9).
+            for P in 1 .. 10 loop
+               Add_Format
+                 ("digit_text", A, Digit_Item_UTF8 (B, P),
+                  Sub => [1 => Character'Val (Character'Pos ('0') + P - 1)]);
+            end loop;
          end if;
       end if;
 
