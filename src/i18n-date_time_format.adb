@@ -33,6 +33,13 @@ package body I18N.Date_Time_Format is
    --  nothing. The extension keywords themselves (calendar, numbering system,
    --  hour cycle) are read separately from the raw Locale, so stripping here is
    --  safe. Mirrors I18N.Locales.Base_Locale, which is private to that unit.
+   --  The on-the-fly composite sub-key for an indexed name: the bare decimal.
+   function Index_Key (N : Natural) return String is
+      Image : constant String := Natural'Image (N);
+   begin
+      return Image (Image'First + 1 .. Image'Last);
+   end Index_Key;
+
    function Base_Locale (Locale : String) return String is
       Subtag_First : Positive := Locale'First;
       Ext          : Natural := 0;
@@ -363,10 +370,24 @@ package body I18N.Date_Time_Format is
       return String
    is
       Found : Boolean;
-      DMY   : constant Boolean :=
+      DMY   : Boolean :=
         I18N.Runtime_Data.Locale_Boolean
           (Locale, "uses_day_month_year", Found);
    begin
+      if not Found then
+         declare
+            Store_Found : Boolean;
+            Store_Value : constant String :=
+              I18N.Locale_Data.Lookup
+                ("uses_day_month_year", Locale, "", Store_Found);
+         begin
+            if Store_Found then
+               DMY := Store_Value = "1";
+               Found := True;
+            end if;
+         end;
+      end if;
+
       if not Found then
          return I18N.CLDR_Data.Date_Style_Pattern
            (Locale, Calendar_Key (Locale), Style);
@@ -1195,7 +1216,16 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Month_Name (Locale, Month);
       else
-         return I18N.CLDR_Data.Month_Name (Base_Locale (Locale), Month);
+         declare
+            SF : Boolean;
+            SV : constant String :=
+              I18N.Locale_Data.Lookup
+                ("month_name", Base_Locale (Locale), Index_Key (Month), SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Month_Name (Base_Locale (Locale), Month));
+         end;
       end if;
    end Month_Name;
 
@@ -1216,7 +1246,16 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Weekday_Name (Locale, Day);
       else
-         return I18N.CLDR_Data.Weekday_Name (Base_Locale (Locale), Day);
+         declare
+            SF : Boolean;
+            SV : constant String :=
+              I18N.Locale_Data.Lookup
+                ("weekday_name", Base_Locale (Locale), Index_Key (Day), SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Weekday_Name (Base_Locale (Locale), Day));
+         end;
       end if;
    end Weekday_Name;
 
@@ -1764,7 +1803,18 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Month_Name_Short (Locale, Month);
       else
-         return I18N.CLDR_Data.Month_Name_Short (Base_Locale (Locale), Month);
+         declare
+            SF : Boolean;
+            SV : constant String :=
+              I18N.Locale_Data.Lookup
+                ("month_name_short", Base_Locale (Locale), Index_Key (Month),
+                 SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Month_Name_Short
+                      (Base_Locale (Locale), Month));
+         end;
       end if;
    end Month_Name_Short;
 
@@ -1808,7 +1858,18 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Weekday_Name_Short (Locale, Day);
       else
-         return I18N.CLDR_Data.Weekday_Name_Short (Base_Locale (Locale), Day);
+         declare
+            SF : Boolean;
+            SV : constant String :=
+              I18N.Locale_Data.Lookup
+                ("weekday_name_short", Base_Locale (Locale), Index_Key (Day),
+                 SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Weekday_Name_Short
+                      (Base_Locale (Locale), Day));
+         end;
       end if;
    end Weekday_Name_Short;
 
@@ -1854,7 +1915,17 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Quarter_Name (Locale, Quarter, Quarter_Text);
       else
-         return I18N.CLDR_Data.Quarter_Name (Locale, Quarter, Quarter_Text);
+         declare
+            SF : Boolean;
+            SV : constant String :=
+              I18N.Locale_Data.Lookup
+                ("quarter_name", Locale, Index_Key (Quarter), SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Quarter_Name
+                      (Locale, Quarter, Quarter_Text));
+         end;
       end if;
    end Quarter_Name;
 
@@ -1877,8 +1948,17 @@ package body I18N.Date_Time_Format is
       elsif Standalone then
          return Quarter_Name_Short (Locale, Quarter, Quarter_Text);
       else
-         return I18N.CLDR_Data.Quarter_Name_Short
-           (Locale, Quarter, Quarter_Text);
+         declare
+            SF : Boolean;
+            SV : constant String :=
+              I18N.Locale_Data.Lookup
+                ("quarter_name_short", Locale, Index_Key (Quarter), SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Quarter_Name_Short
+                      (Locale, Quarter, Quarter_Text));
+         end;
       end if;
    end Quarter_Name_Short;
 

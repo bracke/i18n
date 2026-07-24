@@ -79,6 +79,9 @@ procedure Generate_CLDR_Data is
       Key     : US.Unbounded_String;
       Value   : US.Unbounded_String;
    end record;
+   --  Matches I18N.Data_Store.Key_Separator: joins locale and sub-key in a
+   --  composite record key (e.g. "de" & Sep & "1" for January).
+   Store_Sep : constant Character := Character'Val (16#1F#);
    Max_Format_Entries : constant := 500_000;
    type Format_Entry_Array is array (Positive range <>) of Format_Entry;
    type Format_Entry_Array_Access is access Format_Entry_Array;
@@ -316,7 +319,10 @@ procedure Generate_CLDR_Data is
    end Hex_Bytes_To_Base64;
 
    --  Rows that arrive as four hex digits a code point.
-   function Hex_Points_To_Base64 (Hex : String) return String is
+   --  Decode a run of four-hex-digit BMP code points to raw UTF-8. (The packed
+   --  name sets are BMP-only; astral names arrive through the U (16#...#)
+   --  override rows instead.)
+   function Hex_Points_To_UTF8 (Hex : String) return String is
       Bytes : US.Unbounded_String;
       Index : Natural := Hex'First;
    begin
@@ -339,8 +345,11 @@ procedure Generate_CLDR_Data is
          Index := Index + 4;
       end loop;
 
-      return To_Base64 (S (Bytes));
-   end Hex_Points_To_Base64;
+      return S (Bytes);
+   end Hex_Points_To_UTF8;
+
+   function Hex_Points_To_Base64 (Hex : String) return String is
+     (To_Base64 (Hex_Points_To_UTF8 (Hex)));
 
    --  Codes and base-62 offsets share one alphabet.
    Code_Alphabet : constant String :=
@@ -970,7 +979,15 @@ procedure Generate_CLDR_Data is
       return Result;
    end To_Store_Locale;
 
-   procedure Add_Format (Section : String; Locale : String; Value : String) is
+   procedure Add_Format
+     (Section : String;
+      Locale  : String;
+      Value   : String;
+      Sub     : String := "")
+   is
+      Key : constant String :=
+        (if Sub = "" then To_Store_Locale (Locale)
+         else To_Store_Locale (Locale) & Store_Sep & Sub);
    begin
       if Locale'Length = 0 or else Value'Length = 0 then
          return;
@@ -987,9 +1004,31 @@ procedure Generate_CLDR_Data is
       Format_Count := Format_Count + 1;
       Format_Entries (Format_Count) :=
         (Section => US.To_Unbounded_String (Section),
-         Key     => US.To_Unbounded_String (To_Store_Locale (Locale)),
+         Key     => US.To_Unbounded_String (Key),
          Value   => US.To_Unbounded_String (Value));
    end Add_Format;
+
+   --  Store index (month/weekday/quarter number) as its bare decimal image.
+   function Index_Sub (N : Integer) return String is
+      Image : constant String := Integer'Image (N);
+   begin
+      return (if Image (Image'First) = ' '
+              then Image (Image'First + 1 .. Image'Last) else Image);
+   end Index_Sub;
+
+   --  Map a CLDR date-name kind to its I18N.Locale_Data section.
+   function Name_Section (Kind : String) return String is
+     (if Kind = "month_full" then "month_name"
+      elsif Kind = "month_short" then "month_name_short"
+      elsif Kind = "weekday_full" then "weekday_name"
+      elsif Kind = "weekday_short" then "weekday_name_short"
+      elsif Kind = "quarter" then "quarter_name"
+      elsif Kind = "quarter_short" then "quarter_name_short"
+      else "");
+
+   --  Decode the Nth "~"-separated item of a packed name set to raw UTF-8.
+   function Name_Set_Item_UTF8 (Items : String; N : Positive) return String is
+     (Hex_Points_To_UTF8 (Expr_Item (Items, N)));
 
    procedure Add_Rule
      (Kind : String;
@@ -1035,6 +1074,48 @@ procedure Generate_CLDR_Data is
                   end if;
                end loop;
                Take (B (Start .. B'Last));
+            end;
+         elsif Name_Section (Kind) /= "" and then not Locale_Wanted (A) then
+            --  Individual override name row: A=locale, B=index, C=name expr.
+            Add_Format
+              (Name_Section (Kind), A, Ada_Expression_UTF8_Bytes (C),
+               Sub => Index_Sub (Decimal_Value (B)));
+         elsif Kind = "name_set_hex"
+           and then Name_Section (A) /= ""
+           and then not Locale_Wanted (B)
+         then
+            --  Packed name set: A=kind, B=locale, C=start index, D=~-list.
+            declare
+               Section : constant String := Name_Section (A);
+               First   : constant Integer := Decimal_Value (C);
+               Total   : constant Natural := Expr_Item_Count (D);
+            begin
+               for P in 1 .. Total loop
+                  Add_Format
+                    (Section, B, Name_Set_Item_UTF8 (D, P),
+                     Sub => Index_Sub (First + P - 1));
+               end loop;
+            end;
+         elsif Kind = "day_month_year" then
+            --  A is the comma-separated list of languages using D-M-Y order;
+            --  the un-wanted ones need the flag served on the fly.
+            declare
+               Start : Positive := A'First;
+
+               procedure Take (Loc : String) is
+               begin
+                  if Loc'Length > 0 and then not Locale_Wanted (Loc) then
+                     Add_Format ("uses_day_month_year", Loc, "1");
+                  end if;
+               end Take;
+            begin
+               for Index in A'Range loop
+                  if A (Index) = ',' then
+                     Take (A (Start .. Index - 1));
+                     Start := Index + 1;
+                  end if;
+               end loop;
+               Take (A (Start .. A'Last));
             end;
          end if;
       end if;
