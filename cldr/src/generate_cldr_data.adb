@@ -1410,6 +1410,15 @@ procedure Generate_CLDR_Data is
          then
             --  A=locale, B=packed "CODE:hex,...;..." per-code display names.
             Emit_Currency_Names (A, B);
+         elsif Kind = "unit_separator" and then not Locale_Wanted (A) then
+            --  A=locale, B=part ("per"), C=separator.
+            Add_Format
+              ("per_unit_separator", A, Ada_Expression_UTF8_Bytes (C));
+         elsif Kind = "list_separator" and then not Locale_Wanted (A) then
+            --  A=locale, B=family (standard/or), C=part, D=separator.
+            Add_Format
+              ("list_separator", A, Ada_Expression_UTF8_Bytes (D),
+               Sub => B & ":" & C);
          end if;
       end if;
 

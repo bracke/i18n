@@ -21,4 +21,7 @@ package I18N.Unit_Format is
       Category : String)
       return String;
 
+   --  The locale's "per" separator for compound units (miles per hour).
+   function Per_Unit_Separator (Locale : String) return String;
+
 end I18N.Unit_Format;

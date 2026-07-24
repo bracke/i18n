@@ -30,4 +30,9 @@ package body I18N.Unit_Format is
          else I18N.CLDR_Data.Unit_Display_Name (Locale, Base, Width, Category));
    end Display_Name;
 
+   function Per_Unit_Separator (Locale : String) return String is
+     (I18N.Locale_Data.Field
+        ("per_unit_separator", Locale,
+         I18N.CLDR_Data.Per_Unit_Separator'Access));
+
 end I18N.Unit_Format;
