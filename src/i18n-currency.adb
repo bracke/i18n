@@ -253,6 +253,18 @@ package body I18N.Currency is
          end if;
       end;
 
+      declare
+         Store_Found : Boolean;
+         Store_Value : constant String :=
+           I18N.Locale_Data.Shard_Lookup
+             ("currency", "currency", Locale, Code & ":" & Category_Name,
+              Store_Found);
+      begin
+         if Store_Found then
+            return Store_Value;
+         end if;
+      end;
+
       return
         I18N.CLDR_Data.Currency_Display_Name
           (Locale, Code, Category_Name);

@@ -28,6 +28,7 @@ procedure Generate_CLDR_Data is
    Formats_Target : constant String := "../share/i18n/formats.i18ndata";
    Units_Dir      : constant String := "../share/i18n/units";
    Zones_Dir      : constant String := "../share/i18n/zones";
+   Currency_Dir   : constant String := "../share/i18n/currency";
 
    --  The two largest lookup functions are emitted as subunits: inline they made the
    --  single body file exceed GitHub's 100 MB per-file limit, so each goes in its own
@@ -107,6 +108,13 @@ procedure Generate_CLDR_Data is
    Zone_Entries : constant Format_Entry_Array_Access :=
      new Format_Entry_Array (1 .. Max_Zone_Entries);
    Zone_Count   : Natural := 0;
+
+   --  Currency display names, also per-locale and large, sharded into
+   --  currency/<locale>.i18ndata (Key is "CODE:category").
+   Max_Currency_Entries : constant := 1_000_000;
+   Currency_Entries : constant Format_Entry_Array_Access :=
+     new Format_Entry_Array (1 .. Max_Currency_Entries);
+   Currency_Count   : Natural := 0;
 
    use type US.Unbounded_String;
    function Format_Less (L, R : Format_Entry) return Boolean is
@@ -1079,6 +1087,28 @@ procedure Generate_CLDR_Data is
          Value   => US.To_Unbounded_String (Value));
    end Zone_Add;
 
+   --  Capture one narrowed-out currency display name for its locale's shard.
+   procedure Currency_Add (Locale : String; Key : String; Value : String) is
+   begin
+      if Locale'Length = 0 or else Key'Length = 0 or else Value'Length = 0 then
+         return;
+      end if;
+      for C of Value loop
+         if C = ASCII.HT or else C = ASCII.LF then
+            return;
+         end if;
+      end loop;
+      if Currency_Count = Max_Currency_Entries then
+         Add_Error ("too many narrowed-out currency rows");
+         return;
+      end if;
+      Currency_Count := Currency_Count + 1;
+      Currency_Entries (Currency_Count) :=
+        (Section => US.To_Unbounded_String (To_Store_Locale (Locale)),
+         Key     => US.To_Unbounded_String (Key),
+         Value   => US.To_Unbounded_String (Value));
+   end Currency_Add;
+
    --  Emit Section -> "1" for each narrowed-out entry of a comma-separated
    --  membership list (locales or languages a boolean toggle applies to).
    procedure Emit_Membership (Section : String; List : String) is
@@ -1144,6 +1174,51 @@ procedure Generate_CLDR_Data is
    begin
       return Code_Point_UTF8 (Hex_Value (Inner));
    end Digit_Item_UTF8;
+
+   --  Currency payload slot (1 .. 6) to its CLDR plural category.
+   function Currency_Category (Slot : Positive) return String is
+     (case Slot is
+        when 1 => "zero",
+        when 2 => "one",
+        when 3 => "two",
+        when 4 => "few",
+        when 5 => "many",
+        when others => "other");
+
+   --  Emit each (code, category) currency display name of a narrowed-out
+   --  locale from its packed "CODE:hex,...,hex;CODE2:..." payload.
+   procedure Emit_Currency_Names (Locale : String; Payload : String) is
+      Seg_Start : Positive := Payload'First;
+   begin
+      while Seg_Start <= Payload'Last loop
+         declare
+            Seg_End : Natural := Seg_Start;
+         begin
+            while Seg_End <= Payload'Last and then Payload (Seg_End) /= ';' loop
+               Seg_End := Seg_End + 1;
+            end loop;
+            declare
+               Seg : constant String := Payload (Seg_Start .. Seg_End - 1);
+            begin
+               if Seg'Length >= 5 and then Seg (Seg'First + 3) = ':' then
+                  declare
+                     Code  : constant String := Seg (Seg'First .. Seg'First + 2);
+                     List  : constant String := Seg (Seg'First + 4 .. Seg'Last);
+                     Forms : constant Natural := Comma_Count (List) + 1;
+                  begin
+                     for Slot in 1 .. 6 loop
+                        Currency_Add
+                          (Locale, Code & ":" & Currency_Category (Slot),
+                           Hex_Bytes_To_String
+                             (Field (List, Natural'Min (Slot, Forms), ',')));
+                     end loop;
+                  end;
+               end if;
+            end;
+            Seg_Start := Seg_End + 1;
+         end;
+      end loop;
+   end Emit_Currency_Names;
 
    procedure Add_Rule
      (Kind : String;
@@ -1330,6 +1405,11 @@ procedure Generate_CLDR_Data is
             Add_Format
               ("zone_short_generic", A, Ada_Expression_UTF8_Bytes (E),
                Sub => B);
+         elsif Kind = "currency_name_payload"
+           and then not Locale_Wanted (A)
+         then
+            --  A=locale, B=packed "CODE:hex,...;..." per-code display names.
+            Emit_Currency_Names (A, B);
          end if;
       end if;
 
@@ -12602,6 +12682,8 @@ begin
          Emit_Formats_File (Formats_Target);
          Emit_Shards (Unit_Entries, Unit_Count, Units_Dir, "unit");
          Emit_Shards (Zone_Entries, Zone_Count, Zones_Dir, "exemplar");
+         Emit_Shards
+           (Currency_Entries, Currency_Count, Currency_Dir, "currency");
          Ada.Text_IO.Put_Line ("generated src/i18n-cldr_data.adb");
       end if;
    end;
