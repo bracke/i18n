@@ -1117,6 +1117,12 @@ procedure Generate_CLDR_Data is
                end loop;
                Take (A (Start .. A'Last));
             end;
+         elsif Kind = "date_style_pattern" and then not Locale_Wanted (A) then
+            --  A=locale, B=calendar, C=style, D=pattern; serve the exact CLDR
+            --  pattern so a narrowed-out locale keeps its own punctuation.
+            Add_Format
+              ("date_style_pattern", A, Ada_Expression_UTF8_Bytes (D),
+               Sub => B & ":" & C);
          end if;
       end if;
 

@@ -369,11 +369,21 @@ package body I18N.Date_Time_Format is
       Style  : String)
       return String
    is
+      Pattern_Found : Boolean;
+      Pattern_Value : constant String :=
+        I18N.Locale_Data.Lookup
+          ("date_style_pattern", Locale,
+           Calendar_Key (Locale) & ":" & Style, Pattern_Found);
       Found : Boolean;
       DMY   : Boolean :=
         I18N.Runtime_Data.Locale_Boolean
           (Locale, "uses_day_month_year", Found);
    begin
+      --  An exact per-locale CLDR pattern beats the day-month-year template.
+      if Pattern_Found then
+         return Pattern_Value;
+      end if;
+
       if not Found then
          declare
             Store_Found : Boolean;
