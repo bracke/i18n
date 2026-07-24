@@ -1038,6 +1038,19 @@ procedure Generate_CLDR_Data is
    function Name_Set_Item_UTF8 (Items : String; N : Positive) return String is
      (Hex_Points_To_UTF8 (Expr_Item (Items, N)));
 
+   --  Decode a raw two-hex-digits-per-byte blob (e.g. a day_period_hex name).
+   function Hex_Bytes_To_String (Hex : String) return String is
+      Result : String (1 .. Hex'Length / 2);
+      Source : Natural;
+   begin
+      for Index in Result'Range loop
+         Source := Hex'First + (Index - 1) * 2;
+         Result (Index) :=
+           Character'Val (Hex_Value (Hex (Source .. Source + 1)));
+      end loop;
+      return Result;
+   end Hex_Bytes_To_String;
+
    --  Decode the Nth comma-separated "16#NNN#" code point of a digits row.
    function Digit_Item_UTF8 (List : String; N : Positive) return String is
       Item  : constant String := Field (List, N, ',');
@@ -1149,6 +1162,17 @@ procedure Generate_CLDR_Data is
                  ("digit_text", A, Digit_Item_UTF8 (B, P),
                   Sub => [1 => Character'Val (Character'Pos ('0') + P - 1)]);
             end loop;
+         elsif (Kind = "day_period" or else Kind = "day_period_hex")
+           and then not Locale_Wanted (A)
+         then
+            --  A=locale, B=period, C=width (wide/abbreviated), D=name; keyed by
+            --  "width:period". day_period_hex is raw hex bytes, day_period an
+            --  Ada string expression.
+            Add_Format
+              ("day_period_name", A,
+               (if Kind = "day_period_hex" then Hex_Bytes_To_String (D)
+                else Ada_Expression_UTF8_Bytes (D)),
+               Sub => C & ":" & B);
          end if;
       end if;
 

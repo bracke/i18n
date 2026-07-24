@@ -2026,9 +2026,19 @@ package body I18N.Date_Time_Format is
       elsif Width = 5 then
          return Day_Period_Name (Locale, Period, 3);
       else
-         return
-           I18N.CLDR_Data.Day_Period_Name
-             (Base_Locale (Locale), Period, Width = 4 or else Width > 5);
+         declare
+            Wide : constant Boolean := Width = 4 or else Width > 5;
+            SF   : Boolean;
+            SV   : constant String :=
+              I18N.Locale_Data.Lookup
+                ("day_period_name", Base_Locale (Locale),
+                 (if Wide then "wide" else "abbreviated") & ":" & Period, SF);
+         begin
+            return
+              (if SF then SV
+               else I18N.CLDR_Data.Day_Period_Name
+                      (Base_Locale (Locale), Period, Wide));
+         end;
       end if;
    end Day_Period_Name;
 
