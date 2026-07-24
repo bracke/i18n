@@ -1,4 +1,5 @@
 with I18N.CLDR_Data;
+with I18N.Locale_Data;
 with I18N.Plurals;
 with I18N.Runtime_Data;
 
@@ -149,29 +150,16 @@ package body I18N.Currency is
    end Cash_Increment;
 
    function Decimal_Separator (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text (Locale, "decimal_separator", Found);
-   begin
-      return (if Found then Value else I18N.CLDR_Data.Decimal_Separator (Locale));
-   end Decimal_Separator;
+     (I18N.Locale_Data.Field
+        ("decimal_separator", Locale, I18N.CLDR_Data.Decimal_Separator'Access));
 
    function Group_Separator (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text (Locale, "group_separator", Found);
-   begin
-      return (if Found then Value else I18N.CLDR_Data.Group_Separator (Locale));
-   end Group_Separator;
+     (I18N.Locale_Data.Field
+        ("group_separator", Locale, I18N.CLDR_Data.Group_Separator'Access));
 
    function Number_Minus_Sign (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text (Locale, "number_minus_sign", Found);
-   begin
-      return
-        (if Found then Value else I18N.CLDR_Data.Number_Minus_Sign (Locale));
-   end Number_Minus_Sign;
+     (I18N.Locale_Data.Field
+        ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
 
    function Uses_Indian_Grouping (Locale : String) return Boolean is
       Found : Boolean;
@@ -291,34 +279,19 @@ package body I18N.Currency is
    end Symbol_First;
 
    function Amount_Separator (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "currency_amount_separator", Found);
-   begin
-      return
-        (if Found then Value else I18N.CLDR_Data.Currency_Amount_Separator (Locale));
-   end Amount_Separator;
+     (I18N.Locale_Data.Field
+        ("currency_amount_separator", Locale,
+         I18N.CLDR_Data.Currency_Amount_Separator'Access));
 
    function Accounting_Prefix (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "currency_accounting_prefix", Found);
-   begin
-      return
-        (if Found then Value else I18N.CLDR_Data.Currency_Accounting_Prefix (Locale));
-   end Accounting_Prefix;
+     (I18N.Locale_Data.Field
+        ("currency_accounting_prefix", Locale,
+         I18N.CLDR_Data.Currency_Accounting_Prefix'Access));
 
    function Accounting_Suffix (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "currency_accounting_suffix", Found);
-   begin
-      return
-        (if Found then Value else I18N.CLDR_Data.Currency_Accounting_Suffix (Locale));
-   end Accounting_Suffix;
+     (I18N.Locale_Data.Field
+        ("currency_accounting_suffix", Locale,
+         I18N.CLDR_Data.Currency_Accounting_Suffix'Access));
 
    procedure Put
      (Target   : in out String;

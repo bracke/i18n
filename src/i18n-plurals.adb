@@ -4,6 +4,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 with I18N.CLDR_Data;
+with I18N.Locale_Data;
 with I18N.Runtime_Data;
 
 package body I18N.Plurals is
@@ -62,8 +63,14 @@ package body I18N.Plurals is
       Found  : Boolean;
       Family : constant String :=
         I18N.Runtime_Data.Plural_Rule_Family ("cardinal", Locale, Found);
+      Store_Found : Boolean := False;
+      Store_Family : constant String :=
+        (if Found then ""
+         else I18N.Locale_Data.Lookup ("cardinal_family", Locale, "", Store_Found));
       Effective_Family : constant String :=
-        (if Found then Family else I18N.CLDR_Data.Cardinal_Rule_Family (Locale));
+        (if Found then Family
+         elsif Store_Found then Store_Family
+         else I18N.CLDR_Data.Cardinal_Rule_Family (Locale));
    begin
       if Effective_Family = "n-is-1" then
          return Lang_N_Is_1;
@@ -1193,8 +1200,14 @@ package body I18N.Plurals is
          Runtime_Family : constant String :=
            I18N.Runtime_Data.Plural_Rule_Family
              ("ordinal", Locale, Family_Found);
+         Store_Found : Boolean := False;
+         Store_Family : constant String :=
+           (if Family_Found then ""
+            else I18N.Locale_Data.Lookup
+                   ("ordinal_family", Locale, "", Store_Found));
          Family : constant String :=
            (if Family_Found then Runtime_Family
+            elsif Store_Found then Store_Family
             else I18N.CLDR_Data.Ordinal_Rule_Family (Locale));
       begin
          if Family = "en-ordinal" then

@@ -1,0 +1,32 @@
+private package I18N.Locale_Data is
+   --  The on-the-fly middle tier between process-wide runtime overrides and the
+   --  compiled CLDR tables. Locale formatting data (number symbols, date names,
+   --  currency placement, plural families) dropped from the compiled tables by
+   --  the crate's `locales` configuration is served from a single
+   --  "formats.i18ndata" file loaded lazily by I18N.Data_Store from the
+   --  configured data dir. When no such file is installed -- the default --
+   --  every entry point here reports "not found", so callers fall through to
+   --  the compiled tables and behaviour is unchanged.
+
+   --  Look Section up for Locale with the same exact -> parent -> root fallback
+   --  the compiled tables use. Sub is an optional composite suffix (calendar,
+   --  index, ...) appended after the locale so fallback still walks locale
+   --  parents. Found is False (and "" returned) when no installed file supplies
+   --  a value.
+   function Lookup
+     (Section : String;
+      Locale  : String;
+      Sub     : String;
+      Found   : out Boolean)
+      return String;
+
+   --  Convenience for the common shape: a runtime override keyed by Section,
+   --  else the on-the-fly file, else the compiled accessor. Used by fields
+   --  whose runtime key equals Section and whose compiled fallback is a plain
+   --  (Locale) -> String function.
+   function Field
+     (Section  : String;
+      Locale   : String;
+      Compiled : not null access function (L : String) return String)
+      return String;
+end I18N.Locale_Data;

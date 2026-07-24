@@ -1,4 +1,5 @@
 with I18N.CLDR_Data;
+with I18N.Locale_Data;
 with I18N.Runtime_Data;
 
 package body I18N.Date_Time_Format is
@@ -2119,15 +2120,9 @@ package body I18N.Date_Time_Format is
    end Time_Zone_Generic_Short_Name;
 
    function Time_Zone_Location_Pattern (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "timezone_location_pattern", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Time_Zone_Location_Pattern (Locale));
-   end Time_Zone_Location_Pattern;
+     (I18N.Locale_Data.Field
+        ("timezone_location_pattern", Locale,
+         I18N.CLDR_Data.Time_Zone_Location_Pattern'Access));
 
    function Time_Zone_Specific_Location_Pattern
      (Locale   : String;
@@ -2184,59 +2179,26 @@ package body I18N.Date_Time_Format is
    end Apply_Time_Zone_Specific_Location_Pattern;
 
    function GMT_Offset_Prefix (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "gmt_offset_prefix", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.GMT_Offset_Prefix (Locale));
-   end GMT_Offset_Prefix;
+     (I18N.Locale_Data.Field
+        ("gmt_offset_prefix", Locale, I18N.CLDR_Data.GMT_Offset_Prefix'Access));
 
    function Time_Zone_UTC_Designator (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "timezone_utc_designator", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Time_Zone_UTC_Designator (Locale));
-   end Time_Zone_UTC_Designator;
+     (I18N.Locale_Data.Field
+        ("timezone_utc_designator", Locale,
+         I18N.CLDR_Data.Time_Zone_UTC_Designator'Access));
 
    function Time_Zone_Offset_Separator (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "timezone_offset_separator", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Time_Zone_Offset_Separator (Locale));
-   end Time_Zone_Offset_Separator;
+     (I18N.Locale_Data.Field
+        ("timezone_offset_separator", Locale,
+         I18N.CLDR_Data.Time_Zone_Offset_Separator'Access));
 
    function Number_Plus_Sign (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "number_plus_sign", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Number_Plus_Sign (Locale));
-   end Number_Plus_Sign;
+     (I18N.Locale_Data.Field
+        ("number_plus_sign", Locale, I18N.CLDR_Data.Number_Plus_Sign'Access));
 
    function Number_Minus_Sign (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "number_minus_sign", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Number_Minus_Sign (Locale));
-   end Number_Minus_Sign;
+     (I18N.Locale_Data.Field
+        ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
 
    procedure Put_Zone
      (Target   : in out String;

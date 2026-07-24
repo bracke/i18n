@@ -1,7 +1,7 @@
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 with I18N.CLDR_Data;
-with I18N.Data_Store;
+with I18N.Locale_Data;
 with I18N.Plurals;
 with I18N.Runtime_Data;
 
@@ -99,96 +99,12 @@ package body I18N.Number_Format is
       end if;
    end UTF8;
 
-   --  Base name of the on-the-fly number-symbol data file (I18N.Data_Store
-   --  resolves it to "<data-dir>/numbers.i18ndata", loaded lazily on first use).
-   Store_File : constant String := "numbers";
-
-   function To_Store_Key (Locale : String) return String is
-      Result : String := Locale;
-   begin
-      for Index in Result'Range loop
-         if Result (Index) in 'A' .. 'Z' then
-            Result (Index) :=
-              Character'Val (Character'Pos (Result (Index)) + 32);
-         elsif Result (Index) = '_' then
-            Result (Index) := '-';
-         end if;
-      end loop;
-      return Result;
-   end To_Store_Key;
-
-   --  Look a symbol field up in the on-the-fly file, with the same
-   --  exact -> parent -> root fallback the compiled tables use. Returns "" when
-   --  the file, section, or locale (and its parents and root) are all absent.
-   function Store_Lookup (Section : String; Locale : String) return String is
-      Key : constant String := To_Store_Key (Locale);
-      Cut : Natural := Key'Last;
-   begin
-      declare
-         Exact : constant String :=
-           I18N.Data_Store.Lookup (Store_File, Section, Key);
-      begin
-         if Exact /= "" then
-            return Exact;
-         end if;
-      end;
-
-      while Cut > Key'First loop
-         if Key (Cut) = '-' then
-            declare
-               Parent : constant String :=
-                 I18N.Data_Store.Lookup
-                   (Store_File, Section, Key (Key'First .. Cut - 1));
-            begin
-               if Parent /= "" then
-                  return Parent;
-               end if;
-            end;
-         end if;
-         Cut := Cut - 1;
-      end loop;
-
-      return I18N.Data_Store.Lookup (Store_File, Section, "root");
-   end Store_Lookup;
-
-   --  Resolve a locale symbol field with three tiers, highest priority first:
-   --  process-wide runtime overrides, then the on-the-fly data file (present
-   --  only when the compiled tables were narrowed via the `locales` config),
-   --  then the compiled tables. When no file is installed the middle tier is a
-   --  no-op, so behaviour is identical to consulting the compiled tables.
-   function Locale_Field
-     (Key      : String;
-      Locale   : String;
-      Compiled : not null access function (L : String) return String)
-      return String
-   is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text (Locale, Key, Found);
-   begin
-      if Found then
-         return Value;
-      end if;
-
-      if I18N.Data_Store.Available (Store_File) then
-         declare
-            From_Store : constant String := Store_Lookup (Key, Locale);
-         begin
-            if From_Store /= "" then
-               return From_Store;
-            end if;
-         end;
-      end if;
-
-      return Compiled (Locale);
-   end Locale_Field;
-
    function Decimal_Separator (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("decimal_separator", Locale, I18N.CLDR_Data.Decimal_Separator'Access));
 
    function Group_Separator (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("group_separator", Locale, I18N.CLDR_Data.Group_Separator'Access));
 
    function Uses_Indian_Grouping (Locale : String) return Boolean is
@@ -202,35 +118,35 @@ package body I18N.Number_Format is
    end Uses_Indian_Grouping;
 
    function Number_Percent_Suffix (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_percent_suffix", Locale,
          I18N.CLDR_Data.Number_Percent_Suffix'Access));
 
    function Number_Permille_Suffix (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_permille_suffix", Locale,
          I18N.CLDR_Data.Number_Permille_Suffix'Access));
 
    function Number_Plus_Sign (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_plus_sign", Locale, I18N.CLDR_Data.Number_Plus_Sign'Access));
 
    function Number_Minus_Sign (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
 
    function Number_Accounting_Prefix (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_accounting_prefix", Locale,
          I18N.CLDR_Data.Number_Accounting_Prefix'Access));
 
    function Number_Accounting_Suffix (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_accounting_suffix", Locale,
          I18N.CLDR_Data.Number_Accounting_Suffix'Access));
 
    function Number_Exponent_Separator (Locale : String) return String is
-     (Locale_Field
+     (I18N.Locale_Data.Field
         ("number_exponent_separator", Locale,
          I18N.CLDR_Data.Number_Exponent_Separator'Access));
 
