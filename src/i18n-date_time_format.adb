@@ -2099,6 +2099,23 @@ package body I18N.Date_Time_Format is
       elsif Store_Found then
          return Store_Value;
       end if;
+
+      --  As the compiled accessor does, fall from the specific zone name to
+      --  the metazone family's long name before the compiled tables.
+      declare
+         Family    : constant String :=
+           I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
+         Fam_Found : Boolean := False;
+         Fam_Value : constant String :=
+           (if Family = "" then ""
+            else I18N.Locale_Data.Lookup ("zone_family_display", Locale,
+                                          Family, Fam_Found));
+      begin
+         if Fam_Found then
+            return Fam_Value;
+         end if;
+      end;
+
       return I18N.CLDR_Data.Time_Zone_Display_Name (Locale, Zone);
    end Time_Zone_Display_Name;
 

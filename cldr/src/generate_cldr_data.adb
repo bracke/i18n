@@ -1390,6 +1390,11 @@ procedure Generate_CLDR_Data is
             --  A=locale, B=zone id, C=display name.
             Add_Format
               ("zone_display", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+         elsif Kind = "zone_family_display" and then not Locale_Wanted (A) then
+            --  A=locale, B=metazone family, C=long name.
+            Add_Format
+              ("zone_family_display", A, Ada_Expression_UTF8_Bytes (C),
+               Sub => B);
          elsif Kind = "zone_exemplar" and then not Locale_Wanted (A) then
             --  A=locale, B=zone id, C=exemplar city (Ada expression).
             Zone_Add (A, B, Ada_Expression_UTF8_Bytes (C));
