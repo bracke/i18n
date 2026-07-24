@@ -27,6 +27,7 @@ procedure Generate_CLDR_Data is
    --  (the default) nothing is narrowed out and the file is not written.
    Formats_Target : constant String := "../share/i18n/formats.i18ndata";
    Units_Dir      : constant String := "../share/i18n/units";
+   Zones_Dir      : constant String := "../share/i18n/zones";
 
    --  The two largest lookup functions are emitted as subunits: inline they made the
    --  single body file exceed GitHub's 100 MB per-file limit, so each goes in its own
@@ -98,6 +99,14 @@ procedure Generate_CLDR_Data is
    Unit_Entries : constant Format_Entry_Array_Access :=
      new Format_Entry_Array (1 .. Max_Unit_Entries);
    Unit_Count   : Natural := 0;
+
+   --  Time-zone exemplar cities are the other large per-locale block, sharded
+   --  the same way into zones/<locale>.i18ndata (Section holds the locale, Key
+   --  the zone id).
+   Max_Zone_Entries : constant := 1_000_000;
+   Zone_Entries : constant Format_Entry_Array_Access :=
+     new Format_Entry_Array (1 .. Max_Zone_Entries);
+   Zone_Count   : Natural := 0;
 
    use type US.Unbounded_String;
    function Format_Less (L, R : Format_Entry) return Boolean is
@@ -1048,6 +1057,28 @@ procedure Generate_CLDR_Data is
          Value   => US.To_Unbounded_String (Value));
    end Unit_Add;
 
+   --  Capture one narrowed-out zone exemplar city for its locale's shard.
+   procedure Zone_Add (Locale : String; Key : String; Value : String) is
+   begin
+      if Locale'Length = 0 or else Key'Length = 0 or else Value'Length = 0 then
+         return;
+      end if;
+      for C of Value loop
+         if C = ASCII.HT or else C = ASCII.LF then
+            return;
+         end if;
+      end loop;
+      if Zone_Count = Max_Zone_Entries then
+         Add_Error ("too many narrowed-out zone rows");
+         return;
+      end if;
+      Zone_Count := Zone_Count + 1;
+      Zone_Entries (Zone_Count) :=
+        (Section => US.To_Unbounded_String (To_Store_Locale (Locale)),
+         Key     => US.To_Unbounded_String (Key),
+         Value   => US.To_Unbounded_String (Value));
+   end Zone_Add;
+
    --  Emit Section -> "1" for each narrowed-out entry of a comma-separated
    --  membership list (locales or languages a boolean toggle applies to).
    procedure Emit_Membership (Section : String; List : String) is
@@ -1284,6 +1315,21 @@ procedure Generate_CLDR_Data is
             --  A=locale, B=zone id, C=display name.
             Add_Format
               ("zone_display", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+         elsif Kind = "zone_exemplar" and then not Locale_Wanted (A) then
+            --  A=locale, B=zone id, C=exemplar city (Ada expression).
+            Zone_Add (A, B, Ada_Expression_UTF8_Bytes (C));
+         elsif Kind = "zone_exemplar_hex" and then not Locale_Wanted (A) then
+            --  A=locale, B=zone id, C=exemplar city (raw hex bytes).
+            Zone_Add (A, B, Hex_Bytes_To_String (C));
+         elsif Kind = "zone_short_family" and then not Locale_Wanted (A) then
+            --  A=locale, B=metazone family, C=standard, D=daylight, E=generic.
+            Add_Format
+              ("zone_short_std", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+            Add_Format
+              ("zone_short_dst", A, Ada_Expression_UTF8_Bytes (D), Sub => B);
+            Add_Format
+              ("zone_short_generic", A, Ada_Expression_UTF8_Bytes (E),
+               Sub => B);
          end if;
       end if;
 
@@ -12458,9 +12504,15 @@ procedure Generate_CLDR_Data is
       Ada.Text_IO.Close (Out_F);
    end Emit_Formats_File;
 
-   --  Write the captured narrowed-out unit names as one Data_Store file per
-   --  locale under Dir, or clear a stale directory when nothing was narrowed.
-   procedure Emit_Unit_Shards (Dir : String) is
+   --  Write captured narrowed-out entries as one Data_Store file per locale
+   --  under Dir (Section is the shard's single section name), or clear a stale
+   --  directory when nothing was narrowed.
+   procedure Emit_Shards
+     (Entries : Format_Entry_Array_Access;
+      Count   : Natural;
+      Dir     : String;
+      Section : String)
+   is
       procedure Sort is new Ada.Containers.Generic_Array_Sort
         (Index_Type   => Positive,
          Element_Type => Format_Entry,
@@ -12474,38 +12526,36 @@ procedure Generate_CLDR_Data is
       if Ada.Directories.Exists (Dir) then
          Ada.Directories.Delete_Tree (Dir);
       end if;
-      if Unit_Count = 0 then
+      if Count = 0 then
          return;
       end if;
 
-      Sort (Unit_Entries (1 .. Unit_Count));
+      Sort (Entries (1 .. Count));
       Ada.Directories.Create_Path (Dir);
 
-      while I <= Unit_Count loop
+      while I <= Count loop
          declare
-            Locale : constant String := S (Unit_Entries (I).Section);
+            Locale : constant String := S (Entries (I).Section);
             J      : Positive := I;
          begin
-            while J <= Unit_Count
-              and then S (Unit_Entries (J).Section) = Locale
-            loop
+            while J <= Count and then S (Entries (J).Section) = Locale loop
                J := J + 1;
             end loop;
             Ada.Text_IO.Create
               (Out_F, Ada.Text_IO.Out_File, Dir & "/" & Locale & ".i18ndata");
             Ada.Text_IO.Put_Line (Out_F, "I18NDATA|1|" & CLDR_Version);
-            Ada.Text_IO.Put_Line (Out_F, "@unit|" & Trim (Natural'Image (J - I)));
+            Ada.Text_IO.Put_Line
+              (Out_F, "@" & Section & "|" & Trim (Natural'Image (J - I)));
             for K in I .. J - 1 loop
                Ada.Text_IO.Put_Line
                  (Out_F,
-                  S (Unit_Entries (K).Key) & ASCII.HT
-                  & S (Unit_Entries (K).Value));
+                  S (Entries (K).Key) & ASCII.HT & S (Entries (K).Value));
             end loop;
             Ada.Text_IO.Close (Out_F);
             I := J;
          end;
       end loop;
-   end Emit_Unit_Shards;
+   end Emit_Shards;
 
 begin
    Read_Wanted_Locales;
@@ -12550,7 +12600,8 @@ begin
          Ada.Directories.Copy_File (Currency_Sub_Generated, Currency_Sub_Target);
          Ada.Directories.Copy_File (Unit_Sub_Generated, Unit_Sub_Target);
          Emit_Formats_File (Formats_Target);
-         Emit_Unit_Shards (Units_Dir);
+         Emit_Shards (Unit_Entries, Unit_Count, Units_Dir, "unit");
+         Emit_Shards (Zone_Entries, Zone_Count, Zones_Dir, "exemplar");
          Ada.Text_IO.Put_Line ("generated src/i18n-cldr_data.adb");
       end if;
    end;

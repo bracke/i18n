@@ -2173,6 +2173,17 @@ package body I18N.Date_Time_Format is
       end if;
 
       declare
+         Store_Found : Boolean;
+         Store_Value : constant String :=
+           I18N.Locale_Data.Shard_Lookup
+             ("zones", "exemplar", Locale, Zone, Store_Found);
+      begin
+         if Store_Found then
+            return Store_Value;
+         end if;
+      end;
+
+      declare
          Generated : constant String :=
            I18N.CLDR_Data.Time_Zone_Exemplar_Location (Locale, Zone);
       begin
@@ -2769,8 +2780,15 @@ package body I18N.Date_Time_Format is
            Current_Valid and then Base_Valid and then Current /= Base;
          Override_Name : constant String :=
            Time_Zone_Short_Name (Locale, Zone, Daylight);
+         Short_Found   : Boolean;
+         Short_Store   : constant String :=
+           I18N.Locale_Data.Lookup
+             ((if Daylight then "zone_short_dst" else "zone_short_std"),
+              Locale, Family, Short_Found);
          CLDR_Name     : constant String :=
-           I18N.CLDR_Data.Time_Zone_Short_Name (Locale, Family, Daylight);
+           (if Short_Found then Short_Store
+            else I18N.CLDR_Data.Time_Zone_Short_Name
+                   (Locale, Family, Daylight));
       begin
          if Override_Name /= "" then
             return Override_Name;
@@ -2795,8 +2813,13 @@ package body I18N.Date_Time_Format is
            I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
          Override_Name : constant String :=
            Time_Zone_Generic_Short_Name (Locale, Zone);
+         Gen_Found     : Boolean;
+         Gen_Store     : constant String :=
+           I18N.Locale_Data.Lookup
+             ("zone_short_generic", Locale, Family, Gen_Found);
          CLDR_Name     : constant String :=
-           I18N.CLDR_Data.Time_Zone_Generic_Short_Name (Locale, Family);
+           (if Gen_Found then Gen_Store
+            else I18N.CLDR_Data.Time_Zone_Generic_Short_Name (Locale, Family));
       begin
          if Override_Name /= "" then
             return Override_Name;
