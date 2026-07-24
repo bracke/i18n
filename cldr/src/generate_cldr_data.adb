@@ -19,6 +19,14 @@ procedure Generate_CLDR_Data is
    Target_Path : constant String := "../src/i18n-cldr_data.adb";
    Generated_Path : constant String := "/tmp/i18n_cldr_data.generated.adb";
 
+   CLDR_Version : constant String := "48.2";
+
+   --  When --locales narrows the compiled tables, the per-locale formatting
+   --  data of the dropped locales is written here as a Data_Store file so
+   --  I18N.Locale_Data can still serve it on the fly. With --locales=all
+   --  (the default) nothing is narrowed out and the file is not written.
+   Formats_Target : constant String := "../share/i18n/formats.i18ndata";
+
    --  The two largest lookup functions are emitted as subunits: inline they made the
    --  single body file exceed GitHub's 100 MB per-file limit, so each goes in its own
    --  source file (each well under the limit).
@@ -62,6 +70,27 @@ procedure Generate_CLDR_Data is
 
    Rules      : constant Rule_Array_Access := new Rule_Array;
    Rule_Count : Natural := 0;
+
+   --  Per-locale formatting rows dropped by --locales narrowing, captured here
+   --  and written to formats.i18ndata for on-the-fly service. Section is the
+   --  I18N.Locale_Data section name, Key the store-normalised locale.
+   type Format_Entry is record
+      Section : US.Unbounded_String;
+      Key     : US.Unbounded_String;
+      Value   : US.Unbounded_String;
+   end record;
+   Max_Format_Entries : constant := 500_000;
+   type Format_Entry_Array is array (Positive range <>) of Format_Entry;
+   type Format_Entry_Array_Access is access Format_Entry_Array;
+   Format_Entries : constant Format_Entry_Array_Access :=
+     new Format_Entry_Array (1 .. Max_Format_Entries);
+   Format_Count   : Natural := 0;
+
+   use type US.Unbounded_String;
+   function Format_Less (L, R : Format_Entry) return Boolean is
+     (US."<" (L.Section, R.Section)
+      or else (L.Section = R.Section
+               and then US."<" (L.Key, R.Key)));
    TZDB_Zone_Names : array (1 .. Max_TZDB_Zones) of US.Unbounded_String;
    TZDB_Zone_Initial_Offsets : array (1 .. Max_TZDB_Zones) of Integer;
    TZDB_Zone_Count : Natural := 0;
@@ -925,6 +954,43 @@ procedure Generate_CLDR_Data is
       return S (Result);
    end Wanted_Subset;
 
+   --  Normalise a CLDR locale id to the store form I18N.Locale_Data queries:
+   --  ASCII-lowercase with '_' folded to '-'.
+   function To_Store_Locale (Locale : String) return String is
+      Result : String := Locale;
+   begin
+      for Index in Result'Range loop
+         if Result (Index) in 'A' .. 'Z' then
+            Result (Index) :=
+              Character'Val (Character'Pos (Result (Index)) + 32);
+         elsif Result (Index) = '_' then
+            Result (Index) := '-';
+         end if;
+      end loop;
+      return Result;
+   end To_Store_Locale;
+
+   procedure Add_Format (Section : String; Locale : String; Value : String) is
+   begin
+      if Locale'Length = 0 or else Value'Length = 0 then
+         return;
+      end if;
+      for C of Value loop
+         if C = ASCII.HT or else C = ASCII.LF then
+            return;   --  a tab or newline would corrupt the record framing
+         end if;
+      end loop;
+      if Format_Count = Max_Format_Entries then
+         Add_Error ("too many narrowed-out format rows");
+         return;
+      end if;
+      Format_Count := Format_Count + 1;
+      Format_Entries (Format_Count) :=
+        (Section => US.To_Unbounded_String (Section),
+         Key     => US.To_Unbounded_String (To_Store_Locale (Locale)),
+         Value   => US.To_Unbounded_String (Value));
+   end Add_Format;
+
    procedure Add_Rule
      (Kind : String;
       A    : String := "";
@@ -938,6 +1004,39 @@ procedure Generate_CLDR_Data is
       if Rule_Count = Max_Rules then
          Add_Error ("too many CLDR source rows");
          return;
+      end if;
+
+      --  Before narrowing drops them, capture the per-locale formatting rows of
+      --  the un-wanted locales so formats.i18ndata can serve them on the fly.
+      if S (Wanted_Locales) /= "all" then
+         if Kind = "decimal" and then not Locale_Wanted (A) then
+            Add_Format ("decimal_separator", A, Ada_Expression_UTF8_Bytes (B));
+         elsif Kind = "group" and then not Locale_Wanted (A) then
+            Add_Format ("group_separator", A, Ada_Expression_UTF8_Bytes (B));
+         elsif Kind = "cardinal" or else Kind = "ordinal" then
+            --  A is the rule-family name, B its comma-separated locale list.
+            declare
+               Section : constant String :=
+                 (if Kind = "cardinal" then "cardinal_family"
+                  else "ordinal_family");
+               Start   : Positive := B'First;
+
+               procedure Take (Loc : String) is
+               begin
+                  if Loc'Length > 0 and then not Locale_Wanted (Loc) then
+                     Add_Format (Section, Loc, A);
+                  end if;
+               end Take;
+            begin
+               for Index in B'Range loop
+                  if B (Index) = ',' then
+                     Take (B (Start .. Index - 1));
+                     Start := Index + 1;
+                  end if;
+               end loop;
+               Take (B (Start .. B'Last));
+            end;
+         end if;
       end if;
 
       if S (Wanted_Locales) /= "all" then
@@ -2934,29 +3033,52 @@ procedure Generate_CLDR_Data is
       end Emit_Locale_Return_Table;
 
       procedure Emit_Grouping is
+         Has_Row : Boolean := False;
       begin
+         for Index in 1 .. Rule_Count loop
+            Has_Row := Has_Row or else Is_Kind (Index, "indian_grouping");
+         end loop;
          L;
          L ("   function Uses_Indian_Grouping (Locale : String) return Boolean is");
+         --  Narrowing may drop every row, leaving Locale unused below.
+         if not Has_Row then
+            L ("      pragma Unreferenced (Locale);");
+         end if;
          L ("   begin");
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, "indian_grouping") then
-               L ("      return In_List (Language (Locale), """ & S (Rules (Index).A) & """)");
-               L ("        or else Contains (Locale, """ & S (Rules (Index).B) & """);");
+               L ("      if In_List (Language (Locale), """ & S (Rules (Index).A) & """)");
+               L ("        or else Contains (Locale, """ & S (Rules (Index).B) & """)");
+               L ("      then");
+               L ("         return True;");
+               L ("      end if;");
             end if;
          end loop;
+         L ("      return False;");
          L ("   end Uses_Indian_Grouping;");
       end Emit_Grouping;
 
       procedure Emit_Day_Month_Year is
+         Has_Row : Boolean := False;
       begin
+         for Index in 1 .. Rule_Count loop
+            Has_Row := Has_Row or else Is_Kind (Index, "day_month_year");
+         end loop;
          L;
          L ("   function Uses_Day_Month_Year (Locale : String) return Boolean is");
+         --  Narrowing may drop every row, leaving Locale unused below.
+         if not Has_Row then
+            L ("      pragma Unreferenced (Locale);");
+         end if;
          L ("   begin");
          for Index in 1 .. Rule_Count loop
             if Is_Kind (Index, "day_month_year") then
-               L ("      return In_List (Language (Locale), """ & S (Rules (Index).A) & """);");
+               L ("      if In_List (Language (Locale), """ & S (Rules (Index).A) & """) then");
+               L ("         return True;");
+               L ("      end if;");
             end if;
          end loop;
+         L ("      return False;");
          L ("   end Uses_Day_Month_Year;");
       end Emit_Day_Month_Year;
 
@@ -12038,6 +12160,56 @@ procedure Generate_CLDR_Data is
          raise;
    end Generate;
 
+   --  Write the captured narrowed-out formatting rows as a Data_Store file, or
+   --  remove a stale one when nothing was narrowed out.
+   procedure Emit_Formats_File (Path : String) is
+      procedure Sort is new Ada.Containers.Generic_Array_Sort
+        (Index_Type   => Positive,
+         Element_Type => Format_Entry,
+         Array_Type   => Format_Entry_Array,
+         "<"          => Format_Less);
+      Out_F : Ada.Text_IO.File_Type;
+      I     : Positive := 1;
+   begin
+      if Format_Count = 0 then
+         if Ada.Directories.Exists (Path) then
+            Ada.Directories.Delete_File (Path);
+         end if;
+         return;
+      end if;
+
+      Sort (Format_Entries (1 .. Format_Count));
+
+      Ada.Directories.Create_Path (Ada.Directories.Containing_Directory (Path));
+      Ada.Text_IO.Create (Out_F, Ada.Text_IO.Out_File, Path);
+      Ada.Text_IO.Put_Line (Out_F, "I18NDATA|1|" & CLDR_Version);
+
+      while I <= Format_Count loop
+         declare
+            Section : constant String := S (Format_Entries (I).Section);
+            J       : Positive := I;
+         begin
+            --  Entries are section-major after the sort; measure this run.
+            while J <= Format_Count
+              and then S (Format_Entries (J).Section) = Section
+            loop
+               J := J + 1;
+            end loop;
+            Ada.Text_IO.Put_Line
+              (Out_F, "@" & Section & "|" & Trim (Natural'Image (J - I)));
+            for K in I .. J - 1 loop
+               Ada.Text_IO.Put_Line
+                 (Out_F,
+                  S (Format_Entries (K).Key) & ASCII.HT
+                  & S (Format_Entries (K).Value));
+            end loop;
+            I := J;
+         end;
+      end loop;
+
+      Ada.Text_IO.Close (Out_F);
+   end Emit_Formats_File;
+
 begin
    Read_Wanted_Locales;
    if Has_Argument ("--help") then
@@ -12080,6 +12252,7 @@ begin
          Ada.Directories.Copy_File (Generated_Path, Target_Path);
          Ada.Directories.Copy_File (Currency_Sub_Generated, Currency_Sub_Target);
          Ada.Directories.Copy_File (Unit_Sub_Generated, Unit_Sub_Target);
+         Emit_Formats_File (Formats_Target);
          Ada.Text_IO.Put_Line ("generated src/i18n-cldr_data.adb");
       end if;
    end;
