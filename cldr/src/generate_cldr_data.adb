@@ -1048,6 +1048,27 @@ procedure Generate_CLDR_Data is
          Value   => US.To_Unbounded_String (Value));
    end Unit_Add;
 
+   --  Emit Section -> "1" for each narrowed-out entry of a comma-separated
+   --  membership list (locales or languages a boolean toggle applies to).
+   procedure Emit_Membership (Section : String; List : String) is
+      Start : Positive := List'First;
+
+      procedure Take (Item : String) is
+      begin
+         if Item'Length > 0 and then not Locale_Wanted (Item) then
+            Add_Format (Section, Item, "1");
+         end if;
+      end Take;
+   begin
+      for Index in List'Range loop
+         if List (Index) = ',' then
+            Take (List (Start .. Index - 1));
+            Start := Index + 1;
+         end if;
+      end loop;
+      Take (List (Start .. List'Last));
+   end Emit_Membership;
+
    --  Store index (month/weekday/quarter number) as its bare decimal image.
    function Index_Sub (N : Integer) return String is
       Image : constant String := Integer'Image (N);
@@ -1236,6 +1257,33 @@ procedure Generate_CLDR_Data is
             --  A=locale, B=base, C=width, D=category, E=name; sharded per
             --  locale into units/<locale>.i18ndata, keyed "base:width:category".
             Unit_Add (A, B & ":" & C & ":" & D, Ada_Expression_UTF8_Bytes (E));
+         elsif Kind = "symbol_first" then
+            --  A = comma-separated list of symbol-first languages.
+            Emit_Membership ("currency_symbol_first", A);
+         elsif Kind = "indian_grouping" then
+            --  A = language list, B = locale list, both using Indian grouping.
+            Emit_Membership ("indian_grouping", A);
+            Emit_Membership ("indian_grouping", B);
+         elsif Kind = "available_format" and then not Locale_Wanted (A) then
+            --  A=locale, B=skeleton, C=pattern.
+            Add_Format
+              ("available_format", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+         elsif Kind = "zone_gmt_prefix" and then not Locale_Wanted (A) then
+            Add_Format ("gmt_offset_prefix", A, Ada_Expression_UTF8_Bytes (B));
+         elsif Kind = "zone_offset_separator"
+           and then not Locale_Wanted (A)
+         then
+            Add_Format
+              ("timezone_offset_separator", A, Ada_Expression_UTF8_Bytes (B));
+         elsif Kind = "zone_location_pattern"
+           and then not Locale_Wanted (A)
+         then
+            Add_Format
+              ("timezone_location_pattern", A, Ada_Expression_UTF8_Bytes (B));
+         elsif Kind = "zone_display" and then not Locale_Wanted (A) then
+            --  A=locale, B=zone id, C=display name.
+            Add_Format
+              ("zone_display", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
          end if;
       end if;
 

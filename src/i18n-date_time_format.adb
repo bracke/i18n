@@ -1585,8 +1585,14 @@ package body I18N.Date_Time_Format is
       Override_Pattern : constant String :=
         I18N.Runtime_Data.Locale_Text
           (Locale, "available_format." & Skeleton, Override_Found);
+      Store_Found : Boolean := False;
+      Store_Pattern : constant String :=
+        (if Override_Found then ""
+         else I18N.Locale_Data.Lookup
+                ("available_format", Locale, Skeleton, Store_Found));
       Pattern : constant String :=
-        I18N.CLDR_Data.Available_Format_Pattern (Locale, Skeleton);
+        (if Store_Found then Store_Pattern
+         else I18N.CLDR_Data.Available_Format_Pattern (Locale, Skeleton));
    begin
       if Override_Found then
          return Override_Pattern;
@@ -2082,10 +2088,18 @@ package body I18N.Date_Time_Format is
       Value : constant String :=
         I18N.Runtime_Data.Locale_Text
           (Locale, "timezone_display." & Zone, Found);
+      Store_Found : Boolean := False;
+      Store_Value : constant String :=
+        (if Found then ""
+         else I18N.Locale_Data.Lookup ("zone_display", Locale, Zone,
+                                       Store_Found));
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Time_Zone_Display_Name (Locale, Zone));
+      if Found then
+         return Value;
+      elsif Store_Found then
+         return Store_Value;
+      end if;
+      return I18N.CLDR_Data.Time_Zone_Display_Name (Locale, Zone);
    end Time_Zone_Display_Name;
 
    function Time_Zone_Exemplar_Location

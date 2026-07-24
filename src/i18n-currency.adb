@@ -166,9 +166,18 @@ package body I18N.Currency is
       Value : constant Boolean :=
         I18N.Runtime_Data.Locale_Boolean
           (Locale, "uses_indian_grouping", Found);
+      Store_Found : Boolean := False;
+      Store_Value : constant String :=
+        (if Found then ""
+         else I18N.Locale_Data.Lookup ("indian_grouping", Locale, "",
+                                       Store_Found));
    begin
-      return
-        (if Found then Value else I18N.CLDR_Data.Uses_Indian_Grouping (Locale));
+      if Found then
+         return Value;
+      elsif Store_Found then
+         return Store_Value = "1";
+      end if;
+      return I18N.CLDR_Data.Uses_Indian_Grouping (Locale);
    end Uses_Indian_Grouping;
 
    function Currency_Symbol (Code : String) return String is
@@ -273,9 +282,18 @@ package body I18N.Currency is
       Value : constant Boolean :=
         I18N.Runtime_Data.Locale_Boolean
           (Locale, "currency_symbol_first", Found);
+      Store_Found : Boolean := False;
+      Store_Value : constant String :=
+        (if Found then ""
+         else I18N.Locale_Data.Lookup ("currency_symbol_first", Locale, "",
+                                       Store_Found));
    begin
-      return
-        (if Found then Value else I18N.CLDR_Data.Currency_Symbol_First (Locale));
+      if Found then
+         return Value;
+      elsif Store_Found then
+         return Store_Value = "1";
+      end if;
+      return I18N.CLDR_Data.Currency_Symbol_First (Locale);
    end Symbol_First;
 
    function Amount_Separator (Locale : String) return String is
