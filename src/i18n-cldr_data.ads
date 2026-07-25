@@ -355,23 +355,6 @@ package I18N.CLDR_Data is
    --  @return UTF-8 narrow symbol text, or the standard symbol fallback.
    function Currency_Narrow_Symbol (Code : String) return String;
 
-   --  Return the English plural currency display name.
-   --  @param Code Three-letter uppercase currency code.
-   --  @return Display name text, or Code when no name is built in.
-   function Currency_Display_Name (Code : String) return String;
-
-   --  Return a localized currency display name from generated CLDR data.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Code Three-letter uppercase currency code.
-   --  @param Category CLDR plural category name: zero, one, two, few, many,
-   --    or other.
-   --  @return Localized display name text, or English/code fallback.
-   function Currency_Display_Name
-     (Locale   : String;
-      Code     : String;
-      Category : String := "other")
-      return String;
-
    --  Report whether currency symbols are formatted before the amount.
    --  @param Locale Locale identifier or catalog locale key.
    --  @return True when symbol-first formatting is built in for Locale.
