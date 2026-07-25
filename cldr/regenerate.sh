@@ -26,19 +26,6 @@ UPSTREAM="$CLDR_DIR/upstream/cldr-json"
 
 log () { printf 'cldr: %s\n' "$1"; }
 
-#  The locale set is a crate configuration variable, so a consumer that only
-#  wants "en,de" gets a 4 MB table instead of 14 MB. Alire writes the resolved
-#  value into the generated config; read it there rather than duplicating a
-#  default that could drift.
-LOCALES=all
-if [ -f config/i18n_config.ads ]; then
-   VALUE=$(sed -n 's/^ *locales *: *constant String *:= *"\(.*\)";.*/\1/p' \
-           config/i18n_config.ads | head -1)
-   [ -n "${VALUE:-}" ] && LOCALES="$VALUE"
-fi
-LOCALE_ARG=""
-[ "$LOCALES" != "all" ] && LOCALE_ARG="--locales=$LOCALES"
-
 if [ ! -d "$CLDR_DIR" ]; then
    log "no $CLDR_DIR directory; cannot regenerate" >&2
    exit 1
@@ -155,8 +142,8 @@ generate_runtime_data () {
 
 generate () {
    build_tools
-   log "generating $BODY${LOCALE_ARG:+ ($LOCALE_ARG)}"
-   ( cd "$CLDR_DIR" && ./bin/generate_cldr_data $LOCALE_ARG )
+   log "generating $BODY"
+   ( cd "$CLDR_DIR" && ./bin/generate_cldr_data )
    generate_runtime_data
 }
 

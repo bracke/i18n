@@ -1,12 +1,10 @@
 private package I18N.Locale_Data is
-   --  The on-the-fly middle tier between process-wide runtime overrides and the
-   --  compiled CLDR tables. Locale formatting data (number symbols, date names,
-   --  currency placement, plural families) dropped from the compiled tables by
-   --  the crate's `locales` configuration is served from a single
-   --  "formats.i18ndata" file loaded lazily by I18N.Data_Store from the
-   --  configured data dir. When no such file is installed -- the default --
-   --  every entry point here reports "not found", so callers fall through to
-   --  the compiled tables and behaviour is unchanged.
+   --  The on-the-fly tier beneath the process-wide runtime overrides. Locale
+   --  formatting data (number symbols, date names, currency placement, plural
+   --  families) is served from a single "formats.i18ndata" file loaded lazily
+   --  by I18N.Data_Store from the configured data dir. When no such file is
+   --  installed every entry point here reports "not found", so callers fall
+   --  through to whatever compiled data still backs their section.
 
    --  Look Section up for Locale with the same exact -> parent -> root fallback
    --  the compiled tables use. Sub is an optional composite suffix (calendar,

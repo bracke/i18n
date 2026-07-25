@@ -21,10 +21,9 @@ procedure Generate_CLDR_Data is
 
    CLDR_Version : constant String := "48.2";
 
-   --  When --locales narrows the compiled tables, the per-locale formatting
-   --  data of the dropped locales is written here as a Data_Store file so
-   --  I18N.Locale_Data can still serve it on the fly. With --locales=all
-   --  (the default) nothing is narrowed out and the file is not written.
+   --  Every locale's per-locale formatting data is written here as a
+   --  Data_Store file so I18N.Locale_Data serves it on the fly; the compiled
+   --  tables carry only structural data with no on-the-fly equivalent.
    Formats_Target : constant String := "../share/i18n/formats.i18ndata";
    Units_Dir      : constant String := "../share/i18n/units";
    Zones_Dir      : constant String := "../share/i18n/zones";
@@ -66,9 +65,9 @@ procedure Generate_CLDR_Data is
    Rules      : constant Rule_Array_Access := new Rule_Array;
    Rule_Count : Natural := 0;
 
-   --  Per-locale formatting rows dropped by --locales narrowing, captured here
-   --  and written to formats.i18ndata for on-the-fly service. Section is the
-   --  I18N.Locale_Data section name, Key the store-normalised locale.
+   --  Per-locale formatting rows captured here and written to formats.i18ndata
+   --  for on-the-fly service. Section is the I18N.Locale_Data section name,
+   --  Key the store-normalised locale.
    type Format_Entry is record
       Section : US.Unbounded_String;
       Key     : US.Unbounded_String;
@@ -124,9 +123,6 @@ procedure Generate_CLDR_Data is
    TZDB_Transition_Offsets : array (1 .. Max_TZDB_Transitions) of Integer;
    TZDB_Transition_Count : Natural := 0;
    Errors     : Natural := 0;
-
-   --  Set from --locales=; "all" is every locale in the pinned subset.
-   Wanted_Locales : US.Unbounded_String := US.To_Unbounded_String ("all");
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
 
@@ -488,28 +484,6 @@ procedure Generate_CLDR_Data is
       Add_Error
         (TZDB_Path & ": line" & Positive'Image (Line_Number) & ": " & Message);
    end Add_TZDB_Line_Error;
-
-   --  --locales=en,de,fr narrows the generated tables; the default is every
-   --  locale in the pinned subset. The value comes from the crate
-   --  configuration variable of the same name.
-   procedure Read_Wanted_Locales is
-      Prefix : constant String := "--locales=";
-   begin
-      for Index in 1 .. Ada.Command_Line.Argument_Count loop
-         declare
-            Argument : constant String := Ada.Command_Line.Argument (Index);
-         begin
-            if Argument'Length > Prefix'Length
-              and then Argument (Argument'First ..
-                                   Argument'First + Prefix'Length - 1) = Prefix
-            then
-               Wanted_Locales :=
-                 US.To_Unbounded_String
-                   (Argument (Argument'First + Prefix'Length .. Argument'Last));
-            end if;
-         end;
-      end loop;
-   end Read_Wanted_Locales;
 
    function Has_Argument (Value : String) return Boolean is
    begin
@@ -897,84 +871,13 @@ procedure Generate_CLDR_Data is
       return Count;
    end Comma_Count;
 
-   --  Which locales the generated tables carry. "all" is every locale in the
-   --  pinned subset; otherwise a comma-separated list from the crate
-   --  configuration. Filtering happens here, at the one place every row
-   --  enters, so no emitter has to know about it.
-   --
-   --  The locale is not in a fixed field, and for some kinds it is a list:
-   --
-   --    cardinal, ordinal                      field B, a list
-   --    digits, day_month_year, indian_grouping,
-   --    symbol_first                           field A, a list
-   --    name_set_hex                           field B
-   --    currency, unit_short                   no locale -- always kept
-   --    everything else                        field A
-   function Locale_Wanted (Value : String) return Boolean is
-      List : constant String := S (Wanted_Locales);
-      Start : Positive := List'First;
-   begin
-      --  Numbering systems and the root rows are not locales and always stay.
-      if List = "all"
-        or else Value'Length = 0
-        or else Starts_With (Value, "nu-")
-        or else Value = "und"
-        or else Value = "root"
-      then
-         return True;
-      end if;
-
-      for Index in List'Range loop
-         if List (Index) = ',' then
-            if List (Start .. Index - 1) = Value then
-               return True;
-            end if;
-            Start := Index + 1;
-         end if;
-      end loop;
-
-      return List (Start .. List'Last) = Value;
-   end Locale_Wanted;
-
-   --  Load-everything mode: capture every locale's rows into the data files,
-   --  not just the narrowed-out ones, so the compiled tables can be retired.
-   --  nu-* and empty are not locales; und/root are the base the runtime
-   --  fallback walk resolves to, so they ARE captured.
-   Load_Everything : constant Boolean := True;
-
+   --  Every real locale's rows are captured into the data files so the runtime
+   --  serves them on the fly. nu-* and empty are not locales; und/root are the
+   --  base the fallback walk resolves to, so they ARE captured.
    function Capture_Locale (Value : String) return Boolean is
    begin
-      if Value'Length = 0 or else Starts_With (Value, "nu-") then
-         return False;
-      end if;
-      return Load_Everything or else not Locale_Wanted (Value);
+      return Value'Length > 0 and then not Starts_With (Value, "nu-");
    end Capture_Locale;
-
-   --  A locale list keeps the wanted entries; empty means drop the row.
-   function Wanted_Subset (Value : String) return String is
-      Result : US.Unbounded_String;
-      Start  : Positive := Value'First;
-
-      procedure Take (Item : String) is
-      begin
-         if Item'Length > 0 and then Locale_Wanted (Item) then
-            if US.Length (Result) > 0 then
-               US.Append (Result, ",");
-            end if;
-            US.Append (Result, Item);
-         end if;
-      end Take;
-   begin
-      for Index in Value'Range loop
-         if Value (Index) = ',' then
-            Take (Value (Start .. Index - 1));
-            Start := Index + 1;
-         end if;
-      end loop;
-      Take (Value (Start .. Value'Last));
-
-      return S (Result);
-   end Wanted_Subset;
 
    --  Normalise a CLDR locale id to the store form I18N.Locale_Data queries:
    --  ASCII-lowercase with '_' folded to '-'.
@@ -1215,237 +1118,200 @@ procedure Generate_CLDR_Data is
 
       --  Before narrowing drops them, capture the per-locale formatting rows of
       --  the un-wanted locales so formats.i18ndata can serve them on the fly.
-      if Load_Everything or else S (Wanted_Locales) /= "all" then
-         if Kind = "decimal" and then Capture_Locale (A) then
-            Add_Format ("decimal_separator", A, Ada_Expression_UTF8_Bytes (B));
-         elsif Kind = "group" and then Capture_Locale (A) then
-            Add_Format ("group_separator", A, Ada_Expression_UTF8_Bytes (B));
-         elsif Kind = "cardinal" or else Kind = "ordinal" then
-            --  A is the rule-family name, B its comma-separated locale list.
-            declare
-               Section : constant String :=
-                 (if Kind = "cardinal" then "cardinal_family"
-                  else "ordinal_family");
-               Start   : Positive := B'First;
+      if Kind = "decimal" and then Capture_Locale (A) then
+         Add_Format ("decimal_separator", A, Ada_Expression_UTF8_Bytes (B));
+      elsif Kind = "group" and then Capture_Locale (A) then
+         Add_Format ("group_separator", A, Ada_Expression_UTF8_Bytes (B));
+      elsif Kind = "cardinal" or else Kind = "ordinal" then
+         --  A is the rule-family name, B its comma-separated locale list.
+         declare
+            Section : constant String :=
+              (if Kind = "cardinal" then "cardinal_family"
+               else "ordinal_family");
+            Start   : Positive := B'First;
 
-               procedure Take (Loc : String) is
-               begin
-                  if Loc'Length > 0 and then Capture_Locale (Loc) then
-                     Add_Format (Section, Loc, A);
-                  end if;
-               end Take;
+            procedure Take (Loc : String) is
             begin
-               for Index in B'Range loop
-                  if B (Index) = ',' then
-                     Take (B (Start .. Index - 1));
-                     Start := Index + 1;
-                  end if;
-               end loop;
-               Take (B (Start .. B'Last));
-            end;
-         elsif Name_Section (Kind) /= "" and then Capture_Locale (A) then
-            --  Individual override name row: A=locale, B=index, C=name expr.
-            Add_Format
-              (Name_Section (Kind), A, Ada_Expression_UTF8_Bytes (C),
-               Sub => Index_Sub (Decimal_Value (B)));
-         elsif Kind = "name_set_hex"
-           and then Name_Section (A) /= ""
-           and then Capture_Locale (B)
-         then
-            --  Packed name set: A=kind, B=locale, C=start index, D=~-list.
-            declare
-               Section : constant String := Name_Section (A);
-               First   : constant Integer := Decimal_Value (C);
-               Total   : constant Natural := Expr_Item_Count (D);
-            begin
-               for P in 1 .. Total loop
-                  Add_Format
-                    (Section, B, Name_Set_Item_UTF8 (D, P),
-                     Sub => Index_Sub (First + P - 1));
-               end loop;
-            end;
-         elsif Kind = "day_month_year" then
-            --  A is the comma-separated list of languages using D-M-Y order;
-            --  the un-wanted ones need the flag served on the fly.
-            declare
-               Start : Positive := A'First;
-
-               procedure Take (Loc : String) is
-               begin
-                  if Loc'Length > 0 and then Capture_Locale (Loc) then
-                     Add_Format ("uses_day_month_year", Loc, "1");
-                  end if;
-               end Take;
-            begin
-               for Index in A'Range loop
-                  if A (Index) = ',' then
-                     Take (A (Start .. Index - 1));
-                     Start := Index + 1;
-                  end if;
-               end loop;
-               Take (A (Start .. A'Last));
-            end;
-         elsif Kind = "date_style_pattern" and then Capture_Locale (A) then
-            --  A=locale, B=calendar, C=style, D=pattern; serve the exact CLDR
-            --  pattern so a narrowed-out locale keeps its own punctuation.
-            Add_Format
-              ("date_style_pattern", A, Ada_Expression_UTF8_Bytes (D),
-               Sub => B & ":" & C);
-         elsif Kind = "digits" and then Capture_Locale (A) then
-            --  A=locale, B=ten comma-separated "16#NNN#" native digit points,
-            --  keyed by the Latin digit they replace (0 .. 9).
-            for P in 1 .. 10 loop
-               Add_Format
-                 ("digit_text", A, Digit_Item_UTF8 (B, P),
-                  Sub => [1 => Character'Val (Character'Pos ('0') + P - 1)]);
+               if Loc'Length > 0 and then Capture_Locale (Loc) then
+                  Add_Format (Section, Loc, A);
+               end if;
+            end Take;
+         begin
+            for Index in B'Range loop
+               if B (Index) = ',' then
+                  Take (B (Start .. Index - 1));
+                  Start := Index + 1;
+               end if;
             end loop;
-         elsif (Kind = "day_period" or else Kind = "day_period_hex")
-           and then Capture_Locale (A)
-         then
-            --  A=locale, B=period, C=width (wide/abbreviated), D=name; keyed by
-            --  "width:period". day_period_hex is raw hex bytes, day_period an
-            --  Ada string expression.
-            Add_Format
-              ("day_period_name", A,
-               (if Kind = "day_period_hex" then Hex_Bytes_To_String (D)
-                else Ada_Expression_UTF8_Bytes (D)),
-               Sub => C & ":" & B);
-         elsif Kind = "relative_current" and then Capture_Locale (A) then
-            --  A=locale, B=base, C=width, D=name.
-            Add_Format
-              ("relative_current", A, Ada_Expression_UTF8_Bytes (D),
-               Sub => B & ":" & C);
-         elsif Kind = "relative_offset" and then Capture_Locale (A) then
-            --  A=locale, B=tense (future/past), C=prefix, D=suffix.
-            Add_Format
-              ("relative_offset_prefix", A, Ada_Expression_UTF8_Bytes (C),
-               Sub => B);
-            Add_Format
-              ("relative_offset_suffix", A, Ada_Expression_UTF8_Bytes (D),
-               Sub => B);
-         elsif Kind = "relative_unit_category"
-           and then Capture_Locale (A)
-         then
-            --  A=locale, B=base, C=category, D=name.
-            Add_Format
-              ("relative_unit_category", A, Ada_Expression_UTF8_Bytes (D),
-               Sub => B & ":" & C);
-         elsif Kind = "relative_time_pattern"
-           and then Capture_Locale (A)
-         then
-            --  A=locale, B=base, C=width, D=tense, E=category, F=pattern.
-            Add_Format
-              ("relative_time_pattern", A, Ada_Expression_UTF8_Bytes (F),
-               Sub => B & ":" & C & ":" & D & ":" & E);
-         elsif Kind = "unit_name" and then Capture_Locale (A) then
-            --  A=locale, B=base, C=width, D=category, E=name; sharded per
-            --  locale into units/<locale>.i18ndata, keyed "base:width:category".
-            Unit_Add (A, B & ":" & C & ":" & D, Ada_Expression_UTF8_Bytes (E));
-         elsif Kind = "symbol_first" then
-            --  A = comma-separated list of symbol-first languages.
-            Emit_Membership ("currency_symbol_first", A);
-         elsif Kind = "indian_grouping" then
-            --  A = the language list (the narrowable part). B is the fixed
-            --  "-IN" substring rule, kept by the compiled fallback, so only the
-            --  languages need serving.
-            Emit_Membership ("indian_grouping", A);
-         elsif Kind = "available_format" and then Capture_Locale (A) then
-            --  A=locale, B=skeleton, C=pattern.
-            Add_Format
-              ("available_format", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
-         elsif Kind = "zone_gmt_prefix" and then Capture_Locale (A) then
-            Add_Format ("gmt_offset_prefix", A, Ada_Expression_UTF8_Bytes (B));
-         elsif Kind = "zone_offset_separator"
-           and then Capture_Locale (A)
-         then
-            Add_Format
-              ("timezone_offset_separator", A, Ada_Expression_UTF8_Bytes (B));
-         elsif Kind = "zone_location_pattern"
-           and then Capture_Locale (A)
-         then
-            Add_Format
-              ("timezone_location_pattern", A, Ada_Expression_UTF8_Bytes (B));
-         elsif Kind = "zone_display" and then Capture_Locale (A) then
-            --  A=locale, B=zone id, C=display name.
-            Add_Format
-              ("zone_display", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
-         elsif Kind = "zone_family_display" and then Capture_Locale (A) then
-            --  A=locale, B=metazone family, C=long name.
-            Add_Format
-              ("zone_family_display", A, Ada_Expression_UTF8_Bytes (C),
-               Sub => B);
-         elsif Kind = "zone_exemplar" and then Capture_Locale (A) then
-            --  A=locale, B=zone id, C=exemplar city (Ada expression).
-            Zone_Add (A, B, Ada_Expression_UTF8_Bytes (C));
-         elsif Kind = "zone_exemplar_hex" and then Capture_Locale (A) then
-            --  A=locale, B=zone id, C=exemplar city (raw hex bytes).
-            Zone_Add (A, B, Hex_Bytes_To_String (C));
-         elsif Kind = "zone_short_family" and then Capture_Locale (A) then
-            --  A=locale, B=metazone family, C=standard, D=daylight, E=generic.
-            Add_Format
-              ("zone_short_std", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
-            Add_Format
-              ("zone_short_dst", A, Ada_Expression_UTF8_Bytes (D), Sub => B);
-            Add_Format
-              ("zone_short_generic", A, Ada_Expression_UTF8_Bytes (E),
-               Sub => B);
-         elsif Kind = "currency_name_payload"
-           and then Capture_Locale (A)
-         then
-            --  A=locale, B=packed "CODE:hex,...;..." per-code display names.
-            Emit_Currency_Names (A, B);
-         elsif Kind = "unit_separator" and then Capture_Locale (A) then
-            --  A=locale, B=part ("per"), C=separator.
-            Add_Format
-              ("per_unit_separator", A, Ada_Expression_UTF8_Bytes (C));
-         elsif Kind = "list_separator" and then Capture_Locale (A) then
-            --  A=locale, B=family (standard/or), C=part, D=separator.
-            Add_Format
-              ("list_separator", A, Ada_Expression_UTF8_Bytes (D),
-               Sub => B & ":" & C);
-         end if;
-      end if;
+            Take (B (Start .. B'Last));
+         end;
+      elsif Name_Section (Kind) /= "" and then Capture_Locale (A) then
+         --  Individual override name row: A=locale, B=index, C=name expr.
+         Add_Format
+           (Name_Section (Kind), A, Ada_Expression_UTF8_Bytes (C),
+            Sub => Index_Sub (Decimal_Value (B)));
+      elsif Kind = "name_set_hex"
+        and then Name_Section (A) /= ""
+        and then Capture_Locale (B)
+      then
+         --  Packed name set: A=kind, B=locale, C=start index, D=~-list.
+         declare
+            Section : constant String := Name_Section (A);
+            First   : constant Integer := Decimal_Value (C);
+            Total   : constant Natural := Expr_Item_Count (D);
+         begin
+            for P in 1 .. Total loop
+               Add_Format
+                 (Section, B, Name_Set_Item_UTF8 (D, P),
+                  Sub => Index_Sub (First + P - 1));
+            end loop;
+         end;
+      elsif Kind = "day_month_year" then
+         --  A is the comma-separated list of languages using D-M-Y order;
+         --  the un-wanted ones need the flag served on the fly.
+         declare
+            Start : Positive := A'First;
 
-      if S (Wanted_Locales) /= "all" then
-         if Kind = "currency" or else Kind = "unit_short" then
-            null;                       --  no locale of its own
-         elsif Kind = "cardinal" or else Kind = "ordinal" then
-            if Wanted_Subset (B) = "" then
-               return;
-            end if;
-         elsif Kind = "digits"
-           or else Kind = "day_month_year"
-           or else Kind = "indian_grouping"
-           or else Kind = "symbol_first"
-         then
-            if Wanted_Subset (A) = "" then
-               return;
-            end if;
-         elsif Kind = "name_set_hex" then
-            if not Locale_Wanted (B) then
-               return;
-            end if;
-         elsif not Locale_Wanted (A) then
-            return;
-         end if;
+            procedure Take (Loc : String) is
+            begin
+               if Loc'Length > 0 and then Capture_Locale (Loc) then
+                  Add_Format ("uses_day_month_year", Loc, "1");
+               end if;
+            end Take;
+         begin
+            for Index in A'Range loop
+               if A (Index) = ',' then
+                  Take (A (Start .. Index - 1));
+                  Start := Index + 1;
+               end if;
+            end loop;
+            Take (A (Start .. A'Last));
+         end;
+      elsif Kind = "date_style_pattern" and then Capture_Locale (A) then
+         --  A=locale, B=calendar, C=style, D=pattern; serve the exact CLDR
+         --  pattern so a narrowed-out locale keeps its own punctuation.
+         Add_Format
+           ("date_style_pattern", A, Ada_Expression_UTF8_Bytes (D),
+            Sub => B & ":" & C);
+      elsif Kind = "digits" and then Capture_Locale (A) then
+         --  A=locale, B=ten comma-separated "16#NNN#" native digit points,
+         --  keyed by the Latin digit they replace (0 .. 9).
+         for P in 1 .. 10 loop
+            Add_Format
+              ("digit_text", A, Digit_Item_UTF8 (B, P),
+               Sub => [1 => Character'Val (Character'Pos ('0') + P - 1)]);
+         end loop;
+      elsif (Kind = "day_period" or else Kind = "day_period_hex")
+        and then Capture_Locale (A)
+      then
+         --  A=locale, B=period, C=width (wide/abbreviated), D=name; keyed by
+         --  "width:period". day_period_hex is raw hex bytes, day_period an
+         --  Ada string expression.
+         Add_Format
+           ("day_period_name", A,
+            (if Kind = "day_period_hex" then Hex_Bytes_To_String (D)
+             else Ada_Expression_UTF8_Bytes (D)),
+            Sub => C & ":" & B);
+      elsif Kind = "relative_current" and then Capture_Locale (A) then
+         --  A=locale, B=base, C=width, D=name.
+         Add_Format
+           ("relative_current", A, Ada_Expression_UTF8_Bytes (D),
+            Sub => B & ":" & C);
+      elsif Kind = "relative_offset" and then Capture_Locale (A) then
+         --  A=locale, B=tense (future/past), C=prefix, D=suffix.
+         Add_Format
+           ("relative_offset_prefix", A, Ada_Expression_UTF8_Bytes (C),
+            Sub => B);
+         Add_Format
+           ("relative_offset_suffix", A, Ada_Expression_UTF8_Bytes (D),
+            Sub => B);
+      elsif Kind = "relative_unit_category"
+        and then Capture_Locale (A)
+      then
+         --  A=locale, B=base, C=category, D=name.
+         Add_Format
+           ("relative_unit_category", A, Ada_Expression_UTF8_Bytes (D),
+            Sub => B & ":" & C);
+      elsif Kind = "relative_time_pattern"
+        and then Capture_Locale (A)
+      then
+         --  A=locale, B=base, C=width, D=tense, E=category, F=pattern.
+         Add_Format
+           ("relative_time_pattern", A, Ada_Expression_UTF8_Bytes (F),
+            Sub => B & ":" & C & ":" & D & ":" & E);
+      elsif Kind = "unit_name" and then Capture_Locale (A) then
+         --  A=locale, B=base, C=width, D=category, E=name; sharded per
+         --  locale into units/<locale>.i18ndata, keyed "base:width:category".
+         Unit_Add (A, B & ":" & C & ":" & D, Ada_Expression_UTF8_Bytes (E));
+      elsif Kind = "symbol_first" then
+         --  A = comma-separated list of symbol-first languages.
+         Emit_Membership ("currency_symbol_first", A);
+      elsif Kind = "indian_grouping" then
+         --  A = the language list (the narrowable part). B is the fixed
+         --  "-IN" substring rule, kept by the compiled fallback, so only the
+         --  languages need serving.
+         Emit_Membership ("indian_grouping", A);
+      elsif Kind = "available_format" and then Capture_Locale (A) then
+         --  A=locale, B=skeleton, C=pattern.
+         Add_Format
+           ("available_format", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+      elsif Kind = "zone_gmt_prefix" and then Capture_Locale (A) then
+         Add_Format ("gmt_offset_prefix", A, Ada_Expression_UTF8_Bytes (B));
+      elsif Kind = "zone_offset_separator"
+        and then Capture_Locale (A)
+      then
+         Add_Format
+           ("timezone_offset_separator", A, Ada_Expression_UTF8_Bytes (B));
+      elsif Kind = "zone_location_pattern"
+        and then Capture_Locale (A)
+      then
+         Add_Format
+           ("timezone_location_pattern", A, Ada_Expression_UTF8_Bytes (B));
+      elsif Kind = "zone_display" and then Capture_Locale (A) then
+         --  A=locale, B=zone id, C=display name.
+         Add_Format
+           ("zone_display", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+      elsif Kind = "zone_family_display" and then Capture_Locale (A) then
+         --  A=locale, B=metazone family, C=long name.
+         Add_Format
+           ("zone_family_display", A, Ada_Expression_UTF8_Bytes (C),
+            Sub => B);
+      elsif Kind = "zone_exemplar" and then Capture_Locale (A) then
+         --  A=locale, B=zone id, C=exemplar city (Ada expression).
+         Zone_Add (A, B, Ada_Expression_UTF8_Bytes (C));
+      elsif Kind = "zone_exemplar_hex" and then Capture_Locale (A) then
+         --  A=locale, B=zone id, C=exemplar city (raw hex bytes).
+         Zone_Add (A, B, Hex_Bytes_To_String (C));
+      elsif Kind = "zone_short_family" and then Capture_Locale (A) then
+         --  A=locale, B=metazone family, C=standard, D=daylight, E=generic.
+         Add_Format
+           ("zone_short_std", A, Ada_Expression_UTF8_Bytes (C), Sub => B);
+         Add_Format
+           ("zone_short_dst", A, Ada_Expression_UTF8_Bytes (D), Sub => B);
+         Add_Format
+           ("zone_short_generic", A, Ada_Expression_UTF8_Bytes (E),
+            Sub => B);
+      elsif Kind = "currency_name_payload"
+        and then Capture_Locale (A)
+      then
+         --  A=locale, B=packed "CODE:hex,...;..." per-code display names.
+         Emit_Currency_Names (A, B);
+      elsif Kind = "unit_separator" and then Capture_Locale (A) then
+         --  A=locale, B=part ("per"), C=separator.
+         Add_Format
+           ("per_unit_separator", A, Ada_Expression_UTF8_Bytes (C));
+      elsif Kind = "list_separator" and then Capture_Locale (A) then
+         --  A=locale, B=family (standard/or), C=part, D=separator.
+         Add_Format
+           ("list_separator", A, Ada_Expression_UTF8_Bytes (D),
+            Sub => B & ":" & C);
       end if;
 
       Rule_Count := Rule_Count + 1;
       Rules (Rule_Count) :=
         (Kind => US.To_Unbounded_String (Kind),
-         A    =>
-           US.To_Unbounded_String
-             (if S (Wanted_Locales) /= "all"
-                and then (Kind = "digits"
-                          or else Kind = "day_month_year"
-                          or else Kind = "indian_grouping"
-                          or else Kind = "symbol_first")
-              then Wanted_Subset (A) else A),
-         B    =>
-           US.To_Unbounded_String
-             (if S (Wanted_Locales) /= "all"
-                and then (Kind = "cardinal" or else Kind = "ordinal")
-              then Wanted_Subset (B) else B),
+         A    => US.To_Unbounded_String (A),
+         B    => US.To_Unbounded_String (B),
          C    => US.To_Unbounded_String (C),
          D    => US.To_Unbounded_String (D),
          E    => US.To_Unbounded_String (E),
@@ -5734,10 +5600,9 @@ procedure Generate_CLDR_Data is
    end Emit_Shards;
 
 begin
-   Read_Wanted_Locales;
    if Has_Argument ("--help") then
       Ada.Text_IO.Put_Line
-        ("usage: generate_cldr_data [--check] [--locales=en,de,...]" & ASCII.LF
+        ("usage: generate_cldr_data [--check]" & ASCII.LF
          & "Generates src/i18n-cldr_data.adb from data/cldr_subset.txt "
          & "and checked tzdb alias/transition metadata.");
       return;

@@ -1,11 +1,9 @@
 --  On-the-fly-aware relative-time formatting primitives.
 --
 --  A peer of I18N.Number_Format and I18N.Date_Time_Format: it returns the
---  localized CLDR relative-time data, consulting the runtime "formats" data
---  file for locales the crate's `locales` configuration narrowed out of the
---  compiled tables and falling back to those tables otherwise. Message
---  renderers delegate here instead of reading I18N.CLDR_Data directly, so a
---  narrowed-out locale still formats "in 3 days" in its own words.
+--  localized CLDR relative-time data from the runtime "formats" data file.
+--  Message renderers delegate here instead of reading I18N.CLDR_Data directly,
+--  so every locale formats "in 3 days" in its own words.
 --
 --  This layer does not consult I18N.Runtime_Data: the catalog-override tier
 --  (with its own category fallbacks) stays with the caller.

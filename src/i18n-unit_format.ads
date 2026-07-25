@@ -2,10 +2,8 @@
 --
 --  A peer of I18N.Number_Format and I18N.Date_Time_Format: it returns a
 --  localized unit name (kilometer -> "kilometers" / "Kilometer" /
---  "kilomètres"), consulting the per-locale units/<locale>.i18ndata shard for
---  locales the crate's `locales` configuration narrowed out of the compiled
---  tables and falling back to those tables otherwise. Message renderers
---  delegate here instead of reading I18N.CLDR_Data directly.
+--  "kilomètres") from the per-locale units/<locale>.i18ndata shard. Message
+--  renderers delegate here instead of reading I18N.CLDR_Data directly.
 --
 --  The unit data is by far the largest CLDR block, so it is sharded one file
 --  per locale; only the locales actually formatted are loaded at runtime.
