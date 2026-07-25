@@ -40,31 +40,6 @@ package I18N.CLDR_Data is
    --  @return Minimum first-week day count, usually 1 or 4.
    function First_Week_Min_Days (Locale : String) return Natural;
 
-   --  Return the deterministic date style pattern for a locale.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Style Date style: default, short, medium, long, or full.
-   --  @return Pattern text consumed by the date/time formatter.
-   function Date_Style_Pattern
-     (Locale : String;
-      Style  : String)
-      return String;
-
-   --  Return the date style pattern a calendar writes for a locale.
-   --
-   --  The calendar is part of the pattern, not just of the year it prints:
-   --  Thai gregorian long is "d MMMM G y" and Thai buddhist long is
-   --  "d MMMM y" -- the era belongs to one and not the other. A calendar with
-   --  no pattern of its own follows the locale's gregorian one.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Calendar Stable calendar key, such as gregorian or buddhist.
-   --  @param Style Date style: default, short, medium, long, or full.
-   --  @return Pattern text consumed by the date/time formatter.
-   function Date_Style_Pattern
-     (Locale   : String;
-      Calendar : String;
-      Style    : String)
-      return String;
-
    --  Return the deterministic time style pattern for a locale.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Style Time style: default, short, medium, long, or full.
@@ -74,15 +49,6 @@ package I18N.CLDR_Data is
      (Locale     : String;
       Style      : String;
       Has_Second : Boolean)
-      return String;
-
-   --  Return the exact CLDR availableFormats pattern for a skeleton.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Skeleton CLDR availableFormats skeleton key.
-   --  @return Pattern text consumed by the date/time formatter, or empty.
-   function Available_Format_Pattern
-     (Locale   : String;
-      Skeleton : String)
       return String;
 
    --  Return the deterministic separator between adjacent date/time fields.
@@ -462,70 +428,6 @@ package I18N.CLDR_Data is
      (Locale  : String;
       Scale   : Natural;
       Ordinal : Boolean := False)
-      return String;
-
-   --  Return the localized zero-offset relative-time label.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Base Canonical unit base name, such as day or year.
-   --  @return UTF-8 relative label, such as today, or now as fallback.
-   function Relative_Current_Name
-     (Locale : String;
-      Base   : String;
-      Width  : String)
-      return String;
-
-   --  Return the localized relative-time prefix for nonzero offsets.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Future True for future offsets, False for past offsets.
-   --  @return UTF-8 prefix text, including spacing when needed.
-   function Relative_Offset_Prefix
-     (Locale : String;
-      Future : Boolean)
-      return String;
-
-   --  Return the localized relative-time suffix for nonzero offsets.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Future True for future offsets, False for past offsets.
-   --  @return UTF-8 suffix text, including spacing when needed.
-   function Relative_Offset_Suffix
-     (Locale : String;
-      Future : Boolean)
-      return String;
-
-   --  Return a relative-time unit name by CLDR plural category.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Base Canonical unit base name, such as day or year.
-   --  @param Category CLDR plural category name.
-   --  @return UTF-8 unit text, or empty string when no category row exists.
-   function Relative_Unit_Category_Name
-     (Locale   : String;
-      Base     : String;
-      Category : String)
-      return String;
-
-   --  Return a complete CLDR relative-time pattern for a nonzero offset.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Base Canonical unit base name, such as day or year.
-   --  @param Category CLDR plural category name for the absolute offset.
-   --  @param Future True for future offsets, False for past offsets.
-   --  @return UTF-8 pattern containing {0}, or empty string when absent.
-   function Relative_Time_Pattern
-     (Locale   : String;
-      Base     : String;
-      Width    : String;
-      Category : String;
-      Future   : Boolean)
-      return String;
-
-   --  Return a relative-time-specific unit display override.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Base Canonical unit base name, such as day or year.
-   --  @param Singular True when the relative amount is exactly one.
-   --  @return UTF-8 unit text, or empty string when normal unit data applies.
-   function Relative_Unit_Display_Name
-     (Locale   : String;
-      Base     : String;
-      Singular : Boolean)
       return String;
 
    --  Return the CLDR cardinal plural rule family for a locale.

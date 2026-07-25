@@ -400,8 +400,7 @@ package body I18N.Date_Time_Format is
       end if;
 
       if not Found then
-         return I18N.CLDR_Data.Date_Style_Pattern
-           (Locale, Calendar_Key (Locale), Style);
+         return "";
       elsif DMY then
          if Style = "short" then
             return "dd'.'MM'.'yy";
@@ -1598,8 +1597,7 @@ package body I18N.Date_Time_Format is
          else I18N.Locale_Data.Lookup
                 ("available_format", Locale, Skeleton, Store_Found));
       Pattern : constant String :=
-        (if Store_Found then Store_Pattern
-         else I18N.CLDR_Data.Available_Format_Pattern (Locale, Skeleton));
+        (if Store_Found then Store_Pattern else "");
    begin
       if Override_Found then
          return Override_Pattern;

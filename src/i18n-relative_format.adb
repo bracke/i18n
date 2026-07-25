@@ -1,4 +1,3 @@
-with I18N.CLDR_Data;
 with I18N.Locale_Data;
 
 package body I18N.Relative_Format is
@@ -11,9 +10,7 @@ package body I18N.Relative_Format is
         I18N.Locale_Data.Lookup
           ("relative_current", Locale, Base & ":" & Width, Found);
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Relative_Current_Name (Locale, Base, Width));
+      return (if Found then Value else "");
    end Current_Name;
 
    function Offset_Prefix (Locale : String; Future : Boolean) return String is
@@ -23,9 +20,7 @@ package body I18N.Relative_Format is
           ("relative_offset_prefix", Locale,
            (if Future then "future" else "past"), Found);
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Relative_Offset_Prefix (Locale, Future));
+      return (if Found then Value else "");
    end Offset_Prefix;
 
    function Offset_Suffix (Locale : String; Future : Boolean) return String is
@@ -35,9 +30,7 @@ package body I18N.Relative_Format is
           ("relative_offset_suffix", Locale,
            (if Future then "future" else "past"), Found);
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Relative_Offset_Suffix (Locale, Future));
+      return (if Found then Value else "");
    end Offset_Suffix;
 
    function Unit_Category_Name
@@ -48,10 +41,7 @@ package body I18N.Relative_Format is
         I18N.Locale_Data.Lookup
           ("relative_unit_category", Locale, Base & ":" & Category, Found);
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Relative_Unit_Category_Name
-                (Locale, Base, Category));
+      return (if Found then Value else "");
    end Unit_Category_Name;
 
    function Time_Pattern
@@ -87,8 +77,7 @@ package body I18N.Relative_Format is
          end;
       end if;
 
-      return I18N.CLDR_Data.Relative_Time_Pattern
-               (Locale, Base, Width, Category, Future);
+      return "";
    end Time_Pattern;
 
    function Unit_Display_Name
@@ -100,10 +89,7 @@ package body I18N.Relative_Format is
           ("relative_unit_category", Locale,
            Base & ":" & (if Singular then "one" else "other"), Found);
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Relative_Unit_Display_Name
-                (Locale, Base, Singular));
+      return (if Found then Value else "");
    end Unit_Display_Name;
 
 end I18N.Relative_Format;
