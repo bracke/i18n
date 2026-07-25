@@ -1,10 +1,14 @@
 # Runtime data files
 
-Some CLDR areas are too large (or too optional) to compile into the library body
-the way `src/i18n-cldr_data.adb` is. Those are served from **runtime data files**
-loaded on demand by `I18N.Data_Store`. Phase 1 introduced this model with the
-display-name / delimiter / measurement data; later heavy areas (annotations,
-collation, transliteration) reuse the same loader with no new lookup algorithm.
+Most CLDR data is served from **runtime data files** loaded on demand by
+`I18N.Data_Store` rather than compiled into the library body. Phase 1 introduced
+this model with the display-name / delimiter / measurement data; heavy areas
+(annotations, collation, transliteration) reuse the same loader with no new
+lookup algorithm. The core per-locale formatting data (number/list separators,
+month/weekday/quarter/day-period names, date/relative patterns, currency and
+unit display names, timezone exemplar cities) is now served this way too — the
+files are the primary source, and `src/i18n-cldr_data.adb` retains only the
+structural data with no on-the-fly equivalent (see `CLDR_DATA.md`).
 
 ## File format (`*.i18ndata`)
 
