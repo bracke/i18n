@@ -1,3 +1,4 @@
+with I18N.Number_Format;
 with I18N.CLDR_Data;
 with I18N.Locale_Data;
 with I18N.Plurals;
@@ -169,14 +170,24 @@ package body I18N.Currency is
       Store_Found : Boolean := False;
       Store_Value : constant String :=
         (if Found then ""
-         else I18N.Locale_Data.Lookup ("indian_grouping", Locale, "",
-                                       Store_Found));
+         else I18N.Locale_Data.Language_Member ("indian_grouping", Locale,
+                                                Store_Found));
    begin
       if Found then
          return Value;
       elsif Store_Found then
          return Store_Value = "1";
       end if;
+
+      --  India uses Indian grouping whatever the language; the compiled table
+      --  carries this as a "-IN" rule that narrowing drops with the Indian
+      --  languages, so apply it here to stay faithful.
+      for Index in Locale'First .. Locale'Last - 2 loop
+         if Locale (Index .. Index + 2) = "-IN" then
+            return True;
+         end if;
+      end loop;
+
       return I18N.CLDR_Data.Uses_Indian_Grouping (Locale);
    end Uses_Indian_Grouping;
 
@@ -297,8 +308,8 @@ package body I18N.Currency is
       Store_Found : Boolean := False;
       Store_Value : constant String :=
         (if Found then ""
-         else I18N.Locale_Data.Lookup ("currency_symbol_first", Locale, "",
-                                       Store_Found));
+         else I18N.Locale_Data.Language_Member ("currency_symbol_first",
+                                                Locale, Store_Found));
    begin
       if Found then
          return Value;
@@ -360,7 +371,8 @@ package body I18N.Currency is
         (Target,
          Last,
          Overflow,
-         (if Found then Value else I18N.CLDR_Data.Digit_Text (Locale, Digit)));
+         (if Found then Value
+          else I18N.Number_Format.Digit_Text (Locale, Digit)));
    end Put_Digit;
 
    procedure Put_Integer_With_Grouping

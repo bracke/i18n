@@ -30,6 +30,14 @@ private package I18N.Locale_Data is
       Compiled : not null access function (L : String) return String)
       return String;
 
+   --  Membership test matching the compiled In_List (Language (Locale), list)
+   --  toggles (currency symbol placement, Indian grouping): looks the locale's
+   --  two-letter language up EXACTLY -- no parent or root fallback, since the
+   --  compiled test is an exact list membership on the bare language. Found is
+   --  False (and "" returned) when no installed file lists that language.
+   function Language_Member
+     (Section : String; Locale : String; Found : out Boolean) return String;
+
    --  Look Key up in a per-locale shard file Dir/<locale>.i18ndata (the layout
    --  used for large data such as units), walking exact -> parent -> root shard
    --  by shard so only the locales actually touched are loaded. Section is the

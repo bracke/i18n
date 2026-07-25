@@ -1367,9 +1367,10 @@ procedure Generate_CLDR_Data is
             --  A = comma-separated list of symbol-first languages.
             Emit_Membership ("currency_symbol_first", A);
          elsif Kind = "indian_grouping" then
-            --  A = language list, B = locale list, both using Indian grouping.
+            --  A = the language list (the narrowable part). B is the fixed
+            --  "-IN" substring rule, kept by the compiled fallback, so only the
+            --  languages need serving.
             Emit_Membership ("indian_grouping", A);
-            Emit_Membership ("indian_grouping", B);
          elsif Kind = "available_format" and then not Locale_Wanted (A) then
             --  A=locale, B=skeleton, C=pattern.
             Add_Format

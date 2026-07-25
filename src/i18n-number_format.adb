@@ -115,14 +115,24 @@ package body I18N.Number_Format is
       Store_Found : Boolean := False;
       Store_Value : constant String :=
         (if Found then ""
-         else I18N.Locale_Data.Lookup ("indian_grouping", Locale, "",
-                                       Store_Found));
+         else I18N.Locale_Data.Language_Member ("indian_grouping", Locale,
+                                                Store_Found));
    begin
       if Found then
          return Value;
       elsif Store_Found then
          return Store_Value = "1";
       end if;
+
+      --  India uses Indian grouping whatever the language; the compiled table
+      --  carries this as a "-IN" rule that narrowing drops with the Indian
+      --  languages, so apply it here to stay faithful.
+      for Index in Locale'First .. Locale'Last - 2 loop
+         if Locale (Index .. Index + 2) = "-IN" then
+            return True;
+         end if;
+      end loop;
+
       return I18N.CLDR_Data.Uses_Indian_Grouping (Locale);
    end Uses_Indian_Grouping;
 

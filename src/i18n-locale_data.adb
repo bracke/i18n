@@ -99,6 +99,32 @@ package body I18N.Locale_Data is
       return Compiled (Locale);
    end Field;
 
+   function Language_Member
+     (Section : String; Locale : String; Found : out Boolean) return String
+   is
+      Lang : constant String :=
+        (if Locale'Length >= 2
+         then To_Store_Locale (Locale (Locale'First .. Locale'First + 1))
+         else "");
+   begin
+      Found := False;
+      if Lang = "" or else not I18N.Data_Store.Available (Store_File) then
+         return "";
+      end if;
+
+      declare
+         Value : constant String :=
+           I18N.Data_Store.Lookup (Store_File, Section, Lang);
+      begin
+         if Value /= "" then
+            Found := True;
+            return Value;
+         end if;
+      end;
+
+      return "";
+   end Language_Member;
+
    function Shard_Lookup
      (Dir     : String;
       Section : String;

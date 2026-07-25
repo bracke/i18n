@@ -27,7 +27,8 @@ package body I18N.Unit_Format is
    begin
       return
         (if Found then Value
-         else I18N.CLDR_Data.Unit_Display_Name (Locale, Base, Width, Category));
+         else I18N.CLDR_Data.Unit_Display_Name
+                (Locale, Base, Canonical_Width (Width), Category));
    end Display_Name;
 
    function Per_Unit_Separator (Locale : String) return String is
