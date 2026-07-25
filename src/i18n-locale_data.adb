@@ -1,4 +1,7 @@
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+
 with I18N.Data_Store;
+with I18N.Parent_Locales;
 with I18N.Runtime_Data;
 
 package body I18N.Locale_Data is
@@ -19,6 +22,30 @@ package body I18N.Locale_Data is
       return Result;
    end To_Store_Locale;
 
+   --  The next locale up the CLDR fallback chain: the supplemental parentLocale
+   --  override when there is one (en-AU -> en-001, az-arab -> root), otherwise
+   --  drop the last subtag, otherwise root. Returns "" once root is reached, so
+   --  callers can bisect exactly the CLDR-defined chain rather than the naive
+   --  "strip a subtag at a time" walk, which is wrong for region and
+   --  non-likely-script variants.
+   function Next_Locale (Loc : String) return String is
+      Override : constant String := I18N.Parent_Locales.Parent (Loc);
+   begin
+      if Override /= "" then
+         return Override;
+      elsif Loc = "root" then
+         return "";
+      end if;
+
+      for Index in reverse Loc'Range loop
+         if Loc (Index) = '-' then
+            return Loc (Loc'First .. Index - 1);
+         end if;
+      end loop;
+
+      return "root";
+   end Next_Locale;
+
    function Lookup
      (Section : String;
       Locale  : String;
@@ -26,50 +53,38 @@ package body I18N.Locale_Data is
       Found   : out Boolean)
       return String
    is
-      Base : constant String := To_Store_Locale (Locale);
-      Cut  : Natural := Base'Last;
-
       function Try (Loc : String) return String is
         (I18N.Data_Store.Lookup
            (Store_File, Section,
             (if Sub = "" then Loc else Loc & Sep & Sub)));
+
+      Cur : Unbounded_String :=
+        To_Unbounded_String (To_Store_Locale (Locale));
    begin
       Found := False;
       if not I18N.Data_Store.Available (Store_File) then
          return "";
       end if;
 
-      declare
-         Exact : constant String := Try (Base);
-      begin
-         if Exact /= "" then
-            Found := True;
-            return Exact;
-         end if;
-      end;
+      loop
+         declare
+            Loc   : constant String := To_String (Cur);
+            Value : constant String := Try (Loc);
+         begin
+            if Value /= "" then
+               Found := True;
+               return Value;
+            end if;
+            exit when Loc = "root";
 
-      while Cut > Base'First loop
-         if Base (Cut) = '-' then
             declare
-               Parent : constant String := Try (Base (Base'First .. Cut - 1));
+               Up : constant String := Next_Locale (Loc);
             begin
-               if Parent /= "" then
-                  Found := True;
-                  return Parent;
-               end if;
+               exit when Up = "";
+               Cur := To_Unbounded_String (Up);
             end;
-         end if;
-         Cut := Cut - 1;
+         end;
       end loop;
-
-      declare
-         Root : constant String := Try ("root");
-      begin
-         if Root /= "" then
-            Found := True;
-            return Root;
-         end if;
-      end;
 
       return "";
    end Lookup;
@@ -133,47 +148,35 @@ package body I18N.Locale_Data is
       Found   : out Boolean)
       return String
    is
-      Base : constant String := To_Store_Locale (Locale);
-      Cut  : Natural := Base'Last;
-
       function Try (Loc : String) return String is
         (if I18N.Data_Store.Available (Dir & "/" & Loc)
          then I18N.Data_Store.Lookup (Dir & "/" & Loc, Section, Key)
          else "");
+
+      Cur : Unbounded_String :=
+        To_Unbounded_String (To_Store_Locale (Locale));
    begin
       Found := False;
 
-      declare
-         Exact : constant String := Try (Base);
-      begin
-         if Exact /= "" then
-            Found := True;
-            return Exact;
-         end if;
-      end;
+      loop
+         declare
+            Loc   : constant String := To_String (Cur);
+            Value : constant String := Try (Loc);
+         begin
+            if Value /= "" then
+               Found := True;
+               return Value;
+            end if;
+            exit when Loc = "root";
 
-      while Cut > Base'First loop
-         if Base (Cut) = '-' then
             declare
-               Parent : constant String := Try (Base (Base'First .. Cut - 1));
+               Up : constant String := Next_Locale (Loc);
             begin
-               if Parent /= "" then
-                  Found := True;
-                  return Parent;
-               end if;
+               exit when Up = "";
+               Cur := To_Unbounded_String (Up);
             end;
-         end if;
-         Cut := Cut - 1;
+         end;
       end loop;
-
-      declare
-         Root : constant String := Try ("root");
-      begin
-         if Root /= "" then
-            Found := True;
-            return Root;
-         end if;
-      end;
 
       return "";
    end Shard_Lookup;
