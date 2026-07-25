@@ -145,7 +145,6 @@ subset; there is no locale-subset configuration to set.
 * `docs/ARCHITECTURE.md` — platform structure and the generated-data boundary
 * `docs/SPARK.md` — SPARK-enabled units and the GNATprove command
 * `docs/ICU_CLDR_COMPLETION_CHECKLIST.md` — the full Unicode/CLDR/ICU target
-* `docs/COMPLETION_MILESTONES.md` — platform milestone tracking
 * `cldr/CLDR_DATA.md` — the CLDR/tzdb data provenance and regeneration
 
 For ICU message formatting built on this platform, see the `messages` crate.

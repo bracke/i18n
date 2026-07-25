@@ -88,7 +88,6 @@ Application examples must not `with` these internal packages.
 | `docs/TEST_MATRIX.md` | Test coverage matrix. |
 | `docs/EXAMPLES.md` | Example suite guide. |
 | `docs/COMPATIBILITY.md` | Source/runtime compatibility policy. |
-| `docs/COMPLETION_MILESTONES.md` | Concrete implementation milestones by subsystem and file slices for completion. |
 | `docs/ICU_CLDR_COMPLETION_CHECKLIST.md` | Hard checklist for the full Unicode 17.0.0 / CLDR 48.2 / ICU 78.3 completion target. |
 | `docs/RELEASE_CHECKLIST.md` | Release audit checklist. |
 | `docs/RELEASE_VERIFICATION.md` | GNAT/GPRbuild commands required before tagging v1.1.0. |
