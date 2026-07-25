@@ -19,16 +19,54 @@ package body I18N.Unit_Format is
       Category : String)
       return String
    is
+      CW : constant String := Canonical_Width (Width);
+      --  CLDR keeps the und/root base as SYMBOLS (second "s", beaufort "B"),
+      --  which are the right inherited value at short/narrow width but NOT at
+      --  full-name (where a spelled-out name belongs). So only reach the und
+      --  base for the symbol widths; at full-name a miss returns "" and callers
+      --  fall to English_Name.
+      Symbol_Width : constant Boolean :=
+        CW = "unit-width-short" or else CW = "unit-width-narrow";
+
+      function Try (Loc : String; Cat : String; Hit : out Boolean) return String
+      is
+      begin
+         return I18N.Locale_Data.Shard_Lookup
+           ("units", "unit", Loc, Base & ":" & CW & ":" & Cat, Hit);
+      end Try;
+
+      --  The locale's shard (Shard_Lookup already walks parentLocale) with the
+      --  CLDR plural-category fallback to "other" (only "other" is mandatory).
+      function Resolve (Loc : String; Hit : out Boolean) return String is
+         V : constant String := Try (Loc, Category, Hit);
+      begin
+         if Hit or else Category = "other" then
+            return V;
+         end if;
+         return Try (Loc, "other", Hit);
+      end Resolve;
+
       Found : Boolean;
-      Value : constant String :=
-        I18N.Locale_Data.Shard_Lookup
-          ("units", "unit", Locale,
-           Base & ":" & Canonical_Width (Width) & ":" & Category, Found);
    begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Unit_Display_Name
-                (Locale, Base, Canonical_Width (Width), Category));
+      declare
+         V : constant String := Resolve (Locale, Found);
+      begin
+         if Found then
+            return V;
+         end if;
+      end;
+
+      if Symbol_Width then
+         declare
+            V : constant String := Resolve ("und", Found);
+         begin
+            if Found then
+               return V;
+            end if;
+         end;
+      end if;
+
+      return "";
    end Display_Name;
 
    function Per_Unit_Separator (Locale : String) return String is
