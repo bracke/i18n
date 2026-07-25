@@ -97,7 +97,16 @@ package body I18N.Data_Store is
       for Dir of Dir_List'
         (To_Unbounded_String (Exe & "/share/i18n"),
          To_Unbounded_String (Exe & "/../share/i18n"),
-         To_Unbounded_String ("share/i18n"))
+         To_Unbounded_String ("share/i18n"),
+         --  Sibling-crate layout: a consumer built next to i18n
+         --  (root/<consumer>/... alongside root/i18n) finds the data with no
+         --  wiring. Dev/workspace convenience; installs use the exe-relative
+         --  copy or I18N_DATA_DIR above.
+         To_Unbounded_String ("../i18n/share/i18n"),
+         To_Unbounded_String ("../../i18n/share/i18n"),
+         To_Unbounded_String ("../../../i18n/share/i18n"),
+         To_Unbounded_String (Exe & "/../../i18n/share/i18n"),
+         To_Unbounded_String (Exe & "/../../../i18n/share/i18n"))
       loop
          declare
             Hit : constant String := Try (To_String (Dir));

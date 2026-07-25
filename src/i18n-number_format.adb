@@ -1,3 +1,4 @@
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 with I18N.CLDR_Data;
@@ -197,9 +198,17 @@ package body I18N.Number_Format is
    end Put_Char;
 
    function Digit_Text (Locale : String; Digit : Character) return String is
-      Found : Boolean;
+      --  A -u-nu-/@numbers= numbering-system override selects a fixed digit set
+      --  keyed by the numbering system, not the locale -- so it must NOT walk
+      --  the parentLocale chain (ar-u-nu-latn must be Latin, not Arabic-Indic).
+      --  That resolution is structural; skip the per-locale data file for it.
+      Numbering_Override : constant Boolean :=
+        Ada.Strings.Fixed.Index (Locale, "-u-nu-") > 0
+        or else Ada.Strings.Fixed.Index (Locale, "@numbers=") > 0;
+      Found : Boolean := False;
       Value : constant String :=
-        I18N.Locale_Data.Lookup ("digit_text", Locale, [1 => Digit], Found);
+        (if Numbering_Override then ""
+         else I18N.Locale_Data.Lookup ("digit_text", Locale, [1 => Digit], Found));
    begin
       return
         (if Found then Value else I18N.CLDR_Data.Digit_Text (Locale, Digit));
