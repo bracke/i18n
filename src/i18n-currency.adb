@@ -276,9 +276,26 @@ package body I18N.Currency is
          end if;
       end;
 
-      return
-        I18N.CLDR_Data.Currency_Display_Name
-          (Locale, Code, Category_Name);
+      --  A locale that spells out only the generic plural form leaves the
+      --  other categories to inherit "other" (CLDR makes just "other"
+      --  mandatory), so fall back to it before giving up.
+      if Category_Name /= "other" then
+         declare
+            Other_Found : Boolean;
+            Other_Value : constant String :=
+              I18N.Locale_Data.Shard_Lookup
+                ("currency", "currency", Locale, Code & ":other", Other_Found);
+         begin
+            if Other_Found then
+               return Other_Value;
+            end if;
+         end;
+      end if;
+
+      --  No locale in the fallback chain names this currency: CLDR's root
+      --  (und) carries only currency symbols, never display names, so the
+      --  display name defaults to the ISO code itself.
+      return Code;
    end Currency_Display_Name;
 
    function Display_Text
