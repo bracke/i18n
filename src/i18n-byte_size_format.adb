@@ -1,6 +1,6 @@
 with I18N.CLDR_Data;
 with I18N.Field_Digits;
-with I18N.Runtime_Data;
+with I18N.Unit_Format;
 
 package body I18N.Byte_Size_Format is
 
@@ -29,19 +29,6 @@ package body I18N.Byte_Size_Format is
       end loop;
       return Result;
    end Natural_Value;
-
-   --  The locale's separator between the scaled value and its unit label, with
-   --  the process-wide runtime override taking precedence over the compiled
-   --  table.
-   function Value_Separator (Locale : String) return String is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text (Locale, "unit_value_separator", Found);
-   begin
-      return
-        (if Found then Value
-         else I18N.CLDR_Data.Unit_Value_Separator (Locale));
-   end Value_Separator;
 
    procedure Format_Into
      (Value_Text : String;
@@ -85,7 +72,8 @@ package body I18N.Byte_Size_Format is
 
       I18N.Field_Digits.Put_Long_Long_Natural
         (Target, Last, Overflow, Locale, Scaled);
-      I18N.Field_Digits.Put (Target, Last, Overflow, Value_Separator (Locale));
+      I18N.Field_Digits.Put
+        (Target, Last, Overflow, I18N.Unit_Format.Value_Separator (Locale));
       I18N.Field_Digits.Put
         (Target, Last, Overflow,
          I18N.CLDR_Data.Byte_Size_Unit_Label (Scale));
