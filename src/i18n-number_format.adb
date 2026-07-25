@@ -186,6 +186,15 @@ package body I18N.Number_Format is
       Put (Target, Last, Overflow, [1 => C]);
    end Put_Char;
 
+   function Digit_Text (Locale : String; Digit : Character) return String is
+      Found : Boolean;
+      Value : constant String :=
+        I18N.Locale_Data.Lookup ("digit_text", Locale, [1 => Digit], Found);
+   begin
+      return
+        (if Found then Value else I18N.CLDR_Data.Digit_Text (Locale, Digit));
+   end Digit_Text;
+
    procedure Put_Digit
      (Target   : in out String;
       Last     : in out Natural;
@@ -196,19 +205,12 @@ package body I18N.Number_Format is
       Found : Boolean;
       Value : constant String :=
         I18N.Runtime_Data.Locale_Digit_Text (Locale, Digit, Found);
-      Store_Found : Boolean := False;
-      Store_Value : constant String :=
-        (if Found then ""
-         else I18N.Locale_Data.Lookup
-                ("digit_text", Locale, [1 => Digit], Store_Found));
    begin
       Put
         (Target,
          Last,
          Overflow,
-         (if Found then Value
-          elsif Store_Found then Store_Value
-          else I18N.CLDR_Data.Digit_Text (Locale, Digit)));
+         (if Found then Value else Digit_Text (Locale, Digit)));
    end Put_Digit;
 
    function Is_Digit (C : Character) return Boolean is (C in '0' .. '9');

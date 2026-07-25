@@ -13,4 +13,15 @@ package I18N.Number_Format is
       Ok         : out Boolean;
       Overflow   : out Boolean);
 
+   --  On-the-fly-aware number primitives, for callers that render digits or a
+   --  decimal point themselves (e.g. inside a unit or relative-time pattern)
+   --  rather than through Format_Into. Both consult the narrowed-out locale
+   --  data file before the compiled tables.
+
+   --  The locale's glyph for a Latin digit '0' .. '9'.
+   function Digit_Text (Locale : String; Digit : Character) return String;
+
+   --  The locale's decimal separator.
+   function Decimal_Separator (Locale : String) return String;
+
 end I18N.Number_Format;
