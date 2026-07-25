@@ -3162,28 +3162,6 @@ procedure Generate_CLDR_Data is
       --  The same table for rows that need more than the kind to select them
       --  and keep their value in a later field: a list separator is picked by
       --  family and part, and several families share one kind.
-      procedure Emit_Selected_Locale_Table
-        (Name         : String;
-         Kind         : String;
-         Family       : String;
-         Part         : String;
-         Default_Expr : String)
-      is
-      begin
-         Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, Kind)
-              and then S (Rules (Index).B) = Family
-              and then S (Rules (Index).C) = Part
-            then
-               Add_Table_Entry
-                 (S (Rules (Index).A),
-                  Ada_Expression_UTF8_Hex (S (Rules (Index).D)));
-            end if;
-         end loop;
-         Emit_Locale_Table (Name, Default_Expr);
-      end Emit_Selected_Locale_Table;
-
       --  Rows selected by family alone, with the value in one of the two
       --  fields after it: a relative offset keeps its prefix in one and its
       --  suffix in the other, and each becomes its own table.
@@ -5375,73 +5353,6 @@ procedure Generate_CLDR_Data is
          L ("   end Currency_Accounting_Suffix;");
       end Emit_Currency_Format_Patterns;
 
-      procedure Emit_List_Final_Separator is
-      begin
-         Emit_Selected_Locale_Table
-           ("List_Final_Separator", "list_separator", "standard", "final",
-            """ and """);
-      end Emit_List_Final_Separator;
-
-      procedure Emit_List_Item_Separator is
-      begin
-         Emit_Selected_Locale_Table
-           ("List_Item_Separator", "list_separator", "standard", "item",
-            """, """);
-      end Emit_List_Item_Separator;
-
-      procedure Emit_List_Pattern_Separators is
-         procedure Emit_List_Pattern_Function
-           (Function_Name : String;
-            Family        : String;
-            Part          : String;
-            Fallback_Call : String)
-         is
-         begin
-            Emit_Selected_Locale_Table
-              (Function_Name, "list_separator", Family, Part, Fallback_Call);
-         end Emit_List_Pattern_Function;
-      begin
-         L;
-         Emit_List_Pattern_Function
-           ("List_Pair_Separator", "standard", "pair", "List_Final_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Start_Separator", "standard", "start", "List_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Middle_Separator", "standard", "middle", "List_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Or_Final_Separator", "or", "final", """ or """);
-         L;
-         Emit_List_Pattern_Function
-           ("List_Or_Pair_Separator", "or", "pair", "List_Or_Final_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Or_Start_Separator", "or", "start", "List_Start_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Or_Middle_Separator", "or", "middle", "List_Middle_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Or_Item_Separator", "or", "item", "List_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Unit_Item_Separator", "unit", "item", "List_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Unit_Final_Separator", "unit", "final", "List_Unit_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Unit_Pair_Separator", "unit", "pair", "List_Unit_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Unit_Start_Separator", "unit", "start", "List_Unit_Item_Separator (Locale)");
-         L;
-         Emit_List_Pattern_Function
-           ("List_Unit_Middle_Separator", "unit", "middle", "List_Unit_Item_Separator (Locale)");
-      end Emit_List_Pattern_Separators;
-
       procedure Emit_Per_Unit_Separator is
       begin
          --  CLDR root (und) per-unit separator is "/", not English " per ". Only
@@ -5701,9 +5612,6 @@ procedure Generate_CLDR_Data is
       Emit_Currency_Field ("Currency_Narrow_Symbol", 5, "String", "Currency_Symbol (Code)");
       Emit_Symbol_First;
       Emit_Currency_Format_Patterns;
-      Emit_List_Final_Separator;
-      Emit_List_Item_Separator;
-      Emit_List_Pattern_Separators;
       Emit_Per_Unit_Separator;
       Emit_Unit_Separators;
       Emit_Byte_Size_Unit_Label;
