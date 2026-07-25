@@ -194,15 +194,6 @@ package I18N.CLDR_Data is
       Zone   : String)
       return String;
 
-   --  Return the localized exemplar location for a time zone.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Zone IANA-style zone identifier or UTC/Z.
-   --  @return Localized exemplar city/location text, or empty.
-   function Time_Zone_Exemplar_Location
-     (Locale : String;
-      Zone   : String)
-      return String;
-
    --  Return the short standard/daylight display name for a DST family.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Family Stable DST family key from Time_Zone_DST_Family.

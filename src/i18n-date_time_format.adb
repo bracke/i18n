@@ -2200,14 +2200,11 @@ package body I18N.Date_Time_Format is
          end if;
       end;
 
-      declare
-         Generated : constant String :=
-           I18N.CLDR_Data.Time_Zone_Exemplar_Location (Locale, Zone);
-      begin
-         if Generated /= "" then
-            return Generated;
-         end if;
-      end;
+      --  No shard row: the exemplar city defaults to the zone id's last
+      --  segment (CLDR's own fallback). A script variant that CLDR routes to
+      --  root -- az-Arab, sr-Latn, mn-Mong -- lands here too, correctly, in
+      --  place of the compiled table's wrong-script inheritance from the base
+      --  language (it wrote Cyrillic "Асмера" under Latin sr-Latn).
 
       if Zone = ""
         or else Zone = "UTC"
