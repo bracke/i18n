@@ -482,20 +482,6 @@ package I18N.CLDR_Data is
    --  @return UTF-8 separator text.
    function Unit_Short_Per_Separator (Locale : String) return String;
 
-   --  Return a localized unit display name from the built-in subset.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Base Canonical unit base name, such as meter or year.
-   --  @param Width ICU unit-width option.
-   --  @param Category CLDR plural category of the value ("zero", "one",
-   --    "two", "few", "many", or "other").
-   --  @return UTF-8 unit display name, or empty string when not built in.
-   function Unit_Display_Name
-     (Locale   : String;
-      Base     : String;
-      Width    : String;
-      Category : String)
-      return String;
-
    --  Return a deterministic byte-size unit label.
    --  @param Scale Binary byte scale from B through PiB.
    --  @return Display label for the byte-size formatter.
