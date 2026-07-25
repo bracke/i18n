@@ -24,6 +24,13 @@ package I18N.Unit_Format is
    --  The locale's "per" separator for compound units (miles per hour).
    function Per_Unit_Separator (Locale : String) return String;
 
+   --  Canonicalize an ICU unit id -- with or without its CLDR category prefix
+   --  (length-, volume-, ...) and in British or American spelling -- to the
+   --  bare base name Display_Name and English_Name key on. Returns "" for an
+   --  unrecognized unit, so it also serves as the canonical is-this-a-known-unit
+   --  gate (which the message parser validates against).
+   function Canonical_Base (Unit_Id : String) return String;
+
    --  The locale's separator between a measured value and its unit name.
    function Value_Separator (Locale : String) return String;
 
