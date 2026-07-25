@@ -1248,7 +1248,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Month_Name (Base_Locale (Locale), Month));
+               else "");
          end;
       end if;
    end Month_Name;
@@ -1278,7 +1278,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Weekday_Name (Base_Locale (Locale), Day));
+               else "");
          end;
       end if;
    end Weekday_Name;
@@ -1842,8 +1842,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Month_Name_Short
-                      (Base_Locale (Locale), Month));
+               else "");
          end;
       end if;
    end Month_Name_Short;
@@ -1897,8 +1896,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Weekday_Name_Short
-                      (Base_Locale (Locale), Day));
+               else "");
          end;
       end if;
    end Weekday_Name_Short;
@@ -1953,8 +1951,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Quarter_Name
-                      (Locale, Quarter, Quarter_Text));
+               else "");
          end;
       end if;
    end Quarter_Name;
@@ -1986,8 +1983,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Quarter_Name_Short
-                      (Locale, Quarter, Quarter_Text));
+               else "");
          end;
       end if;
    end Quarter_Name_Short;
@@ -2049,8 +2045,7 @@ package body I18N.Date_Time_Format is
          begin
             return
               (if SF then SV
-               else I18N.CLDR_Data.Day_Period_Name
-                      (Base_Locale (Locale), Period, Wide));
+               else "");
          end;
       end if;
    end Day_Period_Name;
