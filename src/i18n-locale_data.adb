@@ -89,6 +89,19 @@ package body I18N.Locale_Data is
       return "";
    end Lookup;
 
+   function Lookup_Exact
+     (Section : String; Locale : String; Found : out Boolean) return String
+   is
+      Value : constant String :=
+        (if I18N.Data_Store.Available (Store_File)
+         then I18N.Data_Store.Lookup
+                (Store_File, Section, To_Store_Locale (Locale))
+         else "");
+   begin
+      Found := Value /= "";
+      return Value;
+   end Lookup_Exact;
+
    function Field
      (Section  : String;
       Locale   : String;

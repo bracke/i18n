@@ -64,9 +64,13 @@ package body I18N.Plurals is
       Family : constant String :=
         I18N.Runtime_Data.Plural_Rule_Family ("cardinal", Locale, Found);
       Store_Found : Boolean := False;
+      --  CLDR keys plural rules by the exact locale and resolves by exact
+      --  bisect with an other-only default -- they do NOT inherit up the
+      --  parentLocale chain (ht -> fr-ht -> fr must not pick up French rules).
       Store_Family : constant String :=
         (if Found then ""
-         else I18N.Locale_Data.Lookup ("cardinal_family", Locale, "", Store_Found));
+         else I18N.Locale_Data.Lookup_Exact
+                ("cardinal_family", Locale, Store_Found));
       Effective_Family : constant String :=
         (if Found then Family
          elsif Store_Found then Store_Family
@@ -1201,10 +1205,11 @@ package body I18N.Plurals is
            I18N.Runtime_Data.Plural_Rule_Family
              ("ordinal", Locale, Family_Found);
          Store_Found : Boolean := False;
+         --  Exact per-locale, no parentLocale walk -- see Cardinal_Family.
          Store_Family : constant String :=
            (if Family_Found then ""
-            else I18N.Locale_Data.Lookup
-                   ("ordinal_family", Locale, "", Store_Found));
+            else I18N.Locale_Data.Lookup_Exact
+                   ("ordinal_family", Locale, Store_Found));
          Family : constant String :=
            (if Family_Found then Runtime_Family
             elsif Store_Found then Store_Family

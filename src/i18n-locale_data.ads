@@ -30,6 +30,13 @@ private package I18N.Locale_Data is
       Compiled : not null access function (L : String) return String)
       return String;
 
+   --  Exact per-locale lookup with NO fallback walk -- for fields CLDR keys by
+   --  the exact locale and resolves by exact bisect (plural rule families),
+   --  where walking the parentLocale chain would wrongly inherit (ht -> fr).
+   --  Found is False (and "" returned) when no installed file has that key.
+   function Lookup_Exact
+     (Section : String; Locale : String; Found : out Boolean) return String;
+
    --  Membership test matching the compiled In_List (Language (Locale), list)
    --  toggles (currency symbol placement, Indian grouping): looks the locale's
    --  two-letter language up EXACTLY -- no parent or root fallback, since the
