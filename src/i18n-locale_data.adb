@@ -86,6 +86,19 @@ package body I18N.Locale_Data is
          end;
       end loop;
 
+      --  The parentLocale walk terminates at root, but CLDR keeps the base
+      --  data under the und key (root and und name the same locale). Try it
+      --  explicitly so the minimized sections -- which store only the rows a
+      --  locale overrides -- resolve their inherited base instead of missing.
+      declare
+         Value : constant String := Try ("und");
+      begin
+         if Value /= "" then
+            Found := True;
+            return Value;
+         end if;
+      end;
+
       return "";
    end Lookup;
 
