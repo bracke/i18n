@@ -9,6 +9,7 @@ with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
 with Project_Tools.Files;
+with Hostkit.Fs;
 
 procedure Import_CLDR_Subset is
    package US renames Ada.Strings.Unbounded;
@@ -19,7 +20,7 @@ procedure Import_CLDR_Subset is
 
    Source_Path : constant String := "import/normalized_cldr.txt";
    Target_Path : constant String := "data/cldr_subset.txt";
-   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_cldr_subset.generated.txt";
+   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_cldr_subset.generated.txt";
 
    Max_Keys : constant := 2_000_000;
 

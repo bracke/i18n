@@ -65,6 +65,14 @@ jobs:
           repository: ${{ github.repository_owner }}/regexp
           path: regexp
 
+      # The CLDR import tools ask hostkit for the host's scratch directory
+      # (a real temp path on Windows, not a POSIX "/tmp" guess).
+      - name: Check out hostkit sibling
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/hostkit
+          path: hostkit
+
       - name: Set up Alire
         uses: alire-project/setup-alire@v5
         with:

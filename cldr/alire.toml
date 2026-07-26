@@ -52,6 +52,13 @@ tarlib = "*"
 [[depends-on]]
 awklib = "*"
 
+#  hostkit answers OS questions for the tools: the scratch/temp directory each
+#  importer stages generated files into. On Windows it returns a real temp path
+#  via GetTempPathA (valid even with an empty TMP/TEMP), where a POSIX "/tmp"
+#  guess does not exist.
+[[depends-on]]
+hostkit = "*"
+
 [[pins]]
 httpclient = { path = "../../httpclient" }
 project_tools = { path = "../../project_tools" }
@@ -59,6 +66,7 @@ zlib = { path = "../../zlib" }
 tarlib = { path = "../../tarlib" }
 awklib = { path = "../../awklib" }
 regexp = { path = "../../regexp" }
+hostkit = { path = "../../hostkit" }
 
 # zlib depends on cryptolib, but Alire honours pins only in the root crate, so
 # every root that builds zlib must pin it too.

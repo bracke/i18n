@@ -10,6 +10,7 @@ with Ada.Text_IO;
 with GNAT.OS_Lib;
 
 with Project_Tools.Files;
+with Hostkit.Fs;
 with Project_Tools.Processes;
 
 procedure Generate_CLDR_Data is
@@ -18,7 +19,7 @@ procedure Generate_CLDR_Data is
    Source_Path : constant String := "data/cldr_subset.txt";
    TZDB_Path   : constant String := "upstream/tzdb/tzdata.zi";
    Target_Path : constant String := "../src/i18n-cldr_data.adb";
-   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_cldr_data.generated.adb";
+   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_cldr_data.generated.adb";
 
    CLDR_Version : constant String := "48.2";
 
@@ -674,15 +675,17 @@ procedure Generate_CLDR_Data is
       end loop;
 
       return Result;
-   exception
-      when E : others =>
-         Ada.Text_IO.Put_Line
-           (Ada.Text_IO.Standard_Error,
-            "DIAG Decimal_Value failed on [" & Value & "] len"
-            & Natural'Image (Value'Length) & ASCII.LF
-            & Ada.Exceptions.Exception_Information (E));
-         raise;
    end Decimal_Value;
+
+   --  Parse Text as an unsigned decimal, but never raise: a foreign zdump (BSD
+   --  on macOS) can emit an overflowed year such as "-2147481748" (INT_MIN+1900)
+   --  or otherwise malformed fields. Anything not made of 1 .. Max_Len digits
+   --  yields Natural'Last, an out-of-range sentinel every caller's range guard
+   --  rejects -- so the whole transition line is skipped instead of aborting.
+   function Bounded_Decimal (Text : String; Max_Len : Positive) return Natural is
+     (if Is_Decimal_Text (Text) and then Text'Length in 1 .. Max_Len
+      then Decimal_Value (Text)
+      else Natural'Last);
 
    function Signed_Decimal_Value (Value : String) return Integer is
       Result : Integer := 0;
@@ -1936,7 +1939,7 @@ procedure Generate_CLDR_Data is
 
       Zic   : constant String := Project_Tools.Processes.Locate_Command ("zic");
       ZDump : constant String := Project_Tools.Processes.Locate_Command ("zdump");
-      Out_Dir : constant String := Project_Tools.Files.Temp_Dir & "/i18n_tzdb_generated";
+      Out_Dir : constant String := Hostkit.Fs.Temp_Directory & "/i18n_tzdb_generated";
 
       procedure Parse_Initial_Offset
         (Zone_Index : Positive;
@@ -1993,15 +1996,15 @@ procedure Generate_CLDR_Data is
                         Time_Text   : constant String := Token (Line, 5);
                         Year_Text   : constant String := Token (Line, 6);
                         Offset_Text : constant String := Tail_After (Line, "gmtoff=");
-                        Year        : constant Natural := Decimal_Value (Year_Text);
+                        Year        : constant Natural := Bounded_Decimal (Year_Text, 4);
                         Month       : constant Natural := Month_Number (Month_Text);
-                        Day         : constant Natural := Decimal_Value (Day_Text);
+                        Day         : constant Natural := Bounded_Decimal (Day_Text, 2);
                         Hour        : constant Natural :=
-                          Decimal_Value (Field (Time_Text, 1, ':'));
+                          Bounded_Decimal (Field (Time_Text, 1, ':'), 2);
                         Minute      : constant Natural :=
-                          Decimal_Value (Field (Time_Text, 2, ':'));
+                          Bounded_Decimal (Field (Time_Text, 2, ':'), 2);
                         Second      : constant Natural :=
-                          Decimal_Value (Field (Time_Text, 3, ':'));
+                          Bounded_Decimal (Field (Time_Text, 3, ':'), 2);
                         Offset      : constant Integer :=
                           Signed_Decimal_Value (Offset_Text);
                      begin
