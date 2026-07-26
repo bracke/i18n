@@ -27,7 +27,7 @@ procedure Extract_CLDR_Normalized is
    Coverage_Path : constant String := "raw/coverage.txt";
    Target_Path   : constant String := "import/normalized_cldr.txt";
    Coverage      : constant String := Project_Tools.Files.Read_Raw_File (Coverage_Path);
-   Generated_Path : constant String := "/tmp/i18n_normalized_cldr.generated.txt";
+   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_normalized_cldr.generated.txt";
 
    Max_Keys : constant := 2_000_000;
    Max_Coverage_Keys : constant := 400_000;

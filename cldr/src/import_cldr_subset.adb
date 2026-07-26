@@ -19,7 +19,7 @@ procedure Import_CLDR_Subset is
 
    Source_Path : constant String := "import/normalized_cldr.txt";
    Target_Path : constant String := "data/cldr_subset.txt";
-   Generated_Path : constant String := "/tmp/i18n_cldr_subset.generated.txt";
+   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_cldr_subset.generated.txt";
 
    Max_Keys : constant := 2_000_000;
 

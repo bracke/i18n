@@ -18,7 +18,7 @@ procedure Generate_CLDR_Data is
    Source_Path : constant String := "data/cldr_subset.txt";
    TZDB_Path   : constant String := "upstream/tzdb/tzdata.zi";
    Target_Path : constant String := "../src/i18n-cldr_data.adb";
-   Generated_Path : constant String := "/tmp/i18n_cldr_data.generated.adb";
+   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_cldr_data.generated.adb";
 
    CLDR_Version : constant String := "48.2";
 
@@ -675,11 +675,12 @@ procedure Generate_CLDR_Data is
 
       return Result;
    exception
-      when others =>
+      when E : others =>
          Ada.Text_IO.Put_Line
            (Ada.Text_IO.Standard_Error,
             "DIAG Decimal_Value failed on [" & Value & "] len"
-            & Natural'Image (Value'Length));
+            & Natural'Image (Value'Length) & ASCII.LF
+            & Ada.Exceptions.Exception_Information (E));
          raise;
    end Decimal_Value;
 
@@ -1935,7 +1936,7 @@ procedure Generate_CLDR_Data is
 
       Zic   : constant String := Project_Tools.Processes.Locate_Command ("zic");
       ZDump : constant String := Project_Tools.Processes.Locate_Command ("zdump");
-      Out_Dir : constant String := "/tmp/i18n_tzdb_generated";
+      Out_Dir : constant String := Project_Tools.Files.Temp_Dir & "/i18n_tzdb_generated";
 
       procedure Parse_Initial_Offset
         (Zone_Index : Positive;

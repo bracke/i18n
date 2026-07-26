@@ -16,6 +16,7 @@ with Tarlib.Inputs;
 with Tarlib.Entries;
 with Tarlib.Errors;
 with Awklib.Interpreter;
+with Project_Tools.Files;
 
 --  Fetch the pinned IANA tzdb release and produce the rearguard tzdb fixtures
 --  under cldr/upstream/tzdb/ -- tzdata.zi (built by running the tz project's own
@@ -32,7 +33,7 @@ procedure Download_TZDB is
    TZ_Version  : constant String := "2026a";
    URL         : constant String :=
      "https://data.iana.org/time-zones/releases/tzdata" & TZ_Version & ".tar.gz";
-   Work_Dir    : constant String := "/tmp/i18n_tzdb_download";
+   Work_Dir    : constant String := Project_Tools.Files.Temp_Dir & "/i18n_tzdb_download";
    Tgz_Path    : constant String := Work_Dir & "/tzdata.tar.gz";
    Out_Dir     : constant String := "upstream/tzdb";
 

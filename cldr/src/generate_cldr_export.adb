@@ -18,7 +18,7 @@ procedure Generate_CLDR_Export is
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
 
-   Generated_Path : constant String := "/tmp/i18n_cldr_export.generated.jsonl";
+   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_cldr_export.generated.jsonl";
 
    procedure Add_Error (Message : String) is
    begin

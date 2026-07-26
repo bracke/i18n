@@ -21,7 +21,7 @@ procedure Import_CLDR_Raw is
    Manifest_Path : constant String := "upstream/source_manifest.txt";
    Source_Path   : constant String := "upstream/cldr_export.jsonl";
    Target_Path   : constant String := "raw/cldr_records.txt";
-   Generated_Path : constant String := "/tmp/i18n_cldr_records.generated.txt";
+   Generated_Path : constant String := Project_Tools.Files.Temp_Dir & "/i18n_cldr_records.generated.txt";
 
    Max_Keys : constant := 2_000_000;
 
