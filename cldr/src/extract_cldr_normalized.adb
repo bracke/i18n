@@ -2,6 +2,7 @@ with Ada.Command_Line;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Directories;
+with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
 with Ada.Strings.Hash;
@@ -1703,9 +1704,9 @@ begin
       end if;
    end;
 exception
-   when others =>
+   when E : others =>
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Error,
-         "failed to extract normalized CLDR data");
+         "failed to extract normalized CLDR data: " & Ada.Exceptions.Exception_Information (E));
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
 end Extract_CLDR_Normalized;
