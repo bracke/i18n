@@ -248,9 +248,20 @@ begin
       Config.Enable_Decompression := False;
       Options.Create_Parent_Dirs := True;
       Options.File_Mode := HC.Replace_Atomically;
-      Status := HC.Download_To_File (URL, Tgz_Path, Result, Options, Config);
+      --  Retry: CI runners hit transient connection failures against IANA.
+      for Attempt in 1 .. 3 loop
+         Status := HC.Download_To_File (URL, Tgz_Path, Result, Options, Config);
+         exit when Status = Http_Client.Errors.Ok;
+         Ada.Text_IO.Put_Line
+           (Ada.Text_IO.Standard_Error,
+            "tzdb: download attempt" & Attempt'Image & " failed: " & Status'Image
+            & " (HTTP" & Result.HTTP_Status_Code'Image & ")");
+         if Attempt < 3 then
+            delay 10.0;
+         end if;
+      end loop;
       if Status /= Http_Client.Errors.Ok then
-         Fail ("download failed: " & Status'Image
+         Fail ("download failed after retries: " & Status'Image
                & " (HTTP" & Result.HTTP_Status_Code'Image & ")");
       end if;
       Ada.Text_IO.Put_Line ("tzdb: downloaded" & Natural'Image (Result.Bytes_Written) & " bytes");
