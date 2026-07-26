@@ -26,6 +26,15 @@ command = ["gprbuild", "-P", "cldr/regen_tool/regenerate.gpr", "-p", "-q"]
 type = "pre-build"
 command = ["cldr/regen_tool/bin/regenerate"]
 
+# The release gate is its own crate (check_i18n) with its own dependencies, so
+# build it and run it in that directory. Two directory-scoped actions -- no
+# shell -- replacing `sh -c "cd check_i18n && alr build && ./bin/check_i18n"`.
 [[actions]]
 type = "test"
-command = ["sh", "-c", "cd check_i18n && alr -n build && ./bin/check_i18n --no-upstream"]
+command = ["alr", "-n", "build"]
+directory = "check_i18n"
+
+[[actions]]
+type = "test"
+command = ["./bin/check_i18n", "--no-upstream"]
+directory = "check_i18n"
