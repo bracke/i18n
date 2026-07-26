@@ -21,6 +21,8 @@ with Http_Client.Responses;
 
 with Zlib;
 
+with Project_Tools.JSON;
+
 procedure Fetch_Ucd is
 
    package HC renames Http_Client;
@@ -235,6 +237,18 @@ procedure Fetch_Ucd is
       Config : HC.Clients.Client_Configuration := Plain_Config;
       Result : HC.Clients.Client_Result;
       Status : HC.Errors.Result_Status;
+
+      --  Download one listed file whose name ends in Suffix.
+      procedure Fetch_Name (Name : String) is
+      begin
+         if Name'Length > Suffix'Length
+           and then Name (Name'Last - Suffix'Length + 1 .. Name'Last) = Suffix
+         then
+            Download
+              (Raw_Dir & "/" & Name, Dest & "/" & Name,
+               Label & Name, Essential => False);
+         end if;
+      end Fetch_Name;
    begin
       --  GitHub rejects API requests without a User-Agent; identity encoding
       --  (from Plain_Config) keeps the JSON body directly readable.
@@ -251,52 +265,8 @@ procedure Fetch_Ucd is
          return;
       end if;
 
-      declare
-         Payload : constant String := HC.Responses.Response_Body (Result.Response);
-         Index   : Positive := Payload'First;
-      begin
-         while Index <= Payload'Last loop
-            if Index + 5 <= Payload'Last
-              and then Payload (Index .. Index + 5) = """name"""
-            then
-               Index := Index + 6;
-               while Index <= Payload'Last
-                 and then (Payload (Index) = ' '
-                           or else Payload (Index) = ':'
-                           or else Payload (Index) = ASCII.HT)
-               loop
-                  Index := Index + 1;
-               end loop;
-
-               if Index <= Payload'Last and then Payload (Index) = '"' then
-                  Index := Index + 1;
-                  declare
-                     Start : constant Positive := Index;
-                  begin
-                     while Index <= Payload'Last
-                       and then Payload (Index) /= '"'
-                     loop
-                        Index := Index + 1;
-                     end loop;
-                     declare
-                        Name : constant String := Payload (Start .. Index - 1);
-                     begin
-                        if Name'Length > Suffix'Length
-                          and then Name (Name'Last - Suffix'Length + 1 .. Name'Last)
-                                     = Suffix
-                        then
-                           Download
-                             (Raw_Dir & "/" & Name, Dest & "/" & Name,
-                              Label & Name, Essential => False);
-                        end if;
-                     end;
-                  end;
-               end if;
-            else
-               Index := Index + 1;
-            end if;
-         end loop;
-      end;
+      Project_Tools.JSON.For_Each_Array_Object_Field
+        (HC.Responses.Response_Body (Result.Response), "name", Fetch_Name'Access);
    end Fetch_Listing;
 
    --  CLDR transform catalog + its conformance testData.
