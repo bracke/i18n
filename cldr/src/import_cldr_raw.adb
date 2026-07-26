@@ -1,3 +1,4 @@
+with Ada.Exceptions;
 with Ada.Command_Line;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Directories;
@@ -1092,9 +1093,9 @@ begin
       end if;
    end;
 exception
-   when others =>
+   when E : others =>
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Error,
-         "failed to import raw CLDR data");
+         "failed to import raw CLDR data: " & Ada.Exceptions.Exception_Information (E));
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
 end Import_CLDR_Raw;

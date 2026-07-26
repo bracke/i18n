@@ -1,3 +1,4 @@
+with Ada.Exceptions;
 with Ada.Command_Line;
 with Ada.Containers.Generic_Array_Sort;
 with Ada.Directories;
@@ -5645,9 +5646,9 @@ begin
       end if;
    end;
 exception
-   when others =>
+   when E : others =>
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Error,
-         "failed to generate CLDR data");
+         "failed to generate CLDR data: " & Ada.Exceptions.Exception_Information (E));
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
 end Generate_CLDR_Data;
