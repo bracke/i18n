@@ -123,10 +123,10 @@ required by generated date name functions.
 
 ## Current data families
 
-The list below catalogs every data family the generator produces, regardless of
-where it now lives. Per the split above, the per-locale name/pattern/display-name
-families (items 9–11, 15, 17–20, and the date/relative patterns) are served from
-`share/i18n`; the structural families remain compiled.
+The list below catalogs every data family the generator produces. Per the split
+above, the per-locale name/pattern/display-name families (items 9–11, 15, 17–20,
+and the date/relative patterns) are served from `share/i18n`; the structural
+families are compiled into `I18N.CLDR_Data`.
 
 1. Locale primary-subtag lookup for formatter policy.
 2. Decimal and grouping separators for all 725 imported CLDR 46.1 number

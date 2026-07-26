@@ -14,9 +14,8 @@
 --  Only step 1 costs anything in the normal case, so this is safe to run before
 --  every build. Steps 2-4 are what a fresh clone or a CI runner actually needs.
 --
---  The Ada replacement for the former cldr/regenerate.sh: a standalone,
---  dependency-free program (so it builds with plain gprbuild) run as the i18n
---  pre-build action. It spawns the existing generator and download tools --
+--  A standalone, dependency-free program (so it builds with plain gprbuild) run
+--  as the i18n pre-build action. It spawns the generator and download tools --
 --  itself the reason cldr is a separate crate: the library never inherits their
 --  HTTP stack and ZIP decoder. The optional UCD downloads run through the
 --  fetch_ucd tool, spawned here best-effort.
@@ -96,8 +95,8 @@ procedure Regenerate is
    end Resolve;
 
    --  Run Program with Args, optionally from directory Dir. Aborts the whole
-   --  regeneration on a non-zero exit unless Allow_Failure is set (best-effort
-   --  steps mirror the shell's "|| true").
+   --  regeneration on a non-zero exit unless Allow_Failure is set, which lets a
+   --  best-effort step continue past a failure.
    procedure Run
      (Program       : String;
       Args          : OS.Argument_List := No_Args;

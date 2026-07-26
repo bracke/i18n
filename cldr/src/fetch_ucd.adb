@@ -4,10 +4,9 @@
 --  Unicode version CLDR aligns with. Kept in the tools/build layer -- the library
 --  never fetches.
 --
---  The Ada replacement for the former cldr/fetch_ucd.sh: it downloads over
---  httpclient (no curl) and unpacks the collation test archive with zlib (no
---  unzip). Built by cldr_download.gpr alongside download_cldr_upstream -- the
---  two tools that carry the HTTP stack and ZIP decoder the generators never do.
+--  It downloads over httpclient and unpacks the collation test archive with
+--  zlib. Built by cldr_download.gpr alongside download_cldr_upstream -- the two
+--  tools that carry the HTTP stack and ZIP decoder the generators never do.
 --
 --  Run from the i18n crate root.  Usage: fetch_ucd [version]
 
@@ -78,9 +77,8 @@ procedure Fetch_Ucd is
       Any_Failure := True;
    end Note;
 
-   --  Download URL to Dest if Dest is absent. Essential downloads abort the run
-   --  on failure (mirroring the script's "set -e" + "curl -f"); best-effort ones
-   --  log and continue (the script's "|| true" / "2>/dev/null" downloads).
+   --  Download URL to Dest if Dest is absent. An essential download aborts the
+   --  run on failure; a best-effort one logs and continues.
    procedure Download
      (URL       : String;
       Dest      : String;

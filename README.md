@@ -91,7 +91,7 @@ and `zones/` shards) and is loaded lazily at runtime by `I18N.Data_Store`. Every
 locale in the pinned CLDR subset is present; there is no compile-time locale
 subset to choose.
 
-The generated `I18N.CLDR_Data` boundary now carries only **structural** data with
+The generated `I18N.CLDR_Data` boundary carries only **structural** data with
 no on-the-fly equivalent: timezone transition rules, `-u-nu-` numbering-system
 digit sets, plural-rule interpreters, calendar week rules, and a few small
 scalar tables. Formatters resolve each field as runtime overrides →
