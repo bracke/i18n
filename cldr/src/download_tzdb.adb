@@ -267,7 +267,9 @@ begin
                & "source|tzdb|tzdb/zone1970.tab" & ASCII.LF
                & "source|tzdb|tzdb/zone.tab" & ASCII.LF
                & "source|tzdb|tzdb/leapseconds" & ASCII.LF);
-            Ada.Text_IO.Put_Line ("tzdb: wrote " & Out_Dir & "/{tzdata.zi,zone.tab,zone1970.tab,leapseconds}");
+            Ada.Text_IO.Put_Line
+              ("tzdb: wrote " & Out_Dir & "/{tzdata.zi,zone.tab,zone1970.tab,leapseconds}"
+               & " (tzdata.zi" & Zi'Length'Image & " bytes)");
          end;
       end;
    end;
