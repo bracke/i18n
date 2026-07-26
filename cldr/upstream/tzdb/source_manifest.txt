@@ -1,0 +1,9 @@
+# Deterministic source manifest for checked IANA tzdb fixtures.
+tzdb_version=2026a
+source_family=iana-tzdb
+dataform=rearguard
+source_file_count=4
+source|tzdb|tzdb/tzdata.zi
+source|tzdb|tzdb/zone1970.tab
+source|tzdb|tzdb/zone.tab
+source|tzdb|tzdb/leapseconds

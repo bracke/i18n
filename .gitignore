@@ -39,11 +39,18 @@ check_i18n/alire/
 
 # Vendored upstream CLDR-JSON and large generated data/artifacts: kept local,
 # regenerated from upstream, not committed (they bloat the repo by ~1GB+).
-/cldr/upstream/
+# Ignore the CONTENTS of upstream/ (not the directory itself) so specific small
+# vendored inputs below can be re-included -- git cannot re-include a path whose
+# parent directory is wholly excluded.
+/cldr/upstream/*
 #  ... except the provenance, which is what makes the staged export
 #  reproducible: it names the CLDR release the data was built from. Without it
 #  a clone has the generated table but no way to tell what produced it.
 !/cldr/upstream/source_manifest.txt
+#  ... and the small pinned tzdb inputs (~156 KB, version 2026a). Unlike the
+#  huge CLDR-JSON tree these are not downloaded by the regeneration; the
+#  generator reads them directly, so a fresh checkout (and CI) must carry them.
+!/cldr/upstream/tzdb/
 /cldr/data/cldr_subset.txt
 /cldr/import/normalized_cldr.txt
 /cldr/raw/cldr_records.txt
