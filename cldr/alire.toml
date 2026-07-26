@@ -23,6 +23,7 @@ executables = [
    "generate_cldr_data",
    "import_cldr_subset",
    "download_cldr_upstream",
+   "fetch_ucd",
 ]
 
 [[depends-on]]

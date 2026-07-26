@@ -1,9 +1,9 @@
---  The upstream downloader is a project of its own, not another Main in
---  cldr_tools.gpr: it is the only CLDR tool that needs an HTTP stack and a ZIP
---  decoder, and linking OpenSSL into the six generator/checker tools that never
---  touch the network would make every regeneration pay for a step that runs
---  once. Dependencies arrive through the generated config project, so the two
---  differ in nothing but their Main and their Linker package.
+--  The network tools are a project of their own, not more Mains in
+--  cldr_tools.gpr: they are the only CLDR tools that need an HTTP stack and a
+--  ZIP decoder, and linking OpenSSL into the six generator/checker tools that
+--  never touch the network would make every regeneration pay for a step that
+--  runs once. Dependencies arrive through the generated config project, so the
+--  two projects differ in nothing but their Mains and their Linker package.
 
 with "config/cldr_tools_config.gpr";
 
@@ -14,7 +14,7 @@ project CLDR_Download is
    --  write to the same object directory.
    for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";
-   for Main use ("download_cldr_upstream.adb");
+   for Main use ("download_cldr_upstream.adb", "fetch_ucd.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

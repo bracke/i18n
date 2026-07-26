@@ -16,10 +16,10 @@
 --
 --  The Ada replacement for the former cldr/regenerate.sh: a standalone,
 --  dependency-free program (so it builds with plain gprbuild) run as the i18n
---  pre-build action. It spawns the existing generator tools -- itself the
---  reason cldr is a separate crate: the library never inherits their HTTP stack
---  and ZIP decoder. The optional UCD downloads still go through cldr/fetch_ucd.sh
---  (network plumbing), spawned here best-effort.
+--  pre-build action. It spawns the existing generator and download tools --
+--  itself the reason cldr is a separate crate: the library never inherits their
+--  HTTP stack and ZIP decoder. The optional UCD downloads run through the
+--  fetch_ucd tool, spawned here best-effort.
 --
 --  Run from the i18n crate root (Alire pre-build actions already are).
 
@@ -143,7 +143,8 @@ procedure Regenerate is
       +"generate_uca_collation_data",
       +"generate_cldr_collation_tailoring",
       +"generate_ucd_uprops_data",
-      +"generate_cldr_transform_data"];
+      +"generate_cldr_transform_data",
+      +"fetch_ucd"];
 
    procedure Build_Tools is
       Missing : Boolean := False;
@@ -163,11 +164,13 @@ procedure Regenerate is
       end if;
    end Build_Tools;
 
-   --  Fetch the UCD files (unicode.org) via the download script; best-effort,
-   --  like the shell's "sh fetch_ucd.sh || true".
+   --  Fetch the UCD files (unicode.org) via the fetch_ucd tool, best-effort.
+   --  It uses crate-root-relative paths, so run it from the root (no Dir),
+   --  unlike the cldr/-relative generators.
    procedure Fetch_Ucd is
    begin
-      Run ("sh", [+(Cldr & "/fetch_ucd.sh")], Allow_Failure => True);
+      Build_Tools;
+      Run (Cldr & "/bin/fetch_ucd", Allow_Failure => True);
    end Fetch_Ucd;
 
    --  Runtime data files for the "heavy/optional" areas read upstream cldr-json
