@@ -52,7 +52,7 @@ writes `share/i18n/display-names.i18ndata`. It is **decoupled** from the compile
 subset pipeline (export → normalize → subset) — a runtime area does not need to be
 threaded through those stages.
 
-`cldr/regenerate.sh` (the Alire pre-build action) generates it best-effort: when
+`cldr/regen_tool` (the Alire pre-build action) generates it best-effort: when
 the vendored upstream is present it (re)builds the file if missing; otherwise it
 skips it and the library still compiles — the feature just reports itself
 unavailable via `I18N.Display_Names.Available`. The file is gitignored (a
@@ -74,7 +74,7 @@ Alire installs `share/` as an artifact (`i18n.gpr`'s `Install` package), so a
 ## Adding a new runtime area (later phases)
 
 1. Add a generator (`generate_cldr_<area>_data.adb`) that emits packed sections.
-2. Hook it into `regenerate.sh`'s `generate_runtime_data`.
+2. Hook it into `regen_tool/regenerate.adb`'s `Generate_Runtime_Data`.
 3. Add a public `I18N.<Area>` package that composes keys and calls
    `I18N.Data_Store.Lookup` (+ parent walk if locale-keyed).
 

@@ -1,0 +1,15 @@
+--  Standalone pre-build orchestrator that produces the generated CLDR tables
+--  (see regenerate.adb). Deliberately dependency-free so it builds with plain
+--  gprbuild -- no Alire solve -- as the first i18n pre-build action, before the
+--  library (which needs the generated body) can build. See ../../alire.toml.
+project Regenerate is
+   for Source_Dirs use (".");
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("regenerate.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnat2022", "-gnatyM120");
+   end Compiler;
+end Regenerate;

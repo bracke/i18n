@@ -15,10 +15,16 @@ gnat = ">=12"
 #  src/i18n-cldr_data*.adb are generated build artifacts and are gitignored, so
 #  a clone has the spec and no body. This regenerates them from whatever the
 #  tree has -- pinned subset, vendored upstream JSON, or a fresh download -- and
-#  costs ~3 ms once they exist. See cldr/regenerate.sh and cldr/CLDR_DATA.md.
+#  costs ~3 ms once they exist. The orchestrator is a standalone Ada tool
+#  (cldr/regen_tool/regenerate.adb): build it with plain gprbuild, then run it.
+#  Both are plain executables -- no shell. See cldr/regen_tool and CLDR_DATA.md.
 [[actions]]
 type = "pre-build"
-command = ["sh", "cldr/regenerate.sh"]
+command = ["gprbuild", "-P", "cldr/regen_tool/regenerate.gpr", "-p", "-q"]
+
+[[actions]]
+type = "pre-build"
+command = ["cldr/regen_tool/bin/regenerate"]
 
 [[actions]]
 type = "test"
