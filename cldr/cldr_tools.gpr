@@ -8,6 +8,7 @@ project CLDR_Tools is
    for Main use
      ("check_cldr_sources.adb",
       "check_tzdb_sources.adb",
+      "download_tzdb.adb",
       "generate_cldr_export.adb",
       "import_cldr_raw.adb",
       "extract_cldr_normalized.adb",
@@ -40,4 +41,15 @@ project CLDR_Tools is
    package Binder is
       for Switches ("Ada") use ("-Es"); --  Symbolic traceback
    end Binder;
+
+   package Linker is
+      --  download_tzdb links httpclient (its TLS/crypto bridge needs OpenSSL);
+      --  httpclient leaves the OpenSSL link to its consumers.
+      case Cldr_Tools_Config.Alire_Host_OS is
+         when "windows" =>
+            for Default_Switches ("Ada") use ("-lssl", "-lcrypto", "-lws2_32", "-lcrypt32");
+         when others =>
+            for Default_Switches ("Ada") use ("-lssl", "-lcrypto");
+      end case;
+   end Linker;
 end CLDR_Tools;

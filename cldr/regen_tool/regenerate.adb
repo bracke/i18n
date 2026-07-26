@@ -143,6 +143,7 @@ procedure Regenerate is
       +"generate_cldr_collation_tailoring",
       +"generate_ucd_uprops_data",
       +"generate_cldr_transform_data",
+      +"download_tzdb",
       +"fetch_ucd"];
 
    procedure Build_Tools is
@@ -280,9 +281,23 @@ procedure Regenerate is
       end if;
    end Generate_Runtime_Data;
 
+   --  The tzdb fixtures (rearguard tzdata.zi + zone tables) are downloaded from
+   --  IANA and built by running the tz project's ziguard/zishrink scripts
+   --  through awklib -- no external awk. generate_cldr_data reads them, so fetch
+   --  them first when a fresh tree lacks them.
+   procedure Ensure_TZDB is
+   begin
+      if not File_Here (Cldr & "/upstream/tzdb/tzdata.zi") then
+         Build_Tools;
+         Log ("fetching and building the tzdb fixtures");
+         Run (Cldr & "/bin/download_tzdb", Dir => Cldr);
+      end if;
+   end Ensure_TZDB;
+
    procedure Generate is
    begin
       Build_Tools;
+      Ensure_TZDB;
       Log ("generating " & Body_F);
       Generate_With ("generate_cldr_data");
       Generate_Runtime_Data;

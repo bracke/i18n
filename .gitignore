@@ -47,10 +47,9 @@ check_i18n/alire/
 #  reproducible: it names the CLDR release the data was built from. Without it
 #  a clone has the generated table but no way to tell what produced it.
 !/cldr/upstream/source_manifest.txt
-#  ... and the small pinned tzdb inputs (~156 KB, version 2026a). Unlike the
-#  huge CLDR-JSON tree these are not downloaded by the regeneration; the
-#  generator reads them directly, so a fresh checkout (and CI) must carry them.
-!/cldr/upstream/tzdb/
+#  The tzdb fixtures under upstream/tzdb/ are downloaded from IANA and rebuilt
+#  by download_tzdb (ziguard/zishrink via awklib), like the CLDR tree -- so they
+#  stay ignored and regenerated, not committed.
 /cldr/data/cldr_subset.txt
 /cldr/import/normalized_cldr.txt
 /cldr/raw/cldr_records.txt
