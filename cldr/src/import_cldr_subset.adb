@@ -1470,6 +1470,7 @@ begin
             Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          end if;
       else
+         Ada.Directories.Create_Path (Ada.Directories.Containing_Directory (Target_Path));
          Ada.Directories.Copy_File (Generated_Path, Target_Path);
          Ada.Text_IO.Put_Line ("imported cldr/data/cldr_subset.txt");
       end if;
