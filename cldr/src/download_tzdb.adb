@@ -5,14 +5,17 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
+with Ada.Containers.Indefinite_Hashed_Maps;
+with Ada.Streams;
+with Ada.Strings.Hash;
 with Http_Client.Clients;
 with Http_Client.Errors;
 with Zlib;
 with Tarlib.Readers;
-with Tarlib.Files;
+with Tarlib.Inputs;
+with Tarlib.Entries;
 with Tarlib.Errors;
 with Awklib.Interpreter;
-with Project_Tools.Files;
 
 --  Fetch the pinned IANA tzdb release and produce the rearguard tzdb fixtures
 --  under cldr/upstream/tzdb/ -- tzdata.zi (built by running the tz project's own
@@ -31,8 +34,6 @@ procedure Download_TZDB is
      "https://data.iana.org/time-zones/releases/tzdata" & TZ_Version & ".tar.gz";
    Work_Dir    : constant String := "/tmp/i18n_tzdb_download";
    Tgz_Path    : constant String := Work_Dir & "/tzdata.tar.gz";
-   Tar_Path    : constant String := Work_Dir & "/tzdata.tar";
-   Extract_Dir : constant String := Work_Dir & "/tree";
    Out_Dir     : constant String := "upstream/tzdb";
 
    --  TDATA, in the order the tz Makefile concatenates it.
@@ -74,21 +75,6 @@ procedure Download_TZDB is
       end;
    end Read_Bytes;
 
-   procedure Write_Bytes (Path : String; Data : Zlib.Byte_Array) is
-      use Ada.Streams.Stream_IO;
-      F   : File_Type;
-      SEA : Ada.Streams.Stream_Element_Array
-              (1 .. Ada.Streams.Stream_Element_Offset (Data'Length));
-   begin
-      for I in Data'Range loop
-         SEA (Ada.Streams.Stream_Element_Offset (I - Data'First + 1)) :=
-           Ada.Streams.Stream_Element (Data (I));
-      end loop;
-      Create (F, Out_File, Path);
-      Write (F, SEA);
-      Close (F);
-   end Write_Bytes;
-
    procedure Write_String (Path : String; Content : String) is
       use Ada.Streams.Stream_IO;
       F : File_Type;
@@ -98,14 +84,111 @@ procedure Download_TZDB is
       Close (F);
    end Write_String;
 
-   function Read_String (Path : String) return String is
-     (Project_Tools.Files.Read_Raw_File (Path));
-
    function Trim (S : String) return String is
       use Ada.Strings, Ada.Strings.Fixed;
    begin
       return Trim (S, Both);
    end Trim;
+
+   ---------------------------------------------------------------------------
+   --  In-memory tar extraction (Tarlib.Readers only, so tarlib-files' POSIX
+   --  filesystem code -- chown/symlink/mknod/... -- is never linked; that unit
+   --  does not build on Windows). Regular-file entries are collected by base
+   --  name into a content map the pipeline reads from.
+   ---------------------------------------------------------------------------
+   package Content_Maps is new Ada.Containers.Indefinite_Hashed_Maps
+     (Key_Type => String, Element_Type => Unbounded_String,
+      Hash => Ada.Strings.Hash, Equivalent_Keys => "=");
+
+   Extracted : Content_Maps.Map;
+
+   type SEA_Access is access Ada.Streams.Stream_Element_Array;
+
+   type Memory_Source is limited new Tarlib.Inputs.Input_Source with record
+      Data : SEA_Access;
+      Pos  : Ada.Streams.Stream_Element_Offset := 1;
+   end record;
+
+   overriding procedure Read
+     (Source : in out Memory_Source;
+      Data   : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset;
+      Result : out Tarlib.Errors.Status)
+   is
+      use type Ada.Streams.Stream_Element_Offset;
+      Available : constant Ada.Streams.Stream_Element_Offset :=
+        Source.Data'Last - Source.Pos + 1;
+      Take      : constant Ada.Streams.Stream_Element_Offset :=
+        Ada.Streams.Stream_Element_Offset'Min (Data'Length, Available);
+   begin
+      Result := Tarlib.Errors.OK;
+      if Take <= 0 then
+         Last := Data'First - 1;
+         return;
+      end if;
+      Data (Data'First .. Data'First + Take - 1) :=
+        Source.Data (Source.Pos .. Source.Pos + Take - 1);
+      Source.Pos := Source.Pos + Take;
+      Last := Data'First + Take - 1;
+   end Read;
+
+   function Base_Name (Path : String) return String is
+      Cut : Natural := Path'First - 1;
+   begin
+      for I in Path'Range loop
+         if Path (I) = '/' then
+            Cut := I;
+         end if;
+      end loop;
+      return Path (Cut + 1 .. Path'Last);
+   end Base_Name;
+
+   procedure Extract_Tar (Tar : Zlib.Byte_Array) is
+      use type Ada.Streams.Stream_Element_Offset;
+      use type Tarlib.Entries.Entry_Kind;
+      Bytes  : constant SEA_Access :=
+        new Ada.Streams.Stream_Element_Array (1 .. Ada.Streams.Stream_Element_Offset (Tar'Length));
+      Source : aliased Memory_Source;
+      Reader : Tarlib.Readers.Reader;
+      Info   : Tarlib.Readers.Entry_Info;
+      Has    : Boolean;
+      R      : Tarlib.Errors.Status;
+   begin
+      for I in Tar'Range loop
+         Bytes (Ada.Streams.Stream_Element_Offset (I - Tar'First + 1)) :=
+           Ada.Streams.Stream_Element (Tar (I));
+      end loop;
+      Source.Data := Bytes;
+
+      Tarlib.Readers.Initialize (Reader, Source, R);
+      if not Tarlib.Errors.Is_Success (R) then
+         Fail ("cannot read tar: " & R'Image);
+      end if;
+
+      loop
+         Tarlib.Readers.Next_Entry (Reader, Info, Has, R);
+         exit when not Has;
+         if not Tarlib.Errors.Is_Success (R) then
+            Fail ("tar read failed: " & R'Image);
+         end if;
+         if Tarlib.Readers.Kind (Info) = Tarlib.Entries.Regular_File then
+            declare
+               Content : Unbounded_String;
+               Buf     : Ada.Streams.Stream_Element_Array (1 .. 65536);
+               RLast   : Ada.Streams.Stream_Element_Offset;
+            begin
+               loop
+                  Tarlib.Readers.Read (Reader, Buf, RLast, R);
+                  exit when RLast < Buf'First;
+                  for K in Buf'First .. RLast loop
+                     Append (Content, Character'Val (Natural (Buf (K))));
+                  end loop;
+               end loop;
+               Extracted.Include (Base_Name (Tarlib.Readers.Path (Info)), Content);
+            end;
+         end if;
+      end loop;
+   end Extract_Tar;
 
    ---------------------------------------------------------------------------
    --  awklib driver
@@ -181,38 +264,14 @@ begin
       if Status /= Zlib.Ok then
          Fail ("gunzip failed: " & Status'Image);
       end if;
-      Write_Bytes (Tar_Path, Tar);
-   end;
-
-   --  3. Extract the tar into a working tree.
-   declare
-      Source : aliased Tarlib.Files.File_Input_Source;
-      Reader : Tarlib.Readers.Reader;
-      R      : Tarlib.Errors.Status;
-   begin
-      if Project_Tools.Files.Directory_Exists (Extract_Dir) then
-         Project_Tools.Files.Delete_Tree (Extract_Dir);
-      end if;
-      Ada.Directories.Create_Path (Extract_Dir);
-      Tarlib.Files.Open_Read (Source, Tar_Path, R);
-      if not Tarlib.Errors.Is_Success (R) then
-         Fail ("cannot open tar: " & R'Image);
-      end if;
-      Tarlib.Readers.Initialize (Reader, Source, R);
-      if not Tarlib.Errors.Is_Success (R) then
-         Fail ("cannot read tar: " & R'Image);
-      end if;
-      Tarlib.Files.Extract_All (Reader, Extract_Dir, R);
-      if not Tarlib.Errors.Is_Success (R) then
-         Fail ("tar extraction failed: " & R'Image);
-      end if;
-      Tarlib.Files.Close (Source, R);
+      --  3. Extract the tar in memory (regular files by base name).
+      Extract_Tar (Tar);
    end;
 
    --  4. Run ziguard (rearguard) then zishrink through awklib.
    declare
       function Src (Name : String) return String is
-        (Read_String (Extract_Dir & "/" & Name));
+        (if Extracted.Contains (Name) then To_String (Extracted.Element (Name)) else "");
 
       Version_Str  : constant String := Trim (Src ("version"));
 

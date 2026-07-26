@@ -674,6 +674,13 @@ procedure Generate_CLDR_Data is
       end loop;
 
       return Result;
+   exception
+      when others =>
+         Ada.Text_IO.Put_Line
+           (Ada.Text_IO.Standard_Error,
+            "DIAG Decimal_Value failed on [" & Value & "] len"
+            & Natural'Image (Value'Length));
+         raise;
    end Decimal_Value;
 
    function Signed_Decimal_Value (Value : String) return Integer is
