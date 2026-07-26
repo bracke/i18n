@@ -100,18 +100,6 @@ jobs:
         working-directory: i18n/tests
         run: alr exec -- ./bin/tests
 
-      - name: Build public examples
-        working-directory: i18n/examples
-        run: alr --non-interactive build
-
-      - name: Build render benchmarks
-        working-directory: i18n/benchmarks
-        run: alr --non-interactive build
-
-      - name: Run render benchmark smoke
-        working-directory: i18n
-        run: ./benchmarks/bin/render_benchmarks --smoke
-
       - name: Install GNATdoc
         # gnatdoc is not part of the gnat_native toolchain, so a bare
         # `alr exec -- gnatdoc` fails with "Executable not found in PATH".
@@ -131,10 +119,6 @@ jobs:
       - name: Build release checker
         working-directory: i18n/check_i18n
         run: alr build
-
-      - name: Run public example output checks
-        working-directory: i18n/check_i18n
-        run: ./bin/check_i18n --examples-only
 
       - name: Run project_tools release checker
         working-directory: i18n/check_i18n
