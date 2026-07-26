@@ -23,6 +23,28 @@ jobs:
           repository: ${{ github.repository_owner }}/project_tools
           path: project_tools
 
+      # The CLDR regeneration tooling (cldr_tools) downloads and unpacks upstream
+      # over HTTPS, so it depends on httpclient (which pulls zlib + cryptolib).
+      # The library's pre-build regeneration builds those tools, so their sibling
+      # checkouts must be present or `alr build` fails resolving the path pins.
+      - name: Check out httpclient sibling
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/httpclient
+          path: httpclient
+
+      - name: Check out zlib sibling
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/zlib
+          path: zlib
+
+      - name: Check out cryptolib sibling
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/cryptolib
+          path: cryptolib
+
       - name: Set up Alire
         uses: alire-project/setup-alire@v5
         with:
@@ -31,6 +53,8 @@ jobs:
       - name: Install workflow dependencies
         run: |
           sudo apt-get update
+          # libssl-dev: httpclient's TLS bridge (the CLDR downloader links it).
+          sudo apt-get install -y libssl-dev
           sudo apt-get install -y libaunit-dev || sudo apt-get install -y libaunit22-dev || sudo apt-get install -y libaunit24-dev
 
       - name: Build library package
