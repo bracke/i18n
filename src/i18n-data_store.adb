@@ -8,6 +8,7 @@ package body I18N.Data_Store is
 
    HT : constant Character := Character'Val (16#09#);
    LF : constant Character := Character'Val (16#0A#);
+   CR : constant Character := Character'Val (16#0D#);
 
    type String_Access is access String;
    type Dir_List is array (Positive range <>) of Unbounded_String;
@@ -143,8 +144,23 @@ package body I18N.Data_Store is
          loop
             Read (F, Buf, Last);
             for I in 1 .. Natural (Last) loop
-               Pos := Pos + 1;
-               Result (Pos) := Character'Val (Buf (Stream_Element_Offset (I)));
+               declare
+                  Ch : constant Character :=
+                    Character'Val (Buf (Stream_Element_Offset (I)));
+               begin
+                  --  Collapse CRLF to LF. The data files are written with
+                  --  Ada.Text_IO, which emits CRLF on Windows; the byte-exact
+                  --  section parser and bisection would otherwise keep the CR in
+                  --  every value (and after each key), so every lookup misses and
+                  --  formatting silently falls back to defaults. Standalone CR
+                  --  bytes are left untouched.
+                  if Ch = LF and then Pos >= 1 and then Result (Pos) = CR then
+                     Result (Pos) := LF;
+                  else
+                     Pos := Pos + 1;
+                     Result (Pos) := Ch;
+                  end if;
+               end;
             end loop;
             exit when Last < Buf'Last;   --  short read => end of file
          end loop;
