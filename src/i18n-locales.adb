@@ -108,6 +108,12 @@ package body I18N.Locales is
    function Canonicalize
      (Item : Locale_Id)
       return String
+   with
+      --  Its nested Canonical_Subtag sets the enclosing Primary_Was_Sh, so from
+      --  SPARK's view it is a function with a global output, which is not legal
+      --  SPARK. The behaviour is fine; exclude it from proof like the other
+      --  non-SPARK subprograms in this body rather than restructure it.
+      SPARK_Mode => Off
    is
       Clean           : constant String :=
         Ada.Strings.Fixed.Trim (Item, Ada.Strings.Both);
