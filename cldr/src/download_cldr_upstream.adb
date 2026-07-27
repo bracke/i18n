@@ -262,6 +262,14 @@ begin
       end if;
 
       declare
+         --  Windows CI runners reach the GitHub release CDN only intermittently:
+         --  the same 82 MB fetch that succeeds in one run returns CONNECTION_FAILED
+         --  for the whole of another. The outage outlasts a few quick tries, so
+         --  ride it out with an escalating backoff -- 15, 30, 45, 60, 75 s between
+         --  six attempts, roughly four minutes of patience -- before giving up.
+         Max_Attempts    : constant := 6;
+         Backoff_Seconds : constant := 15;
+
          Tag          : constant String := Release_Tag (Version);
          URL          : constant String := Archive_URL (Tag);
          Archive_Path : constant String :=
@@ -279,9 +287,7 @@ begin
          Put_Line ("CLDR " & Version & " -> release tag " & Tag);
          Put_Line ("fetching " & URL);
 
-         --  Retry: CI runners hit transient connection failures against the
-         --  GitHub release CDN, the same way download_tzdb does against IANA.
-         for Attempt in 1 .. 3 loop
+         for Attempt in 1 .. Max_Attempts loop
             Status :=
               Http_Client.Clients.Download_To_File
                 (URL     => URL,
@@ -292,8 +298,8 @@ begin
             Put_Line
               ("download attempt" & Attempt'Image & " failed: " & Status'Image
                & " (HTTP" & Natural'Image (Result.HTTP_Status_Code) & ")");
-            if Attempt < 3 then
-               delay 10.0;
+            if Attempt < Max_Attempts then
+               delay Duration (Attempt * Backoff_Seconds);
             end if;
          end loop;
 
