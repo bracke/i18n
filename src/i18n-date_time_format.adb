@@ -380,8 +380,12 @@ package body I18N.Date_Time_Format is
         I18N.Runtime_Data.Locale_Boolean
           (Locale, "uses_day_month_year", Found);
    begin
-      --  An exact per-locale CLDR pattern beats the day-month-year template.
-      if Pattern_Found then
+      --  An exact per-locale CLDR pattern beats the day-month-year template --
+      --  but a runtime uses_day_month_year override (Found is set only from the
+      --  runtime store) is explicit and wins over a file-based pattern, which
+      --  for a locale absent from the data is merely inherited from root. File
+      --  locales report Found=False here and keep the exact-pattern precedence.
+      if not Found and then Pattern_Found then
          return Pattern_Value;
       end if;
 
@@ -399,9 +403,16 @@ package body I18N.Date_Time_Format is
          end;
       end if;
 
+      --  The uses_day_month_year data lists only the locales that do use
+      --  day-month-year order; a locale absent from it (en, en-US, ...) uses
+      --  month-day-year or year-month-day. Treat an unknown flag as False and
+      --  fall through to the non-DMY templates rather than returning an empty
+      --  pattern, which would fail the format with Invalid_Argument.
       if not Found then
-         return "";
-      elsif DMY then
+         DMY := False;
+      end if;
+
+      if DMY then
          if Style = "short" then
             return "dd'.'MM'.'yy";
          elsif Style = "long" or else Style = "full" then
