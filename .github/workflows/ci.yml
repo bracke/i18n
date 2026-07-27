@@ -13,12 +13,12 @@ jobs:
       ALIRE_NONINTERACTIVE: "true"
     steps:
       - name: Check out i18n
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: i18n
 
       - name: Check out project_tools sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/project_tools
           path: project_tools
@@ -28,19 +28,19 @@ jobs:
       # The library's pre-build regeneration builds those tools, so their sibling
       # checkouts must be present or `alr build` fails resolving the path pins.
       - name: Check out httpclient sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/httpclient
           path: httpclient
 
       - name: Check out zlib sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/zlib
           path: zlib
 
       - name: Check out cryptolib sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/cryptolib
           path: cryptolib
@@ -48,19 +48,19 @@ jobs:
       # download_tzdb untars with tarlib and runs the tz scripts through awklib
       # (which is built on regexp).
       - name: Check out tarlib sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/tarlib
           path: tarlib
 
       - name: Check out awklib sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/awklib
           path: awklib
 
       - name: Check out regexp sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/regexp
           path: regexp
@@ -68,13 +68,13 @@ jobs:
       # The CLDR import tools ask hostkit for the host's scratch directory
       # (a real temp path on Windows, not a POSIX "/tmp" guess).
       - name: Check out hostkit sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/hostkit
           path: hostkit
 
       - name: Set up Alire
-        uses: alire-project/setup-alire@v5
+        uses: alire-project/setup-alire@v6
         with:
           toolchain: gnat_native=15.2.1 gprbuild
 
