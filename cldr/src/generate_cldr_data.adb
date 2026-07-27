@@ -1939,7 +1939,45 @@ procedure Generate_CLDR_Data is
 
       Zic   : constant String := Project_Tools.Processes.Locate_Command ("zic");
       ZDump : constant String := Project_Tools.Processes.Locate_Command ("zdump");
+
+      --  Ada creates and addresses this directory natively; it must be absolute,
+      --  because zdump reads a slash-led argument as an absolute tzfile but
+      --  anything else as TZDIR-relative (a relative path sends it looking under
+      --  /usr/share/zoneinfo, not here). See Tool_Path for the Windows twist.
       Out_Dir : constant String := Hostkit.Fs.Temp_Directory & "/i18n_tzdb_generated";
+
+      --  On Windows the zic/zdump that Locate_Command finds are the Unix tools
+      --  from git-bash/MSYS2: they cannot resolve a native "C:\Users\...\Temp"
+      --  path (zdump then reports "unknown timezone"). Rewrite a "C:\dir" /
+      --  "C:/dir" drive path to its git-bash mount form "/c/dir" -- an absolute
+      --  POSIX path the tools accept, pointing at the same location Ada created.
+      --  A path with no drive letter is returned unchanged, so this is a no-op
+      --  on Linux and macOS, where Out_Dir is already an absolute POSIX path.
+      function Tool_Path (P : String) return String is
+      begin
+         if P'Length >= 2
+           and then P (P'First + 1) = ':'
+           and then P (P'First) in 'A' .. 'Z' | 'a' .. 'z'
+         then
+            declare
+               Drive : constant Character :=
+                 (if P (P'First) in 'A' .. 'Z'
+                  then Character'Val (Character'Pos (P (P'First)) + 32)
+                  else P (P'First));
+               Rest  : String := P (P'First + 2 .. P'Last);
+            begin
+               for C of Rest loop
+                  if C = '\' then
+                     C := '/';
+                  end if;
+               end loop;
+               return '/' & Drive & Rest;
+            end;
+         end if;
+         return P;
+      end Tool_Path;
+
+      Tool_Out_Dir : constant String := Tool_Path (Out_Dir);
 
       procedure Parse_Initial_Offset
         (Zone_Index : Positive;
@@ -2046,7 +2084,7 @@ procedure Generate_CLDR_Data is
 
       declare
          Args : constant GNAT.OS_Lib.Argument_List (1 .. 3) :=
-           [new String'("-d"), new String'(Out_Dir), new String'(TZDB_Path)];
+           [new String'("-d"), new String'(Tool_Out_Dir), new String'(TZDB_Path)];
       begin
          if Project_Tools.Processes.Run_Status
               ("compile checked tzdb", ".", Zic, Args, Quiet => True) /= 0
@@ -2058,7 +2096,7 @@ procedure Generate_CLDR_Data is
 
       for Zone_Index in 1 .. TZDB_Zone_Count loop
          declare
-            Zone_Path : constant String := Out_Dir & "/" & S (TZDB_Zone_Names (Zone_Index));
+            Zone_Path : constant String := Tool_Out_Dir & "/" & S (TZDB_Zone_Names (Zone_Index));
             Output    : US.Unbounded_String;
             Args_I    : constant GNAT.OS_Lib.Argument_List (1 .. 4) :=
               [new String'("-i"), new String'("-c"), new String'("1900,2051"),
