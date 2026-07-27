@@ -279,15 +279,27 @@ begin
          Put_Line ("CLDR " & Version & " -> release tag " & Tag);
          Put_Line ("fetching " & URL);
 
-         Status :=
-           Http_Client.Clients.Download_To_File
-             (URL     => URL,
-              Path    => Archive_Path,
-              Result  => Result,
-              Options => Options);
+         --  Retry: CI runners hit transient connection failures against the
+         --  GitHub release CDN, the same way download_tzdb does against IANA.
+         for Attempt in 1 .. 3 loop
+            Status :=
+              Http_Client.Clients.Download_To_File
+                (URL     => URL,
+                 Path    => Archive_Path,
+                 Result  => Result,
+                 Options => Options);
+            exit when Status = Http_Client.Errors.Ok;
+            Put_Line
+              ("download attempt" & Attempt'Image & " failed: " & Status'Image
+               & " (HTTP" & Natural'Image (Result.HTTP_Status_Code) & ")");
+            if Attempt < 3 then
+               delay 10.0;
+            end if;
+         end loop;
 
          if Status /= Http_Client.Errors.Ok then
-            Fail ("download failed: " & Status'Image & " (HTTP" & Natural'Image (Result.HTTP_Status_Code) & ")");
+            Fail ("download failed after retries: " & Status'Image
+                  & " (HTTP" & Natural'Image (Result.HTTP_Status_Code) & ")");
             return;
          end if;
 
