@@ -3,4 +3,4 @@ cldr_version=48.2
 source_family=cldr-json
 source_file_count=4437
 export=upstream/cldr_export.jsonl
-record_count=1159732
+record_count=1159858

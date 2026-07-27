@@ -2794,7 +2794,12 @@ procedure Generate_CLDR_Export is
 
             if Region = "" then
                Add_Error ("missing CLDR regionFormat for locale " & Locale);
-            elsif Contains (Region, "{0}") and then Region /= "{0} Time" then
+            elsif Contains (Region, "{0}") then
+               --  Emit the exact CLDR regionFormat, including "{0} Time".
+               --  Special-casing that value as an implicit default was wrong:
+               --  English's "{0} Time" was dropped while root's "{0}" was kept,
+               --  so English locales inherited "{0}" and rendered a bare
+               --  exemplar city ("New York") instead of "New York Time".
                Emit_JSON
                  ("{""type"":""zone_location_pattern"",""locale"":"""
                   & Locale & """,""value"":""" & JSON_Escape (Region) & """}");

@@ -24,7 +24,7 @@ require_raw_count|zone_display|17782
 require_raw_count|zone_exemplar|128821
 require_raw_count|zone_family_display|8580
 require_raw_count|zone_gmt_prefix|759
-require_raw_count|zone_location_pattern|640
+require_raw_count|zone_location_pattern|766
 require_raw_count|zone_offset_separator|9
 require_raw_count|zone_short_family|555
 
