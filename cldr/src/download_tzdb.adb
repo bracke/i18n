@@ -210,6 +210,11 @@ procedure Download_TZDB is
       Status    : Awklib.Interpreter.Run_Status;
       Message   : Unbounded_String;
       Empty     : Awklib.Interpreter.Assignment_Vectors.Vector;
+
+      --  Anything the program redirected to a file of its own. These scripts
+      --  write to standard output and nowhere else, so this stays empty; it is
+      --  here because Awklib.Interpreter.Run has to hand it back somewhere.
+      Written   : Awklib.Interpreter.Assignment_Vectors.Vector;
    begin
       Awklib.Interpreter.Run
         (Program_Source => Program,
@@ -221,6 +226,7 @@ procedure Download_TZDB is
          Exit_Code      => Exit_Code,
          Status         => Status,
          Message        => Message,
+         Output_Files   => Written,
          Files          => Files,
          Input_Files    => Input_Files);
       if Status /= Awklib.Interpreter.Run_Ok then
