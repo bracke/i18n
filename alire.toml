@@ -6,6 +6,7 @@ maintainers = ["Bent Bracke <bent@bracke.dk>"]
 maintainers-logins = ["bracke"]
 licenses = "MIT"
 website = "https://github.com/bracke/i18n"
+long-description = "i18n is a native Ada 2022 implementation of the Unicode text algorithms and the CLDR formatting, names and data stack: locale identity and fallback, plural and ordinal classification, collation, segmentation, and formatting for numbers, dates, currency, units, durations, byte sizes, relative time and lists. It has no external runtime dependencies and generates its locale data from a checked, pinned CLDR and tzdb subset rather than reading a system library's. ICU-style message formatting is deliberately not here; it lives in the sibling messages crate, which is built on this one."
 tags = ["i18n","unicode","cldr","locales"]
 project-files = ["i18n.gpr"]
 
