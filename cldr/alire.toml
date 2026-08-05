@@ -73,6 +73,16 @@ hostkit = { path = "../../hostkit" }
 [[pins]]
 cryptolib = { path = "../../cryptolib" }
 
+# `ssllib` is httpclient's TLS backend, and its own dependencies come with it.
+# Same reason as cryptolib above: Alire honours pins only in the root crate, so
+# every root that builds this graph has to name them.
+[[pins]]
+ssllib = { path = "../../ssllib" }
+
+[[pins]]
+truststores = { path = "../../truststores" }
+
+
 # Build dependencies in the development profile (-Og) too, not the default
 # release (-O3), so roots that share these crates share object files rather
 # than forcing each other into full rebuilds.

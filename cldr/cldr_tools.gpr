@@ -50,13 +50,14 @@ project CLDR_Tools is
    end Binder;
 
    package Linker is
-      --  download_tzdb links httpclient (its TLS/crypto bridge needs OpenSSL);
-      --  httpclient leaves the OpenSSL link to its consumers.
+      --  download_tzdb links httpclient, whose TLS is `ssllib` and whose
+      --  cache crypto is CryptoLib -- both Ada, so there is no C TLS library
+      --  to link here any more.
       case Cldr_Tools_Config.Alire_Host_OS is
          when "windows" =>
-            for Default_Switches ("Ada") use ("-lssl", "-lcrypto", "-lws2_32", "-lcrypt32");
+            for Default_Switches ("Ada") use ("-lws2_32", "-lcrypt32");
          when others =>
-            for Default_Switches ("Ada") use ("-lssl", "-lcrypto");
+            for Default_Switches ("Ada") use ();
       end case;
    end Linker;
 end CLDR_Tools;

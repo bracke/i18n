@@ -1,6 +1,6 @@
 --  The network tools are a project of their own, not more Mains in
 --  cldr_tools.gpr: they are the only CLDR tools that need an HTTP stack and a
---  ZIP decoder, and linking OpenSSL into the six generator/checker tools that
+--  ZIP decoder, and linking a TLS stack into the six generator/checker tools that
 --  never touch the network would make every regeneration pay for a step that
 --  runs once. Dependencies arrive through the generated config project, so the
 --  two projects differ in nothing but their Mains and their Linker package.
@@ -33,16 +33,16 @@ project CLDR_Download is
    end Binder;
 
    package Linker is
-      --  httpclient leaves the OpenSSL bridge to its consumers; its own
-      --  examples.gpr links -lssl -lcrypto the same way.
+      --  Nothing to link for TLS any more: httpclient's TLS is `ssllib` and
+      --  its cache crypto is CryptoLib, both Ada. What is left is the Windows
+      --  socket and certificate-store libraries, which the runtime wants there
+      --  and libc provides elsewhere.
       case Cldr_Tools_Config.Alire_Host_OS is
          when "windows" =>
-            --  OpenSSL on Windows pulls in the socket and certificate-store
-            --  system libraries that are part of libc elsewhere. Unverified:
-            --  no Windows host has built this yet.
-            for Default_Switches ("Ada") use ("-lssl", "-lcrypto", "-lws2_32", "-lcrypt32");
+            --  Unverified: no Windows host has built this yet.
+            for Default_Switches ("Ada") use ("-lws2_32", "-lcrypt32");
          when others =>
-            for Default_Switches ("Ada") use ("-lssl", "-lcrypto");
+            for Default_Switches ("Ada") use ();
       end case;
    end Linker;
 end CLDR_Download;
