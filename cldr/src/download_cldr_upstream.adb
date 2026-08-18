@@ -276,6 +276,8 @@ begin
            Project_Tools.Files.Join (Destination, "cldr-" & Tag & "-json-full.zip");
          Result       : Http_Client.Clients.Download_Result;
          Options      : Http_Client.Clients.Download_Options := Http_Client.Clients.Default_Download_Options;
+         Setup        : Http_Client.Clients.Client_Configuration :=
+           Http_Client.Clients.Default_Client_Configuration;
          Status       : Http_Client.Errors.Result_Status;
          Unpacked     : Zlib.Status_Code;
          Unpack_Error : Ada.Strings.Unbounded.Unbounded_String;
@@ -284,16 +286,32 @@ begin
          Options.Create_Parent_Dirs := True;
          Options.Max_Download_Size := Max_Archive_Bytes;
 
+         --  Resumed rather than restarted, because this transfer does not
+         --  survive its own length. Reading the 82 MB release over TLS fails
+         --  partway with a record that will not authenticate -- after 1 MB in
+         --  one attempt and 40 MB in the next, at no fixed offset -- on Linux
+         --  and Windows runners and on a Linux developer machine, while macOS
+         --  completes it. That is a defect in the TLS record layer rather than
+         --  in this tool, and it is not this tool's to fix; what this tool can
+         --  do is not throw away the megabytes it did receive.
+         --
+         --  With the partial file kept, each of the six attempts continues
+         --  where the last one stopped, so the download finishes in the
+         --  attempts it already had rather than never.
+         Options.Enable_Resume := True;
+         Options.Preserve_Partial_File := True;
+
          Put_Line ("CLDR " & Version & " -> release tag " & Tag);
          Put_Line ("fetching " & URL);
 
          for Attempt in 1 .. Max_Attempts loop
             Status :=
               Http_Client.Clients.Download_To_File
-                (URL     => URL,
-                 Path    => Archive_Path,
-                 Result  => Result,
-                 Options => Options);
+                (URL           => URL,
+                 Path          => Archive_Path,
+                 Result        => Result,
+                 Options       => Options,
+                 Configuration => Setup);
             exit when Status = Http_Client.Errors.Ok;
             Put_Line
               ("download attempt" & Attempt'Image & " failed: " & Status'Image
