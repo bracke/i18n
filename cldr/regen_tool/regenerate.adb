@@ -360,15 +360,40 @@ procedure Regenerate is
       Generate_With ("import_cldr_subset");
    end Import_From_Upstream;
 
-   procedure Download_Upstream is
+   --  Whether the upstream release could be fetched.
+   --
+   --  Best-effort, like the runtime data it exists to produce. A workspace
+   --  that cannot reach the CDN -- a Windows runner whose TLS trust store will
+   --  not load, a machine with no network, a build behind a proxy that refuses
+   --  it -- is not a broken build: this library compiles and runs from the
+   --  tables already in it, and the feature that needs a missing file reports
+   --  itself unavailable.
+   --
+   --  Said out loud, and left to the consumer that actually needs the data to
+   --  insist on it. messages formats real locales and asserts the file exists
+   --  in its own CI; adash uses this library for its catalogue and never asks
+   --  for a locale's formats, and a download it does not need must not be able
+   --  to stop it building.
+   function Fetched_Upstream return Boolean is
    begin
       Build_Tools;
       if not Binary_Here (Cldr & "/bin/download_cldr_upstream") then
-         Fail ("downloader not built; cannot fetch upstream");
+         Log ("the downloader is not built here; leaving the upstream alone");
+         return False;
       end if;
+
       Log ("fetching the CLDR release named by upstream/source_manifest.txt");
-      Generate_With ("download_cldr_upstream");
-   end Download_Upstream;
+      Run (Cldr & "/bin/download_cldr_upstream", Dir => Cldr,
+           Allow_Failure => True);
+
+      if not Dir_Here (Upstream) then
+         Log ("the CLDR upstream could not be fetched here; "
+              & "leaving the runtime data as it is");
+         return False;
+      end if;
+
+      return True;
+   end Fetched_Upstream;
 
 begin
    if not Dir_Here (Cldr) then
@@ -413,9 +438,10 @@ begin
    end if;
 
    --  Step 4 -- nothing local: fetch the release, then fall through 3 and 2.
-   Download_Upstream;
-   Import_From_Upstream;
-   Generate;
+   if Fetched_Upstream then
+      Import_From_Upstream;
+      Generate;
+   end if;
 
 exception
    when Regenerate_Failed =>
