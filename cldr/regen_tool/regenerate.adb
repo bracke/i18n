@@ -67,6 +67,16 @@ procedure Regenerate is
    function Dir_Here (Path : String) return Boolean is
      (Exists (Path) and then Kind (Path) = Directory);
 
+   --  A *generated artifact* that is there.
+   --
+   --  Stricter than File_Here on purpose: a zero-byte file is not data. The
+   --  repository tracks empty placeholders for several of these so that a
+   --  fresh clone has the paths, and every "is it already generated?" test
+   --  below answered yes for a file holding nothing -- so a clone shipped
+   --  empty tables and nothing regenerated them.
+   function Data_Here (Path : String) return Boolean is
+     (File_Here (Path) and then Size (Path) > 0);
+
    --  A built generator, tolerating a .exe suffix on Windows.
    function Binary_Here (Path : String) return Boolean is
      (File_Here (Path) or else File_Here (Path & ".exe"));
@@ -179,7 +189,7 @@ procedure Regenerate is
    --  without them, the feature just reports itself unavailable.
    procedure Generate_Runtime_Data is
    begin
-      if not File_Here (Share & "/display-names.i18ndata")
+      if not Data_Here (Share & "/display-names.i18ndata")
         and then Dir_Here (Upstream & "/cldr-localenames-full")
       then
          Build_Tools;
@@ -221,7 +231,7 @@ procedure Regenerate is
 
       --  UCD normalization data (from unicode.org, not cldr-json). Fetch the
       --  UCD files if missing, then generate; best-effort like the rest.
-      if not File_Here (Share & "/normalization.i18ndata") then
+      if not Data_Here (Share & "/normalization.i18ndata") then
          if not File_Here (Ucd & "/UnicodeData.txt") then
             Fetch_Ucd;
          end if;
@@ -233,7 +243,7 @@ procedure Regenerate is
       end if;
 
       --  Segmentation break tables (UAX #29 / #14), also from the UCD.
-      if not File_Here (Share & "/segmentation.i18ndata") then
+      if not Data_Here (Share & "/segmentation.i18ndata") then
          if not File_Here (Ucd & "/LineBreak.txt") then
             Fetch_Ucd;
          end if;
@@ -245,7 +255,7 @@ procedure Regenerate is
       end if;
 
       --  Collation (UCA DUCET root + CLDR locale tailorings).
-      if not File_Here (Share & "/collation.i18ndata") then
+      if not Data_Here (Share & "/collation.i18ndata") then
          if not File_Here (Uca & "/allkeys.txt") then
             Fetch_Ucd;
          end if;
@@ -261,7 +271,7 @@ procedure Regenerate is
       end if;
 
       --  Transliteration (UCA/UCD 16 properties + CLDR transform catalog).
-      if not File_Here (Share & "/uprops.i18ndata") then
+      if not Data_Here (Share & "/uprops.i18ndata") then
          if not File_Here (Ucd16 & "/Scripts.txt") then
             Fetch_Ucd;
          end if;
@@ -272,7 +282,7 @@ procedure Regenerate is
          end if;
       end if;
 
-      if not File_Here (Share & "/transforms/_index.i18ndata")
+      if not Data_Here (Share & "/transforms/_index.i18ndata")
         and then Dir_Here (Cldr & "/upstream/transforms")
       then
          Build_Tools;
@@ -332,7 +342,9 @@ begin
    --  than the subset it is generated from; without the timestamp test a stale
    --  body silently survives a subset change. The runtime data files are
    --  separate artifacts, so still (re)generate them when they are missing.
-   if File_Here (Body_F) then
+   if File_Here (Body_F)
+     and then Data_Here (Share & "/formats.i18ndata")
+   then
       if not File_Here (Subset)
         or else Modification_Time (Body_F) > Modification_Time (Subset)
       then
@@ -341,6 +353,14 @@ begin
       end if;
       Log (Body_F & " is older than " & Subset & "; regenerating");
    end if;
+
+   --  The formats file is asked about beside the body because one generator
+   --  writes both, and only one of them is tracked. Tracking the body made
+   --  this step conclude that everything was current on a fresh clone, and
+   --  return -- and formats.i18ndata, which nothing else writes, was never
+   --  produced. A consumer's CI found it: `messages` builds, then tests
+   --  `test -f ../i18n/share/i18n/formats.i18ndata`, and had been failing on
+   --  all three hosts since the body was tracked.
 
    --  Step 2 -- the pinned subset is the generator's real input.
    if File_Here (Subset) then
