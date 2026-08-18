@@ -156,7 +156,21 @@ procedure Regenerate is
       +"download_tzdb",
       +"fetch_ucd"];
 
-   procedure Build_Tools is
+   --  Whether the generators can be run here at all.
+   --
+   --  They are their own crate with their own dependencies -- an HTTP client,
+   --  an archive reader, an awk -- and a *consumer* of this library checks out
+   --  the crates this library needs, not the crates its tooling needs. So a
+   --  build of i18n inside somebody else's workspace can be a build where the
+   --  generators cannot even be compiled, and that is not an error in their
+   --  build: the library compiles and runs without the runtime data, and the
+   --  feature that needs a missing file reports itself unavailable.
+   --
+   --  Said out loud rather than passed over in silence, because a consumer who
+   --  *does* need the data -- messages, which formats real locales -- must be
+   --  able to see why it is not there. That one asserts the file exists in its
+   --  own CI, which is exactly the right place for the question.
+   function Tools_Ready return Boolean is
       Missing : Boolean := False;
    begin
       for Tool of Tools loop
@@ -170,7 +184,30 @@ procedure Regenerate is
          Log ("building the CLDR tools");
          Run ("alr",
               [+"-n", +"build", +"--profiles=*=development"],
-              Dir => Cldr);
+              Dir => Cldr, Allow_Failure => True);
+      end if;
+
+      for Tool of Tools loop
+         if not Binary_Here (Cldr & "/bin/" & Tool.all) then
+            Log ("the CLDR tools are not available in this workspace; "
+                 & "leaving the runtime data as it is");
+            return False;
+         end if;
+      end loop;
+
+      return True;
+   end Tools_Ready;
+
+   --  Set once the answer is known, so that the handler at the end can tell a
+   --  workspace without the tooling from a generator that went wrong, without
+   --  trying to build the tools a second time to find out.
+   Tooling_Absent : Boolean := False;
+
+   procedure Build_Tools is
+   begin
+      if not Tools_Ready then
+         Tooling_Absent := True;
+         raise Regenerate_Failed;
       end if;
    end Build_Tools;
 
@@ -382,5 +419,13 @@ begin
 
 exception
    when Regenerate_Failed =>
-      Set_Exit_Status (Failure);
+      if not Tooling_Absent then
+         --  A real failure: the tools are here and something they did went
+         --  wrong.
+         Set_Exit_Status (Failure);
+      end if;
+
+      --  Otherwise this is a workspace that carries the library and not its
+      --  tooling. Nothing was regenerated and nothing is broken; the consumer
+      --  that needs the data says so where it needs it.
 end Regenerate;
