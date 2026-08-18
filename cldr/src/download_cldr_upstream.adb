@@ -303,8 +303,12 @@ begin
          Options.Create_Parent_Dirs := True;
          Options.Max_Download_Size := Max_Archive_Bytes;
 
-         --  Resumed rather than restarted, because this transfer does not
-         --  survive its own length. Reading the 82 MB release over TLS fails
+         --  Resumed rather than restarted, because this transfer did not
+         --  survive its own length. Both reasons it did not are fixed below
+         --  this tool now -- a connection that dropped what its engine could
+         --  not take yet, and a trust bound set under what a Windows host
+         --  carries -- and resuming stays because a long transfer over a
+         --  network nobody controls is worth resuming on its own account. Reading the 82 MB release over TLS fails
          --  partway with a record that will not authenticate -- after 1 MB in
          --  one attempt and 40 MB in the next, at no fixed offset -- on Linux
          --  and Windows runners and on a Linux developer machine, while macOS
