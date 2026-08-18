@@ -262,13 +262,30 @@ begin
       end if;
 
       declare
-         --  Windows CI runners reach the GitHub release CDN only intermittently:
-         --  the same 82 MB fetch that succeeds in one run returns CONNECTION_FAILED
-         --  for the whole of another. The outage outlasts a few quick tries, so
-         --  ride it out with an escalating backoff -- 15, 30, 45, 60, 75 s between
-         --  six attempts, roughly four minutes of patience -- before giving up.
-         Max_Attempts    : constant := 6;
-         Backoff_Seconds : constant := 15;
+         --  Two different failures share this loop, and they want opposite
+         --  things.
+         --
+         --  An *outage* -- the release CDN unreachable for a while, which is
+         --  what CI runners meet -- wants patience: wait, and try again.
+         --
+         --  A *broken transfer* -- the 82 MB read failing partway on a record
+         --  that will not authenticate, which happens on Linux and Windows and
+         --  not on macOS -- wants the opposite: try again at once, because the
+         --  download resumes and each attempt adds what it managed. Six
+         --  attempts with a minute of waiting between them was patience spent
+         --  on the wrong failure; on a runner where each attempt carries a few
+         --  megabytes, an 82 MB archive needs many quick ones.
+         --
+         --  So the two are told apart by what an attempt achieved. An attempt
+         --  that added bytes is progress and is followed immediately; one that
+         --  added nothing is an outage and is followed by a growing wait. The
+         --  run gives up after enough attempts in a row have added nothing,
+         --  rather than after a fixed number of attempts -- a download that is
+         --  moving is not a download to abandon.
+         Max_Attempts     : constant := 60;
+         Max_Stalls       : constant := 6;
+         Backoff_Seconds  : constant := 15;
+         Max_Backoff      : constant := 60;
 
          Tag          : constant String := Release_Tag (Version);
          URL          : constant String := Archive_URL (Tag);
@@ -304,22 +321,41 @@ begin
          Put_Line ("CLDR " & Version & " -> release tag " & Tag);
          Put_Line ("fetching " & URL);
 
-         for Attempt in 1 .. Max_Attempts loop
-            Status :=
-              Http_Client.Clients.Download_To_File
-                (URL           => URL,
-                 Path          => Archive_Path,
-                 Result        => Result,
-                 Options       => Options,
-                 Configuration => Setup);
-            exit when Status = Http_Client.Errors.Ok;
-            Put_Line
-              ("download attempt" & Attempt'Image & " failed: " & Status'Image
-               & " (HTTP" & Natural'Image (Result.HTTP_Status_Code) & ")");
-            if Attempt < Max_Attempts then
-               delay Duration (Attempt * Backoff_Seconds);
-            end if;
-         end loop;
+         declare
+            Carried : Natural := 0;
+            Stalls  : Natural := 0;
+         begin
+            for Attempt in 1 .. Max_Attempts loop
+               Status :=
+                 Http_Client.Clients.Download_To_File
+                   (URL           => URL,
+                    Path          => Archive_Path,
+                    Result        => Result,
+                    Options       => Options,
+                    Configuration => Setup);
+               exit when Status = Http_Client.Errors.Ok;
+
+               if Result.Bytes_Written > Carried then
+                  Put_Line
+                    ("download attempt" & Attempt'Image & " stopped at"
+                     & Natural'Image (Result.Bytes_Written) & " of"
+                     & Natural'Image (Result.Expected_Final_Size) & " bytes: "
+                     & Status'Image & "; resuming");
+                  Carried := Result.Bytes_Written;
+                  Stalls  := 0;
+               else
+                  Stalls := Stalls + 1;
+                  Put_Line
+                    ("download attempt" & Attempt'Image & " added nothing: "
+                     & Status'Image
+                     & " (HTTP" & Natural'Image (Result.HTTP_Status_Code)
+                     & ")");
+                  exit when Stalls >= Max_Stalls;
+                  delay Duration
+                    (Natural'Min (Stalls * Backoff_Seconds, Max_Backoff));
+               end if;
+            end loop;
+         end;
 
          if Status /= Http_Client.Errors.Ok then
             Fail ("download failed after retries: " & Status'Image
