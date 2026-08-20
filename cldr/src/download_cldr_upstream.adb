@@ -293,7 +293,7 @@ begin
            Project_Tools.Files.Join (Destination, "cldr-" & Tag & "-json-full.zip");
          Result       : Http_Client.Clients.Download_Result;
          Options      : Http_Client.Clients.Download_Options := Http_Client.Clients.Default_Download_Options;
-         Setup        : Http_Client.Clients.Client_Configuration :=
+         Setup        : constant Http_Client.Clients.Client_Configuration :=
            Http_Client.Clients.Default_Client_Configuration;
          Status       : Http_Client.Errors.Result_Status;
          Unpacked     : Zlib.Status_Code;

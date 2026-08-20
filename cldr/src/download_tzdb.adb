@@ -38,11 +38,13 @@ procedure Download_TZDB is
    Out_Dir     : constant String := "upstream/tzdb";
 
    --  TDATA, in the order the tz Makefile concatenates it.
-   TDATA : constant array (Positive range <>) of access constant String :=
-     (new String'("africa"), new String'("antarctica"), new String'("asia"),
-      new String'("australasia"), new String'("europe"), new String'("northamerica"),
-      new String'("southamerica"), new String'("etcetera"), new String'("factory"),
-      new String'("backward"));
+   --
+   --  Held as one string with a separator rather than as an array of
+   --  `access constant String`: ten allocations that nothing frees, to hold
+   --  ten literals known at compile time, is what that was.
+   TDATA : constant String :=
+     "africa antarctica asia australasia europe northamerica"
+     & " southamerica etcetera factory backward";
 
    Failed : exception;
 
@@ -302,9 +304,25 @@ begin
       Input_Files : Awklib.Interpreter.Assignment_Vectors.Vector;
       Getline_F   : Awklib.Interpreter.Assignment_Vectors.Vector;
    begin
-      for F of TDATA loop
-         Input_Files.Append (Assign (F.all, Src (F.all)));
-      end loop;
+      --  One name at a time, out of the separated list above.
+      declare
+         From : Positive := TDATA'First;
+      begin
+         while From <= TDATA'Last loop
+            declare
+               Space : constant Natural :=
+                 Ada.Strings.Fixed.Index (TDATA, " ", From);
+
+               Stop : constant Natural :=
+                 (if Space = 0 then TDATA'Last else Space - 1);
+
+               Name : constant String := TDATA (From .. Stop);
+            begin
+               Input_Files.Append (Assign (Name, Src (Name)));
+               From := Stop + 2;
+            end;
+         end loop;
+      end;
       Input_Files.Append (Assign ("backzone", Src ("backzone")));
       Getline_F.Append (Assign ("zone.tab", Src ("zone.tab")));
 
