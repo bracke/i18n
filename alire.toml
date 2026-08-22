@@ -11,7 +11,7 @@ tags = ["i18n","unicode","cldr","locales"]
 project-files = ["i18n.gpr"]
 
 [[depends-on]]
-gnat = ">=12"
+gnat_native = "=15.2.1"
 
 #  src/i18n-cldr_data*.adb are generated build artifacts and are gitignored, so
 #  a clone has the spec and no body. This regenerates them from whatever the
