@@ -272,7 +272,7 @@ begin
          Fail ("download failed after retries: " & Status'Image
                & " (HTTP" & Result.HTTP_Status_Code'Image & ")");
       end if;
-      Ada.Text_IO.Put_Line ("tzdb: downloaded" & Natural'Image (Result.Bytes_Written) & " bytes");
+      Ada.Text_IO.Put_Line ("tzdb: downloaded" & Result.Bytes_Written'Image & " bytes");
    end;
 
    --  2. Gunzip to a plain .tar.

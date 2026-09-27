@@ -16,6 +16,7 @@ with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
+with Interfaces;
 
 with Http_Client.Clients;
 with Http_Client.Errors;
@@ -27,6 +28,7 @@ with Zlib;
 procedure Download_CLDR_Upstream is
 
    use type Http_Client.Errors.Result_Status;
+   use type Interfaces.Unsigned_64;
    use type Zlib.Status_Code;
 
    Manifest_Path : constant String := "upstream/source_manifest.txt";
@@ -301,7 +303,7 @@ begin
       begin
          Options.File_Mode := Http_Client.Clients.Replace_Atomically;
          Options.Create_Parent_Dirs := True;
-         Options.Max_Download_Size := Max_Archive_Bytes;
+         Options.Max_Download_Size := Interfaces.Unsigned_64 (Max_Archive_Bytes);
 
          --  Resumed rather than restarted, because this transfer did not
          --  survive its own length. Both reasons it did not are fixed below
@@ -326,7 +328,7 @@ begin
          Put_Line ("fetching " & URL);
 
          declare
-            Carried : Natural := 0;
+            Carried : Interfaces.Unsigned_64 := 0;
             Stalls  : Natural := 0;
          begin
             for Attempt in 1 .. Max_Attempts loop
@@ -342,8 +344,8 @@ begin
                if Result.Bytes_Written > Carried then
                   Put_Line
                     ("download attempt" & Attempt'Image & " stopped at"
-                     & Natural'Image (Result.Bytes_Written) & " of"
-                     & Natural'Image (Result.Expected_Final_Size) & " bytes: "
+                     & Result.Bytes_Written'Image & " of"
+                     & Result.Expected_Final_Size'Image & " bytes: "
                      & Status'Image & "; resuming");
                   Carried := Result.Bytes_Written;
                   Stalls  := 0;
@@ -367,7 +369,7 @@ begin
             return;
          end if;
 
-         Put_Line ("downloaded" & Natural'Image (Result.Bytes_Written) & " bytes to " & Archive_Path);
+         Put_Line ("downloaded" & Result.Bytes_Written'Image & " bytes to " & Archive_Path);
 
          --  Unpack beside the target and swap it in, so an interrupted or
          --  malformed archive never leaves a half-populated upstream/cldr-json
