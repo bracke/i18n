@@ -225,6 +225,13 @@ procedure Regenerate is
    --  and its output is missing. Best-effort: the library compiles and runs
    --  without them, the feature just reports itself unavailable.
    procedure Generate_Runtime_Data is
+      function Ucd16_Complete return Boolean is
+        (File_Here (Ucd16 & "/Scripts.txt")
+         and then File_Here (Ucd16 & "/SpecialCasing.txt")
+         and then File_Here (Ucd16 & "/UnicodeData.txt")
+         and then File_Here (Ucd16 & "/PropertyValueAliases.txt")
+         and then File_Here (Ucd16 & "/DerivedCoreProperties.txt")
+         and then File_Here (Ucd16 & "/DerivedGeneralCategory.txt"));
    begin
       if not Data_Here (Share & "/display-names.i18ndata")
         and then Dir_Here (Upstream & "/cldr-localenames-full")
@@ -308,11 +315,13 @@ procedure Regenerate is
       end if;
 
       --  Transliteration (UCA/UCD 16 properties + CLDR transform catalog).
+      --  The generator reads every one of these; checking only the first let a
+      --  half-finished fetch crash it on the next missing file.
       if not Data_Here (Share & "/uprops.i18ndata") then
-         if not File_Here (Ucd16 & "/Scripts.txt") then
+         if not Ucd16_Complete then
             Fetch_Ucd;
          end if;
-         if File_Here (Ucd16 & "/Scripts.txt") then
+         if Ucd16_Complete then
             Build_Tools;
             Log ("generating share/i18n/uprops.i18ndata");
             Generate_With ("generate_ucd_uprops_data");

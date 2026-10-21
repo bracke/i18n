@@ -79,6 +79,11 @@ procedure Fetch_Ucd is
       Any_Failure := True;
    end Note;
 
+   --  A single request to unicode.org or GitHub fails now and then on a CI
+   --  runner (a refused TLS handshake, a dropped connection) and succeeds on
+   --  the next try, so each file gets a few, further apart each time.
+   Attempts : constant := 4;
+
    --  Download URL to Dest if Dest is absent. An essential download aborts the
    --  run on failure; a best-effort one logs and continues.
    procedure Download
@@ -90,6 +95,7 @@ procedure Fetch_Ucd is
       Result  : HC.Clients.Download_Result;
       Options : HC.Clients.Download_Options := HC.Clients.Default_Download_Options;
       Status  : HC.Errors.Result_Status;
+      Served  : Boolean := False;
    begin
       if Exists (Dest) then
          return;
@@ -97,10 +103,26 @@ procedure Fetch_Ucd is
 
       Put_Line (Label);
       Options.Create_Parent_Dirs := True;
-      Status :=
-        HC.Clients.Download_To_File (URL, Dest, Result, Options, Download_Config);
+      for Attempt in 1 .. Attempts loop
+         Status :=
+           HC.Clients.Download_To_File (URL, Dest, Result, Options, Download_Config);
+         --  A transfer that worked can still carry the server's error page;
+         --  kept, it would be skipped as present on every later run.
+         Served := Status = HC.Errors.Ok and then Result.HTTP_Status_Code in 200 .. 299;
+         exit when Served;
+         if Exists (Dest) then
+            Delete_File (Dest);
+         end if;
+         --  A file the server does not have will not appear on a retry.
+         exit when Status = HC.Errors.Ok and then Result.HTTP_Status_Code in 400 .. 499;
+         if Attempt < Attempts then
+            Put_Line
+              (Standard_Error, "fetch_ucd: retrying " & URL & " (" & Status'Image & ")");
+            delay Duration (5 * Attempt);
+         end if;
+      end loop;
 
-      if Status /= HC.Errors.Ok then
+      if not Served then
          if Exists (Dest) then
             Delete_File (Dest);
          end if;
