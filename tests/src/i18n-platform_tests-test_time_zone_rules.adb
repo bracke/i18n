@@ -87,6 +87,13 @@ begin
            "Nuuk's start of daylight time at -1:00, the Saturday before");
    Assert (Rule_Offset ("<+00>0<+01>,0/0,J365/25", 2120, 7, 1, 0, 0, 0) = 3_600,
            "Casablanca's rule keeps +01 all year");
+   --  The same rule as an older zic writes it: daylight time ends on the
+   --  last evening of the year at the moment the next year's starts, so it
+   --  never pauses -- the last hours of a year are +01 too.
+   Assert (Rule_Offset ("XXX-2<+01>-1,0/0,J365/23", 2120, 12, 31, 23, 0, 0) = 3_600
+           and then Rule_Offset ("XXX-2<+01>-1,0/0,J365/23", 2120, 12, 31, 21, 0, 0) = 3_600
+           and then Rule_Offset ("XXX-2<+01>-1,0/0,J365/23", 2121, 6, 1, 0, 0, 0) = 3_600,
+           "Casablanca's rule from an older zic keeps +01 across the new year");
    Assert (Rule_Offset ("<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45", 2101, 1, 1, 0, 0, 0) = 49_500,
            "Chatham in January is +13:45");
    Assert (I18N.TZ_Rules.Epoch_Seconds (2000, 3, 1) = 951_868_800, "epoch seconds of 2000-03-01");

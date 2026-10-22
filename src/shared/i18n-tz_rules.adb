@@ -302,18 +302,34 @@ package body I18N.TZ_Rules is
          return Read_Rule.Standard;
       end if;
 
+      --  The changes of the year before, this year and the year after: the
+      --  one in force is the latest at or before the instant. A rule may end
+      --  daylight time on the last evening of one year and start it again at
+      --  the same moment for the next (Casablanca, written by an older zic as
+      --  "XXX-2<+01>-1,0/0,J365/23"), so a year's own two changes alone do not
+      --  decide its last hours; at a tie the start wins.
       declare
-         Year   : constant Integer := Year_Of (Instant);
-         Starts : constant Long_Long_Integer :=
-           Instant_Of (Read_Rule.Start_Rule, Year, Read_Rule.Standard);
-         Ends   : constant Long_Long_Integer :=
-           Instant_Of (Read_Rule.End_Rule, Year, Read_Rule.Daylight);
-         In_Daylight : constant Boolean :=
-           (if Starts < Ends
-            then Instant >= Starts and then Instant < Ends
-            --  Southern hemisphere: daylight time spans the new year.
-            else Instant < Ends or else Instant >= Starts);
+         Year        : constant Integer := Year_Of (Instant);
+         Latest      : Long_Long_Integer := Long_Long_Integer'First;
+         In_Daylight : Boolean := False;
       begin
+         for Around in Year - 1 .. Year + 1 loop
+            declare
+               Starts : constant Long_Long_Integer :=
+                 Instant_Of (Read_Rule.Start_Rule, Around, Read_Rule.Standard);
+               Ends   : constant Long_Long_Integer :=
+                 Instant_Of (Read_Rule.End_Rule, Around, Read_Rule.Daylight);
+            begin
+               if Ends <= Instant and then Ends > Latest then
+                  Latest := Ends;
+                  In_Daylight := False;
+               end if;
+               if Starts <= Instant and then Starts >= Latest then
+                  Latest := Starts;
+                  In_Daylight := True;
+               end if;
+            end;
+         end loop;
          return (if In_Daylight then Read_Rule.Daylight else Read_Rule.Standard);
       end;
    end Offset_At;
