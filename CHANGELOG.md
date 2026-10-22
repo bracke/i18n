@@ -17,6 +17,14 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Number signs come from CLDR.** The plus and minus signs, the percent and
+  per-mille signs and the exponent were the same constants for every locale
+  ("-" where Swedish and Finnish write U+2212, "%" with nothing before it
+  where German, French and Swedish put a no-break space). The exporter now
+  takes each locale's symbols from its numbering system in `numbers.json`,
+  and the percent sign with whatever its percent pattern puts between the
+  digits and the sign, as ICU does: "12 %" in German, "−5" in Swedish, and
+  Arabic's signs with their letter mark.
 - **Number, currency, unit and zone symbols come only from the data files.**
   `I18N.Locale_Data.Field` no longer takes a compiled fallback, and nineteen
   accessors leave `I18N.CLDR_Data` (`Decimal_Separator`, `Group_Separator`,

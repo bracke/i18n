@@ -1231,15 +1231,15 @@ procedure Extract_CLDR_Normalized is
             Add_Key ("zone_meta|" & Field (Line, 2), Line_Number);
             L ("zone_meta|" & Field (Line, 2) & "|" & Field (Line, 3));
             Seen_Output := True;
-         elsif Kind = "zone_text" then
+         elsif Kind = "zone_text" or else Kind = "number_text" then
             if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
               or else Field (Line, 4) = ""
             then
-               Add_Line_Error (Line_Number, "invalid zone_text record");
+               Add_Line_Error (Line_Number, "invalid " & Kind & " record");
                return;
             end if;
-            Add_Key ("zone_text|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
-            L ("zone_text_text|" & Field (Line, 2) & "|" & Field (Line, 3) & "|" & Field (Line, 4));
+            Add_Key (Kind & "|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
+            L (Kind & "_text|" & Field (Line, 2) & "|" & Field (Line, 3) & "|" & Field (Line, 4));
             Seen_Output := True;
          elsif Kind = "zone_specific_name" then
             if Field_Count (Line) /= 9 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then

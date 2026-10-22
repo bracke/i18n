@@ -1760,6 +1760,29 @@ procedure Generate_CLDR_Data is
               ("zone_text", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                Sub => Field (Line, 3));
          end if;
+      elsif Kind = "number_text" then
+         --  A locale's number symbol by name (plus, minus, percent, permille,
+         --  exponent), into the section the number formatter reads.
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid number_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            declare
+               Name    : constant String := Field (Line, 3);
+               Section : constant String :=
+                 (if Name = "plus" then "number_plus_sign"
+                  elsif Name = "minus" then "number_minus_sign"
+                  elsif Name = "percent" then "number_percent_suffix"
+                  elsif Name = "permille" then "number_permille_suffix"
+                  elsif Name = "exponent" then "number_exponent_separator"
+                  else "");
+            begin
+               if Section = "" then
+                  Add_Line_Error (Line_Number, "unknown number_text name " & Name);
+               else
+                  Add_Format (Section, Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)));
+               end if;
+            end;
+         end if;
       elsif Kind = "zone_specific_name" then
          --  A zone's or metazone's six names, into the locale's zone shard
          --  beside its exemplar cities, under keys no zone id can have
@@ -2035,29 +2058,17 @@ procedure Generate_CLDR_Data is
          Add_Error ("failed to read upstream/tzdb/zone.tab");
    end Add_Zone_Countries;
 
-   --  The number, currency, unit and zone symbols the formatters had from
-   --  constants compiled into I18N.CLDR_Data: the same values, as rows of the
-   --  formats file -- a und base and the languages that differ. A value the
+   --  The accounting, currency, unit and zone symbols the formatters had from
+   --  constants compiled into I18N.CLDR_Data, which CLDR keeps in patterns
+   --  rather than as symbols: the same values, as rows of the formats file --
+   --  a und base and the languages that differ. A value the
    --  locale has none of is CLDR's "no value" marker, which the reader maps to
    --  "" (the store has no empty values).
    procedure Add_Fixed_Formats is
       No_Value : constant String := Ada_Expression_UTF8_Bytes ("U (16#2205#) & U (16#2205#) & U (16#2205#)");
    begin
-      Add_Format ("number_plus_sign", "und", "+");
-      Add_Format ("number_minus_sign", "und", "-");
       Add_Format ("number_accounting_prefix", "und", "(");
       Add_Format ("number_accounting_suffix", "und", ")");
-      Add_Format ("number_exponent_separator", "und", "E");
-      Add_Format ("number_percent_suffix", "und", "%");
-      Add_Format ("number_permille_suffix", "und", Ada_Expression_UTF8_Bytes ("U (16#2030#)"));
-      for Arabic_Script in 1 .. 2 loop
-         declare
-            Language : constant String := (if Arabic_Script = 1 then "ar" else "fa");
-         begin
-            Add_Format ("number_percent_suffix", Language, Ada_Expression_UTF8_Bytes ("U (16#66A#)"));
-            Add_Format ("number_permille_suffix", Language, Ada_Expression_UTF8_Bytes ("U (16#609#)"));
-         end;
-      end loop;
       Add_Format ("currency_amount_separator", "und", " ");
       Add_Format ("currency_accounting_prefix", "und", "(");
       Add_Format ("currency_accounting_suffix", "und", ")");

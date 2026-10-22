@@ -679,18 +679,18 @@ procedure Import_CLDR_Raw is
                Add_Key ("zone_meta|" & Key, Line_Number);
                Emit_Record ("zone_meta|" & Key & "|" & Value);
             end;
-         elsif Kind = "zone_text" then
+         elsif Kind = "zone_text" or else Kind = "number_text" then
             declare
                Locale : constant String := JSON_Value (Line, "locale");
                Key    : constant String := JSON_Value (Line, "key");
                Value  : constant String := JSON_Value (Line, "value");
             begin
                if not Valid_Value (Locale) or else not Valid_Value (Key) or else not Valid_Value (Value) then
-                  Add_Line_Error (Line_Number, "invalid staged zone_text record");
+                  Add_Line_Error (Line_Number, "invalid staged " & Kind & " record");
                   return;
                end if;
-               Add_Key ("zone_text|" & Locale & "|" & Key, Line_Number);
-               Emit_Record ("zone_text|" & Locale & "|" & Key & "|" & Value);
+               Add_Key (Kind & "|" & Locale & "|" & Key, Line_Number);
+               Emit_Record (Kind & "|" & Locale & "|" & Key & "|" & Value);
             end;
          elsif Kind = "zone_specific_name" then
             declare

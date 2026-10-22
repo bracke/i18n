@@ -690,6 +690,8 @@ procedure Import_CLDR_Subset is
          return "zone_meta|" & Field (Payload, 2);
       elsif Kind = "zone_text" or else Kind = "zone_text_text" then
          return "zone_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
+      elsif Kind = "number_text" or else Kind = "number_text_text" then
+         return "number_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "zone_specific_name"
         or else Kind = "zone_specific_name_text"
       then
@@ -1223,16 +1225,20 @@ procedure Import_CLDR_Subset is
             Add_Key ("zone_meta|" & Field (Line, 2), Line_Number);
             L ("zone_meta|" & Field (Line, 2) & "|" & Field (Line, 3));
             Seen_Output := True;
-         elsif Kind = "zone_text_text" then
-            if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
-              or else Field (Line, 4) = ""
-            then
-               Add_Line_Error (Line_Number, "invalid zone_text_text row shape");
-               return;
-            end if;
-            Add_Key ("zone_text|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
-            L ("zone_text|" & Field (Line, 2) & "|" & Field (Line, 3) & "|" & Text_Expr (Field (Line, 4)));
-            Seen_Output := True;
+         elsif Kind = "zone_text_text" or else Kind = "number_text_text" then
+            declare
+               Base : constant String := Kind (Kind'First .. Kind'Last - 5);
+            begin
+               if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
+                 or else Field (Line, 4) = ""
+               then
+                  Add_Line_Error (Line_Number, "invalid " & Kind & " row shape");
+                  return;
+               end if;
+               Add_Key (Base & "|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
+               L (Base & "|" & Field (Line, 2) & "|" & Field (Line, 3) & "|" & Text_Expr (Field (Line, 4)));
+               Seen_Output := True;
+            end;
          elsif Kind = "zone_specific_name_text" then
             if Field_Count (Line) /= 9 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
                Add_Line_Error (Line_Number, "invalid zone_specific_name_text row shape");

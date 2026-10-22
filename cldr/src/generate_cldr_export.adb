@@ -3,6 +3,7 @@ with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
@@ -1273,6 +1274,52 @@ procedure Generate_CLDR_Export is
                   Emit_JSON
                     ("{""type"":""symbol"",""kind"":""group"",""locales"":"""
                      & Locale & """,""value"":""" & Group & """}");
+
+                  --  The signs, the per-mille sign and the exponent, as the
+                  --  locale's numbering system writes them, and the percent
+                  --  sign with what the percent pattern puts before it after
+                  --  the digits (a no-break space in German).
+                  declare
+                     procedure Put_Text (Name : String; Value : String) is
+                     begin
+                        if Value /= "" then
+                           Emit_JSON
+                             ("{""type"":""number_text"",""locale"":""" & Locale
+                              & """,""key"":""" & Name & """,""value"":""" & JSON_Escape (Value) & """}");
+                        end if;
+                     end Put_Text;
+
+                     Percent_Sign : constant String :=
+                       Project_Tools.JSON.Object_Field_Value (Symbols, "percentSign");
+                     Percent_Pattern : constant String :=
+                       Project_Tools.JSON.Object_Field_Value
+                         (Object_Field_Object (Text, "percentFormats-numberSystem-" & System), "standard");
+                     Last_Digit : Natural := 0;
+                  begin
+                     for Index in Percent_Pattern'Range loop
+                        if Percent_Pattern (Index) in '0' | '#' then
+                           Last_Digit := Index;
+                        end if;
+                     end loop;
+                     Put_Text ("plus", Project_Tools.JSON.Object_Field_Value (Symbols, "plusSign"));
+                     Put_Text ("minus", Project_Tools.JSON.Object_Field_Value (Symbols, "minusSign"));
+                     Put_Text ("permille", Project_Tools.JSON.Object_Field_Value (Symbols, "perMille"));
+                     Put_Text ("exponent", Project_Tools.JSON.Object_Field_Value (Symbols, "exponential"));
+                     --  A pattern with the sign before the number (Turkish
+                     --  "%#,##0") has no tail; the sign alone follows.
+                     declare
+                        Tail : constant String :=
+                          (if Last_Digit = 0 then "" else Percent_Pattern (Last_Digit + 1 .. Percent_Pattern'Last));
+                        Sign_At : constant Natural := Ada.Strings.Fixed.Index (Tail, "%");
+                     begin
+                        if Sign_At = 0 then
+                           Put_Text ("percent", Percent_Sign);
+                        else
+                           Put_Text ("percent",
+                                 Tail (Tail'First .. Sign_At - 1) & Percent_Sign & Tail (Sign_At + 1 .. Tail'Last));
+                        end if;
+                     end;
+                  end;
 
                   if System /= "latn" then
                      if Digit_Codes = "" then
