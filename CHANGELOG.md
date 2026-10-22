@@ -21,6 +21,14 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Time styles are CLDR's.** `{t, time}` / `short` / `medium` / `long` /
+  `full` used a hand-written pattern ("HH:mm", 12-hour only for Korean).
+  Each locale's Gregorian `timeFormats` now come from the data files (a
+  `time_style_pattern` section): "9:05 AM" in English, "09:05" in German,
+  "9:05 am" in Hindi, "٩:٠٥ ص" in Arabic, and long and full times carry
+  the zone ("9:05:07 AM UTC"), as ICU writes them. A medium (or default)
+  time of a value without seconds is still written as the short one.
+  `I18N.CLDR_Data.Time_Style_Pattern` is gone.
 - **Currency symbols, narrow symbols, minor units and cash increments come
   from `formats.i18ndata`**, keyed by currency code, with the same defaults
   (2, 1, the code, the symbol); `I18N.CLDR_Data` loses the four accessors and

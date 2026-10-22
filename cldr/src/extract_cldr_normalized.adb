@@ -1232,7 +1232,7 @@ procedure Extract_CLDR_Normalized is
             L ("zone_meta|" & Field (Line, 2) & "|" & Field (Line, 3));
             Seen_Output := True;
          elsif Kind = "zone_text" or else Kind = "number_text" or else Kind = "relative_text"
-           or else Kind = "unit_text" or else Kind = "hour_text"
+           or else Kind = "unit_text" or else Kind = "hour_text" or else Kind = "time_text"
          then
             if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
               or else Field (Line, 4) = ""

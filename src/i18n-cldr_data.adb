@@ -194,31 +194,6 @@ package body I18N.CLDR_Data is
       end if;
    end First_Week_Min_Days;
 
-   function Time_Style_Pattern
-     (Locale     : String;
-      Style      : String;
-      Has_Second : Boolean)
-      return String
-   is
-      Lang : constant String := Language (Locale);
-   begin
-      if Lang = "ko" then
-         if Style = "long" or else Style = "full" then
-            return "ah':'mm':'ss";
-         elsif Style = "" or else Style = "medium" then
-            return (if Has_Second then "ah':'mm':'ss" else "ah':'mm");
-         else
-            return "ah':'mm";
-         end if;
-      elsif Style = "long" or else Style = "full" then
-         return "HH':'mm':'ss";
-      elsif Style = "" or else Style = "medium" then
-         return (if Has_Second then "HH':'mm':'ss" else "HH':'mm");
-      else
-         return "HH':'mm";
-      end if;
-   end Time_Style_Pattern;
-
    function Date_Time_Field_Separator
      (Locale     : String;
       Last_Class : Character;

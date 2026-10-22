@@ -4467,11 +4467,19 @@ package body I18N.Date_Time_Format is
          Override_Pattern : constant String :=
            I18N.Runtime_Data.Locale_Text
              (Locale, "time_style." & Style_Field, Override_Found);
+         --  CLDR's time style for the locale; a medium (or default) time of
+         --  a value without seconds is written as the short one.
+         CLDR_Style : constant String :=
+           (if Style_Only = "" or else Style_Only = "medium"
+            then (if Has_Second then "medium" else "short")
+            else Style_Only);
+         CLDR_Found : Boolean;
+         CLDR_Pattern : constant String :=
+           I18N.Locale_Data.Lookup ("time_style_pattern", Locale, CLDR_Style, CLDR_Found);
          Pattern : constant String :=
-           (if Override_Found
-            then Override_Pattern
-            else I18N.CLDR_Data.Time_Style_Pattern
-              (Locale, Style_Only, Has_Second));
+           (if Override_Found then Override_Pattern
+            elsif CLDR_Found then CLDR_Pattern
+            else "HH':'mm");
       begin
          if Pattern = "" then
             return;

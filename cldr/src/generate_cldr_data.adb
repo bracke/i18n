@@ -1672,6 +1672,15 @@ procedure Generate_CLDR_Data is
               ("zone_text", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                Sub => Field (Line, 3));
          end if;
+      elsif Kind = "time_text" then
+         --  A locale's CLDR time style pattern (short, medium, long, full).
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid time_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            Add_Format
+              ("time_style_pattern", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
+               Sub => Field (Line, 3));
+         end if;
       elsif Kind = "hour_text" then
          --  A region's preferred hour symbol, under und keyed by the region.
          if Field_Count (Line) /= 4 or else Field (Line, 3) = "" or else Field (Line, 4) = "" then
@@ -2957,41 +2966,6 @@ procedure Generate_CLDR_Data is
          L ("   end First_Week_Min_Days;");
       end Emit_Week_Data;
 
-      --  The last hand-built index. It bisected the locale as written and,
-      --  on a miss, walked all 766 entries calling Locale_Equals -- the same
-      --  cost the shared tables shed. Onto the shared machinery it goes:
-      --  canonical keys, an explicit sort, repeated segments collapsed, and
-      --  the wider offset field. The locale leaves the record, since the
-      --  segment says which it is.
-      procedure Emit_Time_Style_Pattern is
-      begin
-         L;
-         L ("   function Time_Style_Pattern");
-         L ("     (Locale     : String;");
-         L ("      Style      : String;");
-         L ("      Has_Second : Boolean)");
-         L ("      return String");
-         L ("   is");
-         L ("      Lang : constant String := Language (Locale);");
-         L ("   begin");
-         L ("      if Lang = ""ko"" then");
-         L ("         if Style = ""long"" or else Style = ""full"" then");
-         L ("            return ""ah':'mm':'ss"";");
-         L ("         elsif Style = """" or else Style = ""medium"" then");
-         L ("            return (if Has_Second then ""ah':'mm':'ss"" else ""ah':'mm"");");
-         L ("         else");
-         L ("            return ""ah':'mm"";");
-         L ("         end if;");
-         L ("      elsif Style = ""long"" or else Style = ""full"" then");
-         L ("         return ""HH':'mm':'ss"";");
-         L ("      elsif Style = """" or else Style = ""medium"" then");
-         L ("         return (if Has_Second then ""HH':'mm':'ss"" else ""HH':'mm"");");
-         L ("      else");
-         L ("         return ""HH':'mm"";");
-         L ("      end if;");
-         L ("   end Time_Style_Pattern;");
-      end Emit_Time_Style_Pattern;
-
       --  Two levels: a couple of dozen skeletons select a segment of the
       --  locale index, and the locale is bisected inside that segment. The
       --  chain tested up to 822 Locale_In_List calls -- one per distinct
@@ -3364,7 +3338,6 @@ procedure Generate_CLDR_Data is
       Current_File := Output'Unchecked_Access;
       Emit_Static_Prelude;
       Emit_Week_Data;
-      Emit_Time_Style_Pattern;
       Emit_Date_Time_Field_Separator;
       Emit_Date_Time_Style_Separator;
       Emit_Number_Display_Affixes;

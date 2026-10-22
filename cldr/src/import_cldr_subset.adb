@@ -698,6 +698,8 @@ procedure Import_CLDR_Subset is
          return "unit_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "hour_text" or else Kind = "hour_text_text" then
          return "hour_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
+      elsif Kind = "time_text" or else Kind = "time_text_text" then
+         return "time_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "zone_specific_name"
         or else Kind = "zone_specific_name_text"
       then
@@ -1232,7 +1234,7 @@ procedure Import_CLDR_Subset is
             Seen_Output := True;
          elsif Kind = "zone_text_text" or else Kind = "number_text_text"
            or else Kind = "relative_text_text" or else Kind = "unit_text_text"
-           or else Kind = "hour_text_text"
+           or else Kind = "hour_text_text" or else Kind = "time_text_text"
          then
             declare
                Base : constant String := Kind (Kind'First .. Kind'Last - 5);

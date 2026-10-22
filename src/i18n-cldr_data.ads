@@ -20,17 +20,6 @@ package I18N.CLDR_Data is
    --  @return Minimum first-week day count, usually 1 or 4.
    function First_Week_Min_Days (Locale : String) return Natural;
 
-   --  Return the deterministic time style pattern for a locale.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Style Time style: default, short, medium, long, or full.
-   --  @param Has_Second True when default/medium output should preserve seconds.
-   --  @return Pattern text consumed by the date/time formatter.
-   function Time_Style_Pattern
-     (Locale     : String;
-      Style      : String;
-      Has_Second : Boolean)
-      return String;
-
    --  Return the deterministic separator between adjacent date/time fields.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Last_Class Previous field class: D for date or T for time.

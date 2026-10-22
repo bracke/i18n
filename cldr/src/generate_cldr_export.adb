@@ -2412,6 +2412,36 @@ procedure Generate_CLDR_Export is
                Emit_Style ("long");
                Emit_Style ("medium");
                Emit_Style ("short");
+
+               --  The time styles, which every calendar shares: "h:mm a" in
+               --  English, "HH:mm" in German, "H:mm" in Japanese.
+               if Calendar = "gregorian" then
+                  declare
+                     Times : constant String := Object_Field_Object (Cal_Obj, "timeFormats");
+
+                     procedure Emit_Time (Style : String) is
+                        Nested : constant String := Object_Field_Object (Times, Style);
+                        Raw    : constant String :=
+                          (if Nested /= ""
+                           then Project_Tools.JSON.Object_Field_Value (Nested, "_value")
+                           else Project_Tools.JSON.Object_Field_Value (Times, Style));
+                     begin
+                        if Raw /= "" then
+                           Emit_JSON
+                             ("{""type"":""time_text"",""locale"":""" & Locale
+                              & """,""key"":""" & Style & """,""value"":"""
+                              & JSON_Escape (Internal_Pattern (Raw)) & """}");
+                        end if;
+                     end Emit_Time;
+                  begin
+                     if Times /= "" then
+                        Emit_Time ("full");
+                        Emit_Time ("long");
+                        Emit_Time ("medium");
+                        Emit_Time ("short");
+                     end if;
+                  end;
+               end if;
             end Emit_Calendar;
          begin
             for Source of Calendars loop
