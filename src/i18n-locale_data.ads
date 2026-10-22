@@ -55,4 +55,16 @@ private package I18N.Locale_Data is
       Key     : String;
       Found   : out Boolean)
       return String;
+   --  As Shard_Lookup, for data CLDR ships resolved per locale (a locale's
+   --  file already holds what it inherits, and leaves out what it removes):
+   --  the first locale on the walk that has a shard answers alone, found or
+   --  not. en-GB has no short US zone names; walking on to en would find
+   --  "EST" where CLDR says there is none.
+   function Resolved_Shard_Lookup
+     (Dir     : String;
+      Section : String;
+      Locale  : String;
+      Key     : String;
+      Found   : out Boolean)
+      return String;
 end I18N.Locale_Data;

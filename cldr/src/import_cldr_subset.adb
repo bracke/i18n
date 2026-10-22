@@ -713,8 +713,10 @@ procedure Import_CLDR_Subset is
       then
          return "zone_short_family|" & Field (Payload, 2)
            & "|" & Field (Payload, 3);
-      elsif Kind = "zone_metazone" then
-         return "zone_metazone|" & Field (Payload, 2);
+      elsif Kind = "zone_meta" then
+         return "zone_meta|" & Field (Payload, 2);
+      elsif Kind = "zone_text" or else Kind = "zone_text_text" then
+         return "zone_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "zone_specific_name"
         or else Kind = "zone_specific_name_text"
       then
@@ -1271,26 +1273,34 @@ procedure Import_CLDR_Subset is
                   & Text_Expr (Value));
                Seen_Output := True;
             end;
-         elsif Kind = "zone_metazone" then
+         elsif Kind = "zone_meta" then
             if Field_Count (Line) /= 3 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
-               Add_Line_Error (Line_Number, "invalid zone_metazone row shape");
+               Add_Line_Error (Line_Number, "invalid zone_meta row shape");
                return;
             end if;
-            Add_Key ("zone_metazone|" & Field (Line, 2), Line_Number);
-            L ("zone_metazone|" & Field (Line, 2) & "|" & Field (Line, 3));
+            Add_Key ("zone_meta|" & Field (Line, 2), Line_Number);
+            L ("zone_meta|" & Field (Line, 2) & "|" & Field (Line, 3));
+            Seen_Output := True;
+         elsif Kind = "zone_text_text" then
+            if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
+              or else Field (Line, 4) = ""
+            then
+               Add_Line_Error (Line_Number, "invalid zone_text_text row shape");
+               return;
+            end if;
+            Add_Key ("zone_text|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
+            L ("zone_text|" & Field (Line, 2) & "|" & Field (Line, 3) & "|" & Text_Expr (Field (Line, 4)));
             Seen_Output := True;
          elsif Kind = "zone_specific_name_text" then
-            if Field_Count (Line) /= 5
-              or else Field (Line, 2) = ""
-              or else Field (Line, 3) = ""
-              or else (Field (Line, 4) = "" and then Last_Field (Line) = "")
-            then
+            if Field_Count (Line) /= 9 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
                Add_Line_Error (Line_Number, "invalid zone_specific_name_text row shape");
                return;
             end if;
             Add_Key ("zone_specific_name|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
             L ("zone_specific_name|" & Field (Line, 2) & "|" & Field (Line, 3)
-               & "|" & Text_Expr (Field (Line, 4)) & "|" & Text_Expr (Last_Field (Line)));
+               & "|" & Text_Expr (Field (Line, 4)) & "|" & Text_Expr (Field (Line, 5))
+               & "|" & Text_Expr (Field (Line, 6)) & "|" & Text_Expr (Field (Line, 7))
+               & "|" & Text_Expr (Field (Line, 8)) & "|" & Text_Expr (Last_Field (Line)));
             Seen_Output := True;
          elsif Kind = "zone_short_family_text" then
             declare

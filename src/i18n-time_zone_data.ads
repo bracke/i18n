@@ -21,4 +21,31 @@ package I18N.Time_Zone_Data is
       Valid  : out Boolean)
       return Integer;
 
+   --  Whether Zone is on daylight saving time at the given UTC date and time.
+   --  Valid as above.
+   function Daylight_At_UTC
+     (Zone   : String;
+      Year   : Natural;
+      Month  : Natural;
+      Day    : Natural;
+      Hour   : Natural;
+      Minute : Natural;
+      Second : Natural;
+      Valid  : out Boolean)
+      return Boolean;
+
+   --  Whether Zone observes daylight saving time at any moment within Days
+   --  days either side of the given UTC date and time -- the test TR35's
+   --  generic names make before naming a zone by its standard time.
+   function Daylight_Near_UTC
+     (Zone   : String;
+      Year   : Natural;
+      Month  : Natural;
+      Day    : Natural;
+      Hour   : Natural;
+      Minute : Natural;
+      Second : Natural;
+      Days   : Natural)
+      return Boolean;
+
 end I18N.Time_Zone_Data;

@@ -737,28 +737,82 @@ procedure Generate_CLDR_Export is
 
       procedure Emit_JSON (Text : String) renames L;
 
-      --  Which metazone each zone is in now: of a zone's periods in
-      --  metaZones.json, the one with no end ("_to"). Locale-independent.
+      --  A zone's or a metazone's six names -- long and short; generic,
+      --  standard and daylight -- under Key ("zone:<id>" or "mz:<id>"), when it
+      --  has any.
+      procedure Emit_Name_Set (Locale : String; Key : String; Object : String) is
+         Long  : constant String := Object_Field_Object (Object, "long");
+         Short : constant String := Object_Field_Object (Object, "short");
+
+         function Name (Set : String; Kind : String) return String is
+           (Project_Tools.JSON.Object_Field_Value (Set, Kind));
+
+         Values : constant array (1 .. 6) of US.Unbounded_String :=
+           [US.To_Unbounded_String (Name (Long, "generic")),
+            US.To_Unbounded_String (Name (Long, "standard")),
+            US.To_Unbounded_String (Name (Long, "daylight")),
+            US.To_Unbounded_String (Name (Short, "generic")),
+            US.To_Unbounded_String (Name (Short, "standard")),
+            US.To_Unbounded_String (Name (Short, "daylight"))];
+         Any : Boolean := False;
+      begin
+         for V of Values loop
+            Any := Any or else US.Length (V) > 0;
+         end loop;
+         if Any then
+            Emit_JSON
+              ("{""type"":""zone_specific_name"",""locale"":""" & Locale
+               & """,""key"":""" & Key
+               & """,""long_generic"":""" & JSON_Escape (S (Values (1)))
+               & """,""long_standard"":""" & JSON_Escape (S (Values (2)))
+               & """,""long_daylight"":""" & JSON_Escape (S (Values (3)))
+               & """,""short_generic"":""" & JSON_Escape (S (Values (4)))
+               & """,""short_standard"":""" & JSON_Escape (S (Values (5)))
+               & """,""short_daylight"":""" & JSON_Escape (S (Values (6))) & """}");
+         end if;
+      end Emit_Name_Set;
+
+      --  Locale-independent zone metadata, as key -> value rows:
+      --    mz:<zone>               every period of the zone's metazones, as
+      --                            "<metazone>@<from>@<to>;..." (UTC, CLDR's
+      --                            "YYYY-MM-DD hh:mm"; an open end is empty)
+      --    golden:<mz>:<region>    the zone a metazone stands for in a region
+      --                            ("001" for the world)
+      --    primary:<country>       a country's primary zone, where it has many
       procedure Emit_Zone_Metazone_Rows is
          Source : constant String :=
            Project_Tools.Files.Read_Raw_File
              ("upstream/cldr-json/cldr-core/supplemental/metaZones.json");
+         Root   : constant String := Object_Field_Object (Source, "metaZones");
          Info   : constant String :=
-           Object_Field_Object (Object_Field_Object (Source, "metazoneInfo"), "timezone");
+           Object_Field_Object (Object_Field_Object (Root, "metazoneInfo"), "timezone");
+
+         procedure Meta (Key : String; Value : String) is
+         begin
+            Emit_JSON
+              ("{""type"":""zone_meta"",""key"":""" & Key
+               & """,""value"":""" & JSON_Escape (Value) & """}");
+         end Meta;
 
          procedure Scan (Prefix : String; Object : String);
 
          procedure Scan (Prefix : String; Object : String) is
             procedure Member (Key : String; Value : String) is
                Zone    : constant String := (if Prefix = "" then Key else Prefix & "/" & Key);
-               Current : US.Unbounded_String;
+               Periods : US.Unbounded_String;
 
                procedure Period (Item : String) is
                   Uses : constant String := Object_Field_Object (Item, "usesMetazone");
                begin
-                  if Uses /= "" and then Project_Tools.JSON.Object_Field_Value (Uses, "_to") = "" then
-                     Current := US.To_Unbounded_String
-                       (Project_Tools.JSON.Object_Field_Value (Uses, "_mzone"));
+                  if Uses /= "" then
+                     if US.Length (Periods) > 0 then
+                        US.Append (Periods, ";");
+                     end if;
+                     US.Append
+                       (Periods,
+                        Project_Tools.JSON.Object_Field_Value (Uses, "_mzone")
+                        & "@" & Project_Tools.JSON.Object_Field_Value (Uses, "_from")
+                        & "@" & Project_Tools.JSON.Object_Field_Value (Uses, "_to"));
                   end if;
                end Period;
             begin
@@ -766,18 +820,61 @@ procedure Generate_CLDR_Export is
                   Scan (Zone, Value);
                elsif Value'Length > 0 and then Value (Value'First) = '[' then
                   For_Each_Element (Value, Period'Access);
-                  if US.Length (Current) > 0 and then Valid_Zone_Name (Zone) then
-                     Emit_JSON
-                       ("{""type"":""zone_metazone"",""zone"":""" & Zone
-                        & """,""metazone"":""" & S (Current) & """}");
+                  if US.Length (Periods) > 0 and then Valid_Zone_Name (Zone) then
+                     Meta ("mz:" & Zone, S (Periods));
                   end if;
                end if;
             end Member;
          begin
             For_Each_Member (Object, Member'Access);
          end Scan;
+
+         procedure Golden (Item : String) is
+            Map : constant String := Object_Field_Object (Item, "mapZone");
+         begin
+            if Map /= "" then
+               Meta ("golden:" & Project_Tools.JSON.Object_Field_Value (Map, "_other")
+                     & ":" & Project_Tools.JSON.Object_Field_Value (Map, "_territory"),
+                     Project_Tools.JSON.Object_Field_Value (Map, "_type"));
+            end if;
+         end Golden;
+
+         Primary_Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/primaryZones.json");
+
+         procedure Primary (Country : String; Zone_Value : String) is
+         begin
+            --  The value is a JSON string, quotes included.
+            if Zone_Value'Length > 2 then
+               Meta ("primary:" & Country, Zone_Value (Zone_Value'First + 1 .. Zone_Value'Last - 1));
+            end if;
+         end Primary;
       begin
          Scan ("", Info);
+         declare
+            Map_Start : Natural := 0;
+         begin
+            --  "metazones": [ ... ] -- the array that follows the key.
+            for Index in Root'First .. Root'Last - 11 loop
+               if Root (Index .. Index + 10) = """metazones""" then
+                  Map_Start := Index + 11;
+                  exit;
+               end if;
+            end loop;
+            if Map_Start /= 0 then
+               while Map_Start <= Root'Last and then Root (Map_Start) /= '[' loop
+                  Map_Start := Map_Start + 1;
+               end loop;
+               if Map_Start <= Root'Last then
+                  For_Each_Element
+                    (Root (Map_Start .. JSON_Value_End (Root, Map_Start)), Golden'Access);
+               end if;
+            end if;
+         end;
+         For_Each_Member
+           (Object_Field_Object (Object_Field_Object (Primary_Source, "supplemental"), "primaryZones"),
+            Primary'Access);
       end Emit_Zone_Metazone_Rows;
 
       procedure Emit_Header is
@@ -2947,6 +3044,59 @@ procedure Generate_CLDR_Export is
                   & Locale & """,""value"":""" & JSON_Escape (Separator) & """}");
             end if;
 
+            declare
+               Fallback : constant String :=
+                 Project_Tools.JSON.Object_Field_Value (Names, "fallbackFormat");
+               GMT_Zero : constant String :=
+                 Project_Tools.JSON.Object_Field_Value (Names, "gmtZeroFormat");
+
+               procedure Text (Key : String; Value : String) is
+               begin
+                  if Value /= "" then
+                     Emit_JSON
+                       ("{""type"":""zone_text"",""locale"":""" & Locale
+                        & """,""key"":""" & Key & """,""value"":""" & JSON_Escape (Value) & """}");
+                  end if;
+               end Text;
+
+               --  The sign the hour format writes before the hours of its
+               --  positive (Part = 1) or negative (Part = 2) half: "+HH:mm;-HH:mm"
+               --  in English, U+2212 for the minus in French.
+               function Sign (Part : Positive) return String is
+                  Semicolon : Natural := 0;
+               begin
+                  for Index in Hour_Format'Range loop
+                     if Hour_Format (Index) = ';' then
+                        Semicolon := Index;
+                        exit;
+                     end if;
+                  end loop;
+                  if Semicolon = 0 then
+                     return "";
+                  end if;
+                  declare
+                     Half : constant String :=
+                       (if Part = 1 then Hour_Format (Hour_Format'First .. Semicolon - 1)
+                        else Hour_Format (Semicolon + 1 .. Hour_Format'Last));
+                  begin
+                     for Index in Half'Range loop
+                        if Half (Index) = 'H' then
+                           return Half (Half'First .. Index - 1);
+                        end if;
+                     end loop;
+                     return "";
+                  end;
+               end Sign;
+            begin
+               --  "{1} ({0})": a metazone name with the place it is for, when
+               --  the zone keeps different time from the metazone's own zone.
+               Text ("fallback", Fallback);
+               --  The localized GMT format's zero ("GMT", "UTC") and signs.
+               Text ("gmt_zero", GMT_Zero);
+               Text ("plus", Sign (1));
+               Text ("minus", Sign (2));
+            end;
+
             if Region = "" then
                Add_Error ("missing CLDR regionFormat for locale " & Locale);
             elsif Contains (Region, "{0}") then
@@ -3163,26 +3313,13 @@ procedure Generate_CLDR_Export is
                                           & """}");
                                     end if;
 
-                                    --  A zone's own long standard and daylight
-                                    --  names ("British Summer Time"), which win
-                                    --  over its metazone's.
-                                    declare
-                                       Daylight_Name : constant String :=
-                                         Project_Tools.JSON.Object_Field_Value
-                                           (Long, "daylight");
-                                    begin
-                                       if (Standard_Name /= "" or else Daylight_Name /= "")
-                                         and then Valid_Zone_Name (Canonical)
-                                         and then Contains (Canonical, "/")
-                                       then
-                                          Emit_JSON
-                                            ("{""type"":""zone_specific_name"",""locale"":"""
-                                             & Locale & """,""key"":""zone:" & Canonical
-                                             & """,""standard"":""" & JSON_Escape (Standard_Name)
-                                             & """,""daylight"":""" & JSON_Escape (Daylight_Name)
-                                             & """}");
-                                       end if;
-                                    end;
+                                    --  A zone's own names ("British Summer
+                                    --  Time"), which win over its metazone's.
+                                    if Valid_Zone_Name (Canonical)
+                                      and then Contains (Canonical, "/")
+                                    then
+                                       Emit_Name_Set (Locale, "zone:" & Canonical, Child);
+                                    end if;
 
                                     if Key /= "long" and then Key /= "short" then
                                        Scan_Zone_Object (Child, Zone);
@@ -3254,17 +3391,8 @@ procedure Generate_CLDR_Export is
             --  Every metazone's long standard and daylight names, by CLDR's
             --  own metazone id; zone_metazone says which a zone is in.
             procedure Emit_Specific (Id : String; Object : String) is
-               Long     : constant String := Object_Field_Object (Object, "long");
-               Standard : constant String := Project_Tools.JSON.Object_Field_Value (Long, "standard");
-               Daylight : constant String := Project_Tools.JSON.Object_Field_Value (Long, "daylight");
             begin
-               if Standard /= "" or else Daylight /= "" then
-                  Emit_JSON
-                    ("{""type"":""zone_specific_name"",""locale"":"""
-                     & Locale & """,""key"":""mz:" & Id
-                     & """,""standard"":""" & JSON_Escape (Standard)
-                     & """,""daylight"":""" & JSON_Escape (Daylight) & """}");
-               end if;
+               Emit_Name_Set (Locale, "mz:" & Id, Object);
             end Emit_Specific;
          begin
             if Metazones = "" then

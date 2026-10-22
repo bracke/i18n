@@ -206,4 +206,39 @@ package body I18N.Locale_Data is
 
       return "";
    end Shard_Lookup;
+
+   function Resolved_Shard_Lookup
+     (Dir     : String;
+      Section : String;
+      Locale  : String;
+      Key     : String;
+      Found   : out Boolean)
+      return String
+   is
+      Cur : Unbounded_String := To_Unbounded_String (To_Store_Locale (Locale));
+   begin
+      Found := False;
+      loop
+         declare
+            Loc : constant String := To_String (Cur);
+         begin
+            if I18N.Data_Store.Available (Dir & "/" & Loc) then
+               declare
+                  Value : constant String := I18N.Data_Store.Lookup (Dir & "/" & Loc, Section, Key);
+               begin
+                  Found := Value /= "";
+                  return Value;
+               end;
+            end if;
+            exit when Loc = "root";
+            declare
+               Up : constant String := Next_Locale (Loc);
+            begin
+               exit when Up = "";
+               Cur := To_Unbounded_String (Up);
+            end;
+         end;
+      end loop;
+      return "";
+   end Resolved_Shard_Lookup;
 end I18N.Locale_Data;

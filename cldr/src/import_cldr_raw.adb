@@ -700,39 +700,59 @@ procedure Import_CLDR_Raw is
                Emit_Record
                  ("zone_family_display|" & Locale & "|" & Family & "|" & Value);
             end;
-         elsif Kind = "zone_metazone" then
+         elsif Kind = "zone_meta" then
             declare
-               Zone     : constant String := JSON_Value (Line, "zone");
-               Metazone : constant String := JSON_Value (Line, "metazone");
+               Key   : constant String := JSON_Value (Line, "key");
+               Value : constant String := JSON_Value (Line, "value");
             begin
-               if not Valid_Value (Zone) or else not Valid_Value (Metazone) then
-                  Add_Line_Error (Line_Number, "invalid staged zone_metazone record");
+               if not Valid_Value (Key) or else not Valid_Value (Value) then
+                  Add_Line_Error (Line_Number, "invalid staged zone_meta record");
                   return;
                end if;
-               Add_Key ("zone_metazone|" & Zone, Line_Number);
-               Emit_Record ("zone_metazone|" & Zone & "|" & Metazone);
+               Add_Key ("zone_meta|" & Key, Line_Number);
+               Emit_Record ("zone_meta|" & Key & "|" & Value);
+            end;
+         elsif Kind = "zone_text" then
+            declare
+               Locale : constant String := JSON_Value (Line, "locale");
+               Key    : constant String := JSON_Value (Line, "key");
+               Value  : constant String := JSON_Value (Line, "value");
+            begin
+               if not Valid_Value (Locale) or else not Valid_Value (Key) or else not Valid_Value (Value) then
+                  Add_Line_Error (Line_Number, "invalid staged zone_text record");
+                  return;
+               end if;
+               Add_Key ("zone_text|" & Locale & "|" & Key, Line_Number);
+               Emit_Record ("zone_text|" & Locale & "|" & Key & "|" & Value);
             end;
          elsif Kind = "zone_specific_name" then
             declare
-               Locale   : constant String := JSON_Value (Line, "locale");
-               Key      : constant String := JSON_Value (Line, "key");
-               Standard : constant String := JSON_Value (Line, "standard");
-               Daylight : constant String := JSON_Value (Line, "daylight");
+               Locale : constant String := JSON_Value (Line, "locale");
+               Key    : constant String := JSON_Value (Line, "key");
+               type Six is array (1 .. 6) of US.Unbounded_String;
+               Names  : constant Six :=
+                 [US.To_Unbounded_String (JSON_Value (Line, "long_generic")),
+                  US.To_Unbounded_String (JSON_Value (Line, "long_standard")),
+                  US.To_Unbounded_String (JSON_Value (Line, "long_daylight")),
+                  US.To_Unbounded_String (JSON_Value (Line, "short_generic")),
+                  US.To_Unbounded_String (JSON_Value (Line, "short_standard")),
+                  US.To_Unbounded_String (JSON_Value (Line, "short_daylight"))];
+               Any    : Boolean := False;
+               Clean  : Boolean := True;
+               Joined : US.Unbounded_String;
             begin
-               --  Either name may be missing (GMT has no daylight time, a zone
-               --  may override only one), but not both.
-               if not Valid_Value (Locale)
-                 or else not Valid_Value (Key)
-                 or else Has_Raw_Separator (Standard)
-                 or else Has_Raw_Separator (Daylight)
-                 or else (Standard = "" and then Daylight = "")
-               then
+               for N of Names loop
+                  Any := Any or else US.Length (N) > 0;
+                  Clean := Clean and then not Has_Raw_Separator (US.To_String (N));
+                  US.Append (Joined, "|" & US.To_String (N));
+               end loop;
+               --  Any of the six may be missing, but not all.
+               if not Valid_Value (Locale) or else not Valid_Value (Key) or else not Any or else not Clean then
                   Add_Line_Error (Line_Number, "invalid staged zone_specific_name record");
                   return;
                end if;
                Add_Key ("zone_specific_name|" & Locale & "|" & Key, Line_Number);
-               Emit_Record
-                 ("zone_specific_name|" & Locale & "|" & Key & "|" & Standard & "|" & Daylight);
+               Emit_Record ("zone_specific_name|" & Locale & "|" & Key & US.To_String (Joined));
             end;
          elsif Kind = "zone_short_family" then
             declare

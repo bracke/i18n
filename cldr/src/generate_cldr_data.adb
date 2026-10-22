@@ -127,12 +127,22 @@ procedure Generate_CLDR_Data is
    TZDB_Transition_Zones : array (1 .. Max_TZDB_Transitions) of Natural;
    TZDB_Transition_Keys : array (1 .. Max_TZDB_Transitions) of Long_Long_Integer;
    TZDB_Transition_Offsets : array (1 .. Max_TZDB_Transitions) of Integer;
+   --  Whether daylight saving time is in effect from the transition on
+   --  (zdump's isdst): the specific zone names follow it.
+   TZDB_Transition_Daylight : array (1 .. Max_TZDB_Transitions) of Boolean;
    TZDB_Transition_Count : Natural := 0;
    --  Each zone's final rule (the POSIX TZ string zic ends its file with), and
    --  the key from which that rule answers instead of the transitions; 0 when
    --  the zone has no rule this can read and the transitions answer always.
    TZDB_Zone_Rules     : array (1 .. Max_TZDB_Zones) of US.Unbounded_String;
    TZDB_Zone_Rule_From : array (1 .. Max_TZDB_Zones) of Long_Long_Integer := [others => 0];
+   --  The last transition each compiled file lists, as seconds since 1970;
+   --  after it the file names no instant and the final rule alone governs.
+   --  What zdump reports past it is only the C library's reading of that
+   --  rule, and macOS's misreads a rule whose change falls at a negative hour
+   --  (America/Nuuk's M3.5.0/-1), so there the rule is checked against itself.
+   TZDB_Zone_Explicit_End : array (1 .. Max_TZDB_Zones) of Long_Long_Integer :=
+     [others => Long_Long_Integer'Last];
    Errors     : Natural := 0;
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
@@ -1303,27 +1313,6 @@ procedure Generate_CLDR_Data is
       elsif Kind = "zone_exemplar_hex" and then Capture_Locale (A) then
          --  A=locale, B=zone id, C=exemplar city (raw hex bytes).
          Zone_Add (A, B, Hex_Bytes_To_String (C));
-      elsif Kind = "zone_metazone" then
-         --  A=zone, B=CLDR metazone id; one map for every locale, kept under
-         --  und where every walk ends.
-         Add_Format ("zone_metazone", "und", B, Sub => A);
-      elsif Kind = "zone_specific_name" and then Capture_Locale (A) then
-         --  A=locale, B="mz:<metazone>" or "zone:<zone>", C=long standard,
-         --  D=long daylight (either may be empty).
-         declare
-            Standard : constant String := Ada_Expression_UTF8_Bytes (C);
-            Daylight : constant String := Ada_Expression_UTF8_Bytes (D);
-         begin
-            --  Into the locale's zone shard, beside its exemplar cities,
-            --  under keys no zone id can have: loaded only for the locales a
-            --  program formats in, where the formats file is loaded whole.
-            if Standard /= "" then
-               Zone_Add (A, "std:" & B, Standard);
-            end if;
-            if Daylight /= "" then
-               Zone_Add (A, "dst:" & B, Daylight);
-            end if;
-         end;
       elsif Kind = "zone_short_family" and then Capture_Locale (A) then
          --  A=locale, B=metazone family, C=standard, D=daylight, E=generic.
          Add_Format
@@ -1802,16 +1791,46 @@ procedure Generate_CLDR_Data is
             Field (Line, 2),
             Field (Line, 3),
             Field (Line, 4));
-      elsif Kind = "zone_metazone" then
+      elsif Kind = "zone_meta" then
+         --  Locale-independent zone metadata (metazone periods, reference
+         --  zones, primary zones), kept under und where every walk ends.
          if Field_Count (Line) /= 3 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
-            Add_Line_Error (Line_Number, "invalid zone_metazone row shape");
+            Add_Line_Error (Line_Number, "invalid zone_meta row shape");
+         else
+            Add_Format ("zone_meta", "und", Field (Line, 3), Sub => Field (Line, 2));
          end if;
-         Add_Rule (Kind, Field (Line, 2), Field (Line, 3));
+      elsif Kind = "zone_text" then
+         --  A locale's zone format text by name ("fallback": "{1} ({0})").
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid zone_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            Add_Format
+              ("zone_text", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
+               Sub => Field (Line, 3));
+         end if;
       elsif Kind = "zone_specific_name" then
-         if Field_Count (Line) /= 5 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+         --  A zone's or metazone's six names, into the locale's zone shard
+         --  beside its exemplar cities, under keys no zone id can have
+         --  (lg/ls/ld: long generic, standard, daylight; sg/ss/sd: short):
+         --  loaded only for the locales a program formats in.
+         if Field_Count (Line) /= 9 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
             Add_Line_Error (Line_Number, "invalid zone_specific_name row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            declare
+               type Prefixes is array (1 .. 6) of String (1 .. 3);
+               Prefix : constant Prefixes := ["lg:", "ls:", "ld:", "sg:", "ss:", "sd:"];
+            begin
+               for Index in Prefix'Range loop
+                  declare
+                     Name : constant String := Ada_Expression_UTF8_Bytes (Field (Line, 3 + Index));
+                  begin
+                     if Name /= "" then
+                        Zone_Add (Field (Line, 2), Prefix (Index) & Field (Line, 3), Name);
+                     end if;
+                  end;
+               end loop;
+            end;
          end if;
-         Add_Rule (Kind, Field (Line, 2), Field (Line, 3), Field (Line, 4), Field (Line, 5));
       elsif Kind = "zone_short_family" then
          if Field_Count (Line) /= 6
            or else Field (Line, 2) = ""
@@ -1957,7 +1976,8 @@ procedure Generate_CLDR_Data is
    procedure Add_TZDB_Transition
      (Zone_Index : Natural;
       Key        : Long_Long_Integer;
-      Offset     : Integer)
+      Offset     : Integer;
+      Daylight   : Boolean)
    is
    begin
       if Zone_Index = 0 then
@@ -1973,6 +1993,7 @@ procedure Generate_CLDR_Data is
       TZDB_Transition_Zones (TZDB_Transition_Count) := Zone_Index;
       TZDB_Transition_Keys (TZDB_Transition_Count) := Key;
       TZDB_Transition_Offsets (TZDB_Transition_Count) := Offset;
+      TZDB_Transition_Daylight (TZDB_Transition_Count) := Daylight;
    end Add_TZDB_Transition;
 
    --  Transitions are read through this year, past any zone's predicted
@@ -1989,31 +2010,113 @@ procedure Generate_CLDR_Data is
    --  (Asia/Calcutta for Asia/Kolkata, America/Godthab for America/Nuuk). A
    --  metazone row or a zone's own name under such an id is filed under the
    --  zone it links to as well, so a lookup by the tz database's name finds it.
-   procedure File_CLDR_Zone_Aliases is
-      function Link_Target (Name : String) return String is
+   --  The zone a tz database link points at; "" for a name that is no link.
+   function Link_Target (Name : String) return String is
+   begin
+      for Index in 1 .. TZDB_Link_Count loop
+         if S (TZDB_Link_Names (Index)) = Name then
+            return S (TZDB_Link_Targets (Index));
+         end if;
+      end loop;
+      return "";
+   end Link_Target;
+
+   --  Each zone's country, from the tz database's zone.tab, as zone_meta
+   --  "cc:<zone>" -> "<country>", with a '*' when the zone is its country's
+   --  primary one: its only zone, or the one CLDR's primaryZones names. A
+   --  zone's generic location name is its country's name when primary, its
+   --  city's otherwise ("United Kingdom Time", "Sydney Time").
+   procedure Add_Zone_Countries is
+      Text : constant String := Project_Tools.Files.Read_Raw_File ("upstream/tzdb/zone.tab");
+
+      type Row is record
+         Country : US.Unbounded_String;
+         Zone    : US.Unbounded_String;
+      end record;
+      Rows  : array (1 .. 1_000) of Row;
+      Count : Natural := 0;
+
+      function Primary_Of (Country : String) return String is
+         Key : constant String := "und" & Store_Sep & "primary:" & Country;
       begin
-         for Index in 1 .. TZDB_Link_Count loop
-            if S (TZDB_Link_Names (Index)) = Name then
-               return S (TZDB_Link_Targets (Index));
+         for Index in 1 .. Format_Count loop
+            if S (Format_Entries (Index).Section) = "zone_meta"
+              and then S (Format_Entries (Index).Key) = Key
+            then
+               return S (Format_Entries (Index).Value);
             end if;
          end loop;
          return "";
-      end Link_Target;
+      end Primary_Of;
+
+      Start : Positive := Text'First;
+   begin
+      while Start <= Text'Last loop
+         declare
+            Stop : Natural := Start;
+         begin
+            while Stop <= Text'Last and then Text (Stop) /= ASCII.LF loop
+               Stop := Stop + 1;
+            end loop;
+            declare
+               Line : constant String := Text (Start .. Stop - 1);
+            begin
+               if Line'Length > 0 and then Line (Line'First) /= '#' and then Count < Rows'Last then
+                  Count := Count + 1;
+                  Rows (Count) :=
+                    (Country => US.To_Unbounded_String (Field (Line, 1, ASCII.HT)),
+                     Zone    => US.To_Unbounded_String (Field (Line, 3, ASCII.HT)));
+               end if;
+            end;
+            Start := Stop + 1;
+         end;
+      end loop;
+
+      for Index in 1 .. Count loop
+         declare
+            Country : constant String := S (Rows (Index).Country);
+            Zone    : constant String := S (Rows (Index).Zone);
+            Zones   : Natural := 0;
+         begin
+            for Other in 1 .. Count loop
+               if S (Rows (Other).Country) = Country then
+                  Zones := Zones + 1;
+               end if;
+            end loop;
+            --  CLDR may name the primary zone by an id the tz database keeps
+            --  as a link (Europe/Kiev for Europe/Kyiv).
+            Add_Format
+              ("zone_meta", "und",
+               Country
+               & (if Zones = 1
+                    or else Primary_Of (Country) = Zone
+                    or else Link_Target (Primary_Of (Country)) = Zone
+                  then "*" else ""),
+               Sub => "cc:" & Zone);
+         end;
+      end loop;
+   exception
+      when others =>
+         Add_Error ("failed to read upstream/tzdb/zone.tab");
+   end Add_Zone_Countries;
+
+   procedure File_CLDR_Zone_Aliases is
 
       Format_Before : constant Natural := Format_Count;
       Zone_Before   : constant Natural := Zone_Count;
    begin
       for Index in 1 .. Format_Before loop
-         if S (Format_Entries (Index).Section) = "zone_metazone" then
+         if S (Format_Entries (Index).Section) = "zone_meta" then
             declare
                Key    : constant String := S (Format_Entries (Index).Key);
-               Prefix : constant String := "und" & Store_Sep;
+               Prefix : constant String := "und" & Store_Sep & "mz:";
                Zone   : constant String :=
-                 (if Key'Length > Prefix'Length then Key (Key'First + Prefix'Length .. Key'Last) else "");
-               Target : constant String := Link_Target (Zone);
+                 (if Key'Length > Prefix'Length and then Key (Key'First .. Key'First + Prefix'Length - 1) = Prefix
+                  then Key (Key'First + Prefix'Length .. Key'Last) else "");
+               Target : constant String := (if Zone = "" then "" else Link_Target (Zone));
             begin
                if Target /= "" then
-                  Add_Format ("zone_metazone", "und", S (Format_Entries (Index).Value), Sub => Target);
+                  Add_Format ("zone_meta", "und", S (Format_Entries (Index).Value), Sub => "mz:" & Target);
                end if;
             end;
          end if;
@@ -2023,24 +2126,35 @@ procedure Generate_CLDR_Data is
          declare
             Key : constant String := S (Zone_Entries (Index).Key);
          begin
-            if Key'Length > 9
-              and then (Key (Key'First .. Key'First + 8) = "std:zone:"
-                        or else Key (Key'First .. Key'First + 8) = "dst:zone:")
-            then
+            --  An exemplar city is keyed by the bare zone id.
+            if Key'Length > 0 and then (for all C of Key => C /= ':') then
                declare
-                  Target : constant String := Link_Target (Key (Key'First + 9 .. Key'Last));
+                  Target : constant String := Link_Target (Key);
                begin
                   if Target /= "" then
                      Zone_Count := Zone_Count + 1;
                      Zone_Entries (Zone_Count) :=
                        (Section => Zone_Entries (Index).Section,
-                        Key     => US.To_Unbounded_String (Key (Key'First .. Key'First + 8) & Target),
+                        Key     => US.To_Unbounded_String (Target),
+                        Value   => Zone_Entries (Index).Value);
+                  end if;
+               end;
+            elsif Key'Length > 8 and then Key (Key'First + 2 .. Key'First + 7) = ":zone:" then
+               declare
+                  Target : constant String := Link_Target (Key (Key'First + 8 .. Key'Last));
+               begin
+                  if Target /= "" then
+                     Zone_Count := Zone_Count + 1;
+                     Zone_Entries (Zone_Count) :=
+                       (Section => Zone_Entries (Index).Section,
+                        Key     => US.To_Unbounded_String (Key (Key'First .. Key'First + 7) & Target),
                         Value   => Zone_Entries (Index).Value);
                   end if;
                end;
             end if;
          end;
       end loop;
+      Add_Zone_Countries;
    end File_CLDR_Zone_Aliases;
 
    procedure Load_TZDB_Transitions is
@@ -2086,6 +2200,56 @@ procedure Generate_CLDR_Data is
       end Tool_Path;
 
       Tool_Out_Dir : constant String := Tool_Path (Out_Dir);
+
+      --  The last transition a compiled (version 2 or later) file lists: the
+      --  last entry of the 64-bit transition times that follow the second
+      --  header. Long_Long_Integer'Last for a file this cannot read, so that
+      --  every instant is checked against zdump.
+      function Last_Explicit_Transition (Raw : String) return Long_Long_Integer is
+         function Count_At (Index : Positive) return Natural is
+           (((Character'Pos (Raw (Index)) * 256 + Character'Pos (Raw (Index + 1))) * 256
+             + Character'Pos (Raw (Index + 2))) * 256 + Character'Pos (Raw (Index + 3)));
+         First : constant Positive := Raw'First;
+         Header : constant := 44;
+      begin
+         if Raw'Length < 2 * Header or else Raw (First .. First + 3) /= "TZif"
+           or else Raw (First + 4) = ASCII.NUL
+         then
+            return Long_Long_Integer'Last;
+         end if;
+         declare
+            Is_UT    : constant Natural := Count_At (First + 20);
+            Is_Std   : constant Natural := Count_At (First + 24);
+            Leaps    : constant Natural := Count_At (First + 28);
+            Times    : constant Natural := Count_At (First + 32);
+            Types    : constant Natural := Count_At (First + 36);
+            Chars    : constant Natural := Count_At (First + 40);
+            Second   : constant Positive :=
+              First + Header + Times * 5 + Types * 6 + Chars + Leaps * 8 + Is_Std + Is_UT;
+            Times_64 : constant Natural := Count_At (Second + 32);
+            Result   : Long_Long_Integer;
+         begin
+            if Raw (Second .. Second + 3) /= "TZif" or else Times_64 = 0 then
+               return Long_Long_Integer'Last;
+            end if;
+            declare
+               At_Last : constant Positive := Second + Header + (Times_64 - 1) * 8;
+            begin
+               --  Big-endian two's complement: the leading byte carries the sign.
+               Result := Long_Long_Integer (Character'Pos (Raw (At_Last)));
+               if Result >= 128 then
+                  Result := Result - 256;
+               end if;
+               for Index in At_Last + 1 .. At_Last + 7 loop
+                  Result := Result * 256 + Long_Long_Integer (Character'Pos (Raw (Index)));
+               end loop;
+               return Result;
+            end;
+         end;
+      exception
+         when Constraint_Error =>
+            return Long_Long_Integer'Last;
+      end Last_Explicit_Transition;
 
       procedure Parse_Initial_Offset
         (Zone_Index : Positive;
@@ -2153,6 +2317,8 @@ procedure Generate_CLDR_Data is
                           Bounded_Decimal (Field (Time_Text, 3, ':'), 2);
                         Offset      : constant Integer :=
                           Signed_Decimal_Value (Offset_Text);
+                        Daylight    : constant Boolean :=
+                          Contains (Line, " isdst=1");
                      begin
                         if Year in 1900 .. TZDB_Last_Year
                           and then Month in 1 .. 12
@@ -2164,7 +2330,7 @@ procedure Generate_CLDR_Data is
                            Add_TZDB_Transition
                              (Zone_Index,
                               TZDB_Key (Year, Month, Day, Hour, Minute, Second),
-                              Offset);
+                              Offset, Daylight);
                         end if;
                      exception
                         when others =>
@@ -2248,6 +2414,7 @@ procedure Generate_CLDR_Data is
                end loop;
                TZDB_Zone_Rules (Zone_Index) := US.To_Unbounded_String (Raw (Start + 1 .. Stop));
             end if;
+            TZDB_Zone_Explicit_End (Zone_Index) := Last_Explicit_Transition (Raw);
          exception
             when others =>
                Add_Error ("failed to read the final tzdb rule for " & S (TZDB_Zone_Names (Zone_Index)));
@@ -2269,6 +2436,7 @@ procedure Generate_CLDR_Data is
       Kept_Zones   : array (1 .. Max_TZDB_Transitions) of Natural;
       Kept_Keys    : array (1 .. Max_TZDB_Transitions) of Long_Long_Integer;
       Kept_Offsets : array (1 .. Max_TZDB_Transitions) of Integer;
+      Kept_Daylight : array (1 .. Max_TZDB_Transitions) of Boolean;
       Kept         : Natural := 0;
 
       function Epoch_Of (Key : Long_Long_Integer) return Long_Long_Integer is
@@ -2303,11 +2471,30 @@ procedure Generate_CLDR_Data is
                return Result;
             end Table_Offset;
 
-            function Agrees (Instant : Long_Long_Integer) return Boolean is
-               Rule_Valid : Boolean;
-               Offset     : constant Integer := I18N.TZ_Rules.Offset_At (Rule, Instant, Rule_Valid);
+            function Table_Daylight (Instant : Long_Long_Integer) return Boolean is
+               Result : Boolean := False;
             begin
-               return Rule_Valid and then Offset = Table_Offset (Instant);
+               if First /= 0 then
+                  for Index in First .. Last loop
+                     exit when Epoch_Of (TZDB_Transition_Keys (Index)) > Instant;
+                     Result := TZDB_Transition_Daylight (Index);
+                  end loop;
+               end if;
+               return Result;
+            end Table_Daylight;
+
+            --  The rule gives the same offset and the same daylight state.
+            function Agrees (Instant : Long_Long_Integer) return Boolean is
+               Rule_Valid, Daylight_Valid : Boolean;
+               Offset   : constant Integer := I18N.TZ_Rules.Offset_At (Rule, Instant, Rule_Valid);
+               Daylight : constant Boolean := I18N.TZ_Rules.Daylight_At (Rule, Instant, Daylight_Valid);
+            begin
+               if Instant > TZDB_Zone_Explicit_End (Zone_Index) then
+                  return Rule_Valid and then Daylight_Valid;
+               end if;
+               return Rule_Valid and then Daylight_Valid
+                 and then Offset = Table_Offset (Instant)
+                 and then Daylight = Table_Daylight (Instant);
             end Agrees;
 
             function Year_Agrees (Year : Integer) return Boolean is
@@ -2379,6 +2566,7 @@ procedure Generate_CLDR_Data is
                      Kept_Zones (Kept) := Zone_Index;
                      Kept_Keys (Kept) := TZDB_Transition_Keys (Index);
                      Kept_Offsets (Kept) := TZDB_Transition_Offsets (Index);
+                     Kept_Daylight (Kept) := TZDB_Transition_Daylight (Index);
                   end if;
                end loop;
             end if;
@@ -2390,6 +2578,7 @@ procedure Generate_CLDR_Data is
          TZDB_Transition_Zones (Index) := Kept_Zones (Index);
          TZDB_Transition_Keys (Index) := Kept_Keys (Index);
          TZDB_Transition_Offsets (Index) := Kept_Offsets (Index);
+         TZDB_Transition_Daylight (Index) := Kept_Daylight (Index);
       end loop;
    end Fit_TZDB_Rules;
 
@@ -2552,10 +2741,6 @@ procedure Generate_CLDR_Data is
       elsif Kind = "zone_family_display" then
          return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
       elsif Kind = "zone_short_family" then
-         return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
-      elsif Kind = "zone_metazone" then
-         return S (Left.A) = S (Right.A);
-      elsif Kind = "zone_specific_name" then
          return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
       elsif Kind = "available_format" then
          return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
@@ -5316,7 +5501,8 @@ procedure Generate_CLDR_Data is
    --  Write the tz database as one Data_Store record per zone, keyed by its
    --  name in section "zone" (see I18N.Time_Zone_Data for the layout):
    --  initial offset; rule-from key; final rule; then the transitions as
-   --  fixed-width YYYYMMDDhhmmss plus a sign ('-' or '0') and six digits.
+   --  fixed-width YYYYMMDDhhmmss, a sign ('-' or '0') and six digits, and
+   --  '1' when daylight saving time is in effect from then on, else '0'.
    procedure Emit_TZDB_File (Path : String) is
       Order : array (1 .. TZDB_Zone_Count) of Positive;
       Out_F : Ada.Text_IO.File_Type;
@@ -5366,7 +5552,8 @@ procedure Generate_CLDR_Data is
                     (Value,
                      Digits_Of (TZDB_Transition_Keys (Index), 14)
                      & (if TZDB_Transition_Offsets (Index) < 0 then "-" else "0")
-                     & Digits_Of (Long_Long_Integer (TZDB_Transition_Offsets (Index)), 6));
+                     & Digits_Of (Long_Long_Integer (TZDB_Transition_Offsets (Index)), 6)
+                     & (if TZDB_Transition_Daylight (Index) then "1" else "0"));
                end if;
             end loop;
             Ada.Text_IO.Put_Line

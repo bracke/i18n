@@ -1296,26 +1296,33 @@ procedure Extract_CLDR_Normalized is
                   & "|" & Value);
                Seen_Output := True;
             end;
-         elsif Kind = "zone_metazone" then
+         elsif Kind = "zone_meta" then
             if Field_Count (Line) /= 3 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
-               Add_Line_Error (Line_Number, "invalid zone_metazone record");
+               Add_Line_Error (Line_Number, "invalid zone_meta record");
                return;
             end if;
-            Add_Key ("zone_metazone|" & Field (Line, 2), Line_Number);
-            L ("zone_metazone|" & Field (Line, 2) & "|" & Field (Line, 3));
+            Add_Key ("zone_meta|" & Field (Line, 2), Line_Number);
+            L ("zone_meta|" & Field (Line, 2) & "|" & Field (Line, 3));
+            Seen_Output := True;
+         elsif Kind = "zone_text" then
+            if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
+              or else Field (Line, 4) = ""
+            then
+               Add_Line_Error (Line_Number, "invalid zone_text record");
+               return;
+            end if;
+            Add_Key ("zone_text|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
+            L ("zone_text_text|" & Field (Line, 2) & "|" & Field (Line, 3) & "|" & Field (Line, 4));
             Seen_Output := True;
          elsif Kind = "zone_specific_name" then
-            if Field_Count (Line) /= 5
-              or else Field (Line, 2) = ""
-              or else Field (Line, 3) = ""
-              or else (Field (Line, 4) = "" and then Last_Field (Line) = "")
-            then
+            if Field_Count (Line) /= 9 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
                Add_Line_Error (Line_Number, "invalid zone_specific_name record");
                return;
             end if;
             Add_Key ("zone_specific_name|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
             L ("zone_specific_name_text|" & Field (Line, 2) & "|" & Field (Line, 3)
-               & "|" & Field (Line, 4) & "|" & Last_Field (Line));
+               & "|" & Field (Line, 4) & "|" & Field (Line, 5) & "|" & Field (Line, 6)
+               & "|" & Field (Line, 7) & "|" & Field (Line, 8) & "|" & Last_Field (Line));
             Seen_Output := True;
          elsif Kind = "zone_short_family" then
             declare

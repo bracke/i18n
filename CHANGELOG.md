@@ -22,6 +22,37 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- **Generic and short zone names ("v", "vvvv", "z", "VVVV") follow TR35 as
+  ICU does, from CLDR data; the hand-kept zone-family list no longer names
+  anything.** London read "Western European Time", en-GB wrote "WET"/"WEST",
+  and a zone outside the list had no name. Now the formatter takes:
+  - specific names from the zone's own name, else its metazone's;
+  - generic names from the zone's own, else (with no daylight time within
+    184 days) its standard name, else the metazone's generic name, with
+    the "{1} ({0})" partial-location form when the zone is not the
+    metazone's reference zone for the locale's region;
+  - the location format from the country name for a zone that is its
+    country's primary zone, else the exemplar city.
+
+  Short names resolve along the locale chain and stop at the first locale
+  that has a zone shard, so en-GB no longer inherits en's US abbreviations.
+  The zero offset is the locale's `gmtZeroFormat`, and the GMT format takes
+  its signs from `hourFormat` (U+2212 in French). A zone CLDR keeps apart
+  from its tz database link keeps its id (Europe/Busingen is "Büsingen
+  Time", not "Switzerland Time").
+
+  Against ICU 74 (CLDR 44), 12,000 cases across 12 locales and 40 zones
+  differ in 420 places, all of them CLDR 44 to 48 data changes. The
+  `I18N.CLDR_Data` family functions (`Time_Zone_DST_Family`,
+  `Time_Zone_Short_Name`, ...) stay for existing callers.
+- **Historical dates use the metazone in force at the date.** London before
+  1971 was "British"; the zone's whole metazone history now comes from
+  `metaZones.json`, and daylight time comes from the tz database (zdump's
+  isdst, kept with each transition) rather than the offset.
+- The generator checks a zone's final rule against zdump only up to the last
+  transition its compiled file lists. Past that, zdump reports the C
+  library's reading of the same rule, and macOS's misreads a change at a
+  negative hour (America/Nuuk's `M3.5.0/-1`), which stopped the generator.
 - The generator asks zdump for one year past the last it keeps: glibc's
   zdump reports a change in the last hours of its range that is none
   (Ubuntu 26.04's zic writes Casablanca's rule in a form that shows it), and

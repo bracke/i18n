@@ -22,6 +22,12 @@ package I18N.TZ_Rules is
       Hour, Minute, Second : Integer := 0)
       return Long_Long_Integer;
 
+   --  The UTC date and time of Instant (seconds since the epoch); the
+   --  inverse of Epoch_Seconds.
+   procedure Civil_Of
+     (Instant : Long_Long_Integer;
+      Year, Month, Day, Hour, Minute, Second : out Integer);
+
    --  The UTC offset in seconds, east of Greenwich positive, that Rule gives
    --  at the UTC instant Instant (seconds since the epoch). Valid is False,
    --  and 0 returned, when Rule is not a TZ string this can read.
@@ -30,6 +36,22 @@ package I18N.TZ_Rules is
       Instant : Long_Long_Integer;
       Valid   : out Boolean)
       return Integer;
+
+   --  Whether Rule has daylight saving time in effect at Instant. Valid as
+   --  above; False for a rule without daylight saving time.
+   function Daylight_At
+     (Rule    : String;
+      Instant : Long_Long_Integer;
+      Valid   : out Boolean)
+      return Boolean;
+
+   --  Whether Rule has daylight saving time in effect at any instant from
+   --  From to To, both included.
+   function Daylight_Within
+     (Rule     : String;
+      From, To : Long_Long_Integer;
+      Valid    : out Boolean)
+      return Boolean;
 
    --  The UTC instants, in Year, at which Rule's daylight saving time starts
    --  and ends. Has_Daylight is False, and both 0, for a rule without

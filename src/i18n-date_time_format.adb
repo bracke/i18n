@@ -1,5 +1,10 @@
+with Ada.Characters.Handling;
 with Ada.Strings.Fixed;
+with Ada.Strings.Unbounded;
 with I18N.CLDR_Data;
+with I18N.Display_Names;
+with I18N.Locales;
+with I18N.TZ_Rules;
 with I18N.Locale_Data;
 with I18N.Time_Zone_Data;
 with I18N.Runtime_Data;
@@ -1473,6 +1478,9 @@ package body I18N.Date_Time_Format is
 
    function Zone_Name (Option : String; Locale : String := "") return String;
 
+   --  Whether the zone metadata (zone_meta, und) has Key.
+   function Zone_Meta_Has (Key : String) return Boolean;
+
    function Canonical_Zone_Name (Zone : String) return String is
    begin
       if Zone = "utc"
@@ -1499,6 +1507,11 @@ package body I18N.Date_Time_Format is
          return "Etc/GMT";
       end if;
 
+      --  A zone CLDR names by its own id keeps it, though the tz database has
+      --  made it a link (Europe/Busingen is named for Busingen, not Zurich).
+      if Zone_Meta_Has ("mz:" & Zone) or else Zone_Meta_Has ("cc:" & Zone) then
+         return Zone;
+      end if;
       return I18N.CLDR_Data.Canonical_Time_Zone (Zone);
    end Canonical_Zone_Name;
 
@@ -2091,141 +2104,10 @@ package body I18N.Date_Time_Format is
          else I18N.CLDR_Data.Era_Year_Separator (Locale, Calendar));
    end Era_Year_Separator;
 
-   function Time_Zone_Display_Name
-     (Locale : String;
-      Zone   : String)
-      return String
-   is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale, "timezone_display." & Zone, Found);
-      Store_Found : Boolean := False;
-      Store_Value : constant String :=
-        (if Found then ""
-         else I18N.Locale_Data.Lookup ("zone_display", Locale, Zone,
-                                       Store_Found));
-   begin
-      if Found then
-         return Value;
-      elsif Store_Found then
-         return Store_Value;
-      end if;
-
-      --  Fall from the specific zone name to the metazone family's long
-      --  name, then to the few names compiled in for when no data names it.
-      declare
-         Family    : constant String :=
-           I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
-         Fam_Found : Boolean := False;
-         Fam_Value : constant String :=
-           (if Family = "" then ""
-            else I18N.Locale_Data.Lookup ("zone_family_display", Locale,
-                                          Family, Fam_Found));
-      begin
-         if Fam_Found then
-            return Fam_Value;
-         end if;
-      end;
-
-      return I18N.CLDR_Data.Time_Zone_Display_Name (Locale, Zone);
-   end Time_Zone_Display_Name;
-
    function Time_Zone_Exemplar_Location
      (Locale : String;
       Zone   : String)
       return String;
-
-   function Time_Zone_Specific_Display_Name
-     (Locale   : String;
-      Zone     : String;
-      Daylight : Boolean)
-      return String
-   is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale,
-           (if Daylight then "timezone_display_daylight."
-            else "timezone_display_standard.") & Zone,
-           Found);
-      --  CLDR's long specific names (TR35 "zzzz"): one the zone has itself
-      --  ("British Summer Time"), else its metazone's standard or daylight
-      --  name ("Eastern Daylight Time"). Both sit in the locale's zone shard.
-      function Specific_Name return String is
-         Kind       : constant String := (if Daylight then "dst:" else "std:");
-         Zone_Found : Boolean;
-         Zone_Name  : constant String :=
-           I18N.Locale_Data.Shard_Lookup ("zones", "exemplar", Locale, Kind & "zone:" & Zone, Zone_Found);
-      begin
-         if Zone_Found then
-            return Zone_Name;
-         end if;
-
-         declare
-            Direct_Found : Boolean;
-            Direct       : constant String :=
-              I18N.Locale_Data.Lookup ("zone_metazone", "und", Zone, Direct_Found);
-            Canonical_Found : Boolean := False;
-            Canonical    : constant String :=
-              (if Direct_Found then ""
-               else I18N.Locale_Data.Lookup
-                      ("zone_metazone", "und", I18N.CLDR_Data.Canonical_Time_Zone (Zone), Canonical_Found));
-            Metazone     : constant String := (if Direct_Found then Direct else Canonical);
-            Name_Found   : Boolean;
-            Name         : constant String :=
-              (if Metazone = "" then ""
-               else I18N.Locale_Data.Shard_Lookup ("zones", "exemplar", Locale, Kind & "mz:" & Metazone, Name_Found));
-         begin
-            return (if Metazone /= "" and then Name_Found then Name else "");
-         end;
-      end Specific_Name;
-   begin
-      if Found then
-         return Value;
-      end if;
-
-      declare
-         Name : constant String := Specific_Name;
-      begin
-         if Name /= "" then
-            return Name;
-         end if;
-      end;
-
-      begin
-         declare
-            Pattern_Found : Boolean;
-            Pattern       : constant String :=
-              I18N.Runtime_Data.Locale_Text
-                (Locale,
-                 (if Daylight then "timezone_location_pattern_daylight"
-                  else "timezone_location_pattern_standard"),
-                 Pattern_Found);
-         begin
-            if Pattern_Found then
-               declare
-                  Location : constant String :=
-                    Time_Zone_Exemplar_Location (Locale, Zone);
-               begin
-                  if Location = "UTC" then
-                     return Location;
-                  end if;
-
-                  for Index in Pattern'First .. Pattern'Last - 2 loop
-                     if Pattern (Index .. Index + 2) = "{0}" then
-                        return Pattern (Pattern'First .. Index - 1)
-                          & Location
-                          & Pattern (Index + 3 .. Pattern'Last);
-                     end if;
-                  end loop;
-               end;
-            end if;
-         end;
-      end;
-
-      return Time_Zone_Display_Name (Locale, Zone);
-   end Time_Zone_Specific_Display_Name;
 
    function Time_Zone_Exemplar_Location
      (Locale : String;
@@ -2323,22 +2205,6 @@ package body I18N.Date_Time_Format is
         ("timezone_location_pattern", Locale,
          I18N.CLDR_Data.Time_Zone_Location_Pattern'Access));
 
-   function Time_Zone_Specific_Location_Pattern
-     (Locale   : String;
-      Daylight : Boolean)
-      return String
-   is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text
-          (Locale,
-           (if Daylight then "timezone_location_pattern_daylight"
-            else "timezone_location_pattern_standard"),
-           Found);
-   begin
-      return (if Found then Value else Time_Zone_Location_Pattern (Locale));
-   end Time_Zone_Specific_Location_Pattern;
-
    function Apply_Time_Zone_Location_Pattern
      (Locale   : String;
       Location : String)
@@ -2356,26 +2222,6 @@ package body I18N.Date_Time_Format is
 
       return Location & " Time";
    end Apply_Time_Zone_Location_Pattern;
-
-   function Apply_Time_Zone_Specific_Location_Pattern
-     (Locale   : String;
-      Location : String;
-      Daylight : Boolean)
-      return String
-   is
-      Pattern : constant String :=
-        Time_Zone_Specific_Location_Pattern (Locale, Daylight);
-   begin
-      for Index in Pattern'First .. Pattern'Last - 2 loop
-         if Pattern (Index .. Index + 2) = "{0}" then
-            return Pattern (Pattern'First .. Index - 1)
-              & Location
-              & Pattern (Index + 3 .. Pattern'Last);
-         end if;
-      end loop;
-
-      return Apply_Time_Zone_Location_Pattern (Locale, Location);
-   end Apply_Time_Zone_Specific_Location_Pattern;
 
    function GMT_Offset_Prefix (Locale : String) return String is
      (I18N.Locale_Data.Field
@@ -2399,39 +2245,368 @@ package body I18N.Date_Time_Format is
      (I18N.Locale_Data.Field
         ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
 
-   procedure Put_Zone
-     (Target   : in out String;
-      Last     : in out Natural;
-      Overflow : in out Boolean;
-      Style    : String;
-      Locale   : String;
-      Specific : Boolean;
-      Daylight : Boolean)
-   is
-      Zone : constant String := Zone_Name (Style, Locale);
-      Name : constant String :=
-        (if Specific
-         then Time_Zone_Specific_Display_Name (Locale, Zone, Daylight)
-         else Time_Zone_Display_Name (Locale, Zone));
+   ---------------------------------------------------------------------
+   --  Time zone names, by TR35's rules as ICU applies them. The names come
+   --  from the locale's zone shard (lg/ls/ld: long generic, standard,
+   --  daylight; sg/ss/sd: short), keyed "zone:<id>" for a zone's own and
+   --  "mz:<metazone>" for its metazone's; zone_meta holds each zone's
+   --  metazones over time, each metazone's zone per region, and each zone's
+   --  country.
+   ---------------------------------------------------------------------
+
+   function Zone_Shard (Locale : String; Key : String) return String is
+      Found : Boolean;
+      Value : constant String :=
+        I18N.Locale_Data.Resolved_Shard_Lookup ("zones", "exemplar", Locale, Key, Found);
    begin
-      if Name /= "" then
-         Put (Target, Last, Overflow, Name);
-      elsif Specific and then Zone /= "" then
+      return (if Found then Value else "");
+   end Zone_Shard;
+
+   function Zone_Meta (Key : String) return String is
+      Found : Boolean;
+      Value : constant String := I18N.Locale_Data.Lookup ("zone_meta", "und", Key, Found);
+   begin
+      return (if Found then Value else "");
+   end Zone_Meta;
+
+   --  The id the names are filed under: UTC's own zone for the UTC spellings.
+   --  A zone the data knows by its own id keeps it: CLDR keeps zones apart
+   --  that the tz database has made links (Europe/Busingen, which the tz
+   --  database now sends to Europe/Zurich).
+   function Name_Zone (Zone : String) return String is
+     (if Zone = "" or else Zone = "UTC" or else Zone = "Z" or else Zone = "Etc/UTC"
+      then "Etc/UTC"
+      elsif Zone_Meta_Has ("mz:" & Zone) or else Zone_Meta_Has ("cc:" & Zone) then Zone
+      else I18N.CLDR_Data.Canonical_Time_Zone (Zone));
+
+   function Zone_Meta_Has (Key : String) return Boolean is
+      Found : Boolean;
+      Value : constant String := I18N.Locale_Data.Lookup ("zone_meta", "und", Key, Found);
+      pragma Unreferenced (Value);
+   begin
+      return Found;
+   end Zone_Meta_Has;
+
+   --  The zone's metazone at Instant (UTC seconds since the epoch): zones move
+   --  between metazones (London was "British" until 1971).
+   function Metazone_At (Zone : String; Instant : Long_Long_Integer) return String is
+      Periods : constant String := Zone_Meta ("mz:" & Name_Zone (Zone));
+      Start   : Positive := Periods'First;
+
+      --  CLDR's "YYYY-MM-DD hh:mm", UTC.
+      function Epoch_Of (Text : String) return Long_Long_Integer is
+        (I18N.TZ_Rules.Epoch_Seconds
+           (Integer'Value (Text (Text'First .. Text'First + 3)),
+            Integer'Value (Text (Text'First + 5 .. Text'First + 6)),
+            Integer'Value (Text (Text'First + 8 .. Text'First + 9)),
+            Integer'Value (Text (Text'First + 11 .. Text'First + 12)),
+            Integer'Value (Text (Text'First + 14 .. Text'First + 15))));
+   begin
+      while Start <= Periods'Last loop
          declare
-            Location : constant String :=
-              Time_Zone_Exemplar_Location (Locale, Zone);
+            Stop  : Natural := Start;
+            First : Natural := 0;
+            Second_At : Natural := 0;
          begin
-            if Location = "UTC" then
-               Put (Target, Last, Overflow, Location);
-            else
-               Put
-                 (Target, Last, Overflow,
-                  Apply_Time_Zone_Specific_Location_Pattern
-                    (Locale, Location, Daylight));
+            while Stop <= Periods'Last and then Periods (Stop) /= ';' loop
+               if Periods (Stop) = '@' then
+                  if First = 0 then
+                     First := Stop;
+                  else
+                     Second_At := Stop;
+                  end if;
+               end if;
+               Stop := Stop + 1;
+            end loop;
+            if First /= 0 and then Second_At /= 0 then
+               declare
+                  Name : constant String := Periods (Start .. First - 1);
+                  From : constant String := Periods (First + 1 .. Second_At - 1);
+                  To   : constant String := Periods (Second_At + 1 .. Stop - 1);
+               begin
+                  if (From = "" or else Epoch_Of (From) <= Instant)
+                    and then (To = "" or else Instant < Epoch_Of (To))
+                  then
+                     return Name;
+                  end if;
+               end;
+            end if;
+            Start := Stop + 1;
+         end;
+      end loop;
+      return "";
+   exception
+      when Constraint_Error =>
+         return "";
+   end Metazone_At;
+
+   --  The locale's region, for a metazone's zone there.
+   function Region_Of (Locale : String) return String is
+      Full  : constant String := I18N.Locales.Maximize (Locale);
+      Start : Positive := Full'First;
+      Found : Natural := 0;
+      Found_Last : Natural := 0;
+   begin
+      for Index in Full'Range loop
+         if Full (Index) = '-' or else Full (Index) = '_' or else Index = Full'Last then
+            declare
+               Stop : constant Natural := (if Index = Full'Last then Index else Index - 1);
+               Part : constant String := Full (Start .. Stop);
+            begin
+               if Start > Full'First
+                 and then ((Part'Length = 2 and then (for all C of Part => C in 'A' .. 'Z' | 'a' .. 'z'))
+                           or else (Part'Length = 3 and then (for all C of Part => C in '0' .. '9')))
+               then
+                  Found := Start;
+                  Found_Last := Stop;
+               end if;
+            end;
+            Start := Index + 1;
+         end if;
+      end loop;
+      return (if Found = 0 then "001" else Ada.Characters.Handling.To_Upper (Full (Found .. Found_Last)));
+   end Region_Of;
+
+   --  A zone's specific name (TR35 z / zzzz): its own, else its metazone's,
+   --  standard or daylight as the zone keeps time at Instant; "" for none.
+   function Specific_Zone_Name
+     (Locale   : String;
+      Zone     : String;
+      Long     : Boolean;
+      Daylight : Boolean;
+      Instant  : Long_Long_Integer)
+      return String
+   is
+      Prefix : constant String :=
+        (if Long then (if Daylight then "ld:" else "ls:") else (if Daylight then "sd:" else "ss:"));
+      Own    : constant String := Zone_Shard (Locale, Prefix & "zone:" & Name_Zone (Zone));
+   begin
+      if Own /= "" then
+         return Own;
+      end if;
+      declare
+         Metazone : constant String := Metazone_At (Zone, Instant);
+      begin
+         return (if Metazone = "" then "" else Zone_Shard (Locale, Prefix & "mz:" & Metazone));
+      end;
+   end Specific_Zone_Name;
+
+   --  A zone's generic location name (TR35 VVVV): "{0} Time" with its
+   --  country when it is its country's primary zone, its city otherwise;
+   --  "" for a zone with no country (Etc/GMT+5).
+   function Generic_Location_Name (Locale : String; Zone : String) return String is
+      Country : constant String := Zone_Meta ("cc:" & Name_Zone (Zone));
+   begin
+      if Country = "" then
+         --  A zone with no country (Etc/GMT+5) has no location -- unless a
+         --  locale's data gives it an exemplar city outright.
+         declare
+            Found : Boolean;
+            Value : constant String :=
+              I18N.Runtime_Data.Locale_Text (Locale, "timezone_exemplar." & Zone, Found);
+         begin
+            if Found then
+               return Apply_Time_Zone_Location_Pattern (Locale, Value);
             end if;
          end;
+         return "";
+      elsif Country (Country'Last) = '*' then
+         return Apply_Time_Zone_Location_Pattern
+           (Locale, I18N.Display_Names.Territory_Name (Locale, Country (Country'First .. Country'Last - 1)));
+      else
+         return Apply_Time_Zone_Location_Pattern (Locale, Time_Zone_Exemplar_Location (Locale, Zone));
       end if;
-   end Put_Zone;
+   end Generic_Location_Name;
+
+   --  A zone's generic name (TR35 v / vvvv), as ICU's TimeZoneGenericNames
+   --  gives it at Instant; "" when the location name must stand in.
+   function Generic_Zone_Name
+     (Locale  : String;
+      Zone    : String;
+      Long    : Boolean;
+      Year, Month, Day, Hour, Minute, Second : Natural)
+      return String
+   is
+      Canonical : constant String := Name_Zone (Zone);
+      Generic_Prefix  : constant String := (if Long then "lg:" else "sg:");
+      Standard_Prefix : constant String := (if Long then "ls:" else "ss:");
+      Instant   : constant Long_Long_Integer :=
+        I18N.TZ_Rules.Epoch_Seconds (Year, Month, Day, Hour, Minute, Second);
+      Own       : constant String := Zone_Shard (Locale, Generic_Prefix & "zone:" & Canonical);
+   begin
+      if Own /= "" then
+         return Own;
+      end if;
+
+      declare
+         Metazone : constant String := Metazone_At (Zone, Instant);
+         Metazone_Generic : constant String :=
+           (if Metazone = "" then "" else Zone_Shard (Locale, Generic_Prefix & "mz:" & Metazone));
+      begin
+         if Metazone = "" then
+            return "";
+         end if;
+
+         --  A zone keeping no daylight time within half a year of the date is
+         --  named by its standard time ("India Standard Time").
+         if not I18N.Time_Zone_Data.Daylight_Near_UTC
+                  (Zone, Year, Month, Day, Hour, Minute, Second, 184)
+         then
+            declare
+               Own_Standard : constant String :=
+                 Zone_Shard (Locale, Standard_Prefix & "zone:" & Canonical);
+               Standard     : constant String :=
+                 (if Own_Standard /= "" then Own_Standard
+                  else Zone_Shard (Locale, Standard_Prefix & "mz:" & Metazone));
+            begin
+               if Standard /= "" and then Standard /= Metazone_Generic then
+                  return Standard;
+               end if;
+            end;
+         end if;
+
+         if Metazone_Generic = "" then
+            return "";
+         end if;
+
+         --  Where the metazone's own zone for the locale's region keeps other
+         --  time, the name says which place: "Central Time (Mexico City)".
+         declare
+            Region  : constant String := Region_Of (Locale);
+            Regional : constant String := Zone_Meta ("golden:" & Metazone & ":" & Region);
+            Golden  : constant String :=
+              (if Regional /= "" then Regional else Zone_Meta ("golden:" & Metazone & ":001"));
+         begin
+            if Golden /= "" and then Golden /= Canonical then
+               declare
+                  Own_Valid, Golden_Valid, Own_D_Valid, Golden_D_Valid : Boolean;
+                  Own_Offset    : constant Integer :=
+                    I18N.Time_Zone_Data.Offset_Seconds_At_UTC
+                      (Zone, Year, Month, Day, Hour, Minute, Second, Own_Valid);
+                  Golden_Offset : constant Integer :=
+                    I18N.Time_Zone_Data.Offset_Seconds_At_UTC
+                      (Golden, Year, Month, Day, Hour, Minute, Second, Golden_Valid);
+                  Own_Daylight  : constant Boolean :=
+                    I18N.Time_Zone_Data.Daylight_At_UTC
+                      (Zone, Year, Month, Day, Hour, Minute, Second, Own_D_Valid);
+                  Golden_Daylight : constant Boolean :=
+                    I18N.Time_Zone_Data.Daylight_At_UTC
+                      (Golden, Year, Month, Day, Hour, Minute, Second, Golden_D_Valid);
+               begin
+                  if Own_Valid and then Golden_Valid
+                    and then (Own_Offset /= Golden_Offset or else Own_Daylight /= Golden_Daylight)
+                  then
+                     declare
+                        Country_Text : constant String := Zone_Meta ("cc:" & Canonical);
+                        Country : constant String :=
+                          (if Country_Text /= "" and then Country_Text (Country_Text'Last) = '*'
+                           then Country_Text (Country_Text'First .. Country_Text'Last - 1)
+                           else Country_Text);
+                        Place   : constant String :=
+                          (if Country /= ""
+                             and then Zone_Meta ("golden:" & Metazone & ":" & Country) = Canonical
+                           then I18N.Display_Names.Territory_Name (Locale, Country)
+                           else Time_Zone_Exemplar_Location (Locale, Zone));
+                        Pattern_Found : Boolean;
+                        Pattern_Text  : constant String :=
+                          I18N.Locale_Data.Lookup ("zone_text", Locale, "fallback", Pattern_Found);
+                        Pattern : constant String := (if Pattern_Found then Pattern_Text else "{1} ({0})");
+                        Result  : Ada.Strings.Unbounded.Unbounded_String;
+                        Index   : Positive := Pattern'First;
+                     begin
+                        while Index <= Pattern'Last loop
+                           if Index + 2 <= Pattern'Last and then Pattern (Index .. Index + 2) = "{0}" then
+                              Ada.Strings.Unbounded.Append (Result, Place);
+                              Index := Index + 3;
+                           elsif Index + 2 <= Pattern'Last and then Pattern (Index .. Index + 2) = "{1}" then
+                              Ada.Strings.Unbounded.Append (Result, Metazone_Generic);
+                              Index := Index + 3;
+                           else
+                              Ada.Strings.Unbounded.Append (Result, Pattern (Index));
+                              Index := Index + 1;
+                           end if;
+                        end loop;
+                        return Ada.Strings.Unbounded.To_String (Result);
+                     end;
+                  end if;
+               end;
+            end if;
+         end;
+         return Metazone_Generic;
+      end;
+   end Generic_Zone_Name;
+
+   --  zzzz (Specific) and vvvv: a runtime override, else TR35's name, else ""
+   --  (the caller writes the localized GMT format).
+   function Long_Zone_Name
+     (Style    : String;
+      Locale   : String;
+      Specific : Boolean;
+      Year, Month, Day, Hour, Minute, Second : Natural)
+      return String
+   is
+      Zone     : constant String := Zone_Name (Style, Locale);
+      D_Valid  : Boolean;
+      Daylight : constant Boolean :=
+        I18N.Time_Zone_Data.Daylight_At_UTC (Zone, Year, Month, Day, Hour, Minute, Second, D_Valid);
+      Found    : Boolean;
+      Override : constant String :=
+        I18N.Runtime_Data.Locale_Text
+          (Locale,
+           (if not Specific then "timezone_display."
+            elsif Daylight then "timezone_display_daylight."
+            else "timezone_display_standard.") & Zone,
+           Found);
+      --  A zone given one display name, with no standard or daylight one,
+      --  goes by it in the specific forms too.
+      Plain_Found : Boolean := False;
+      Plain       : constant String :=
+        (if Specific and then not Found
+         then I18N.Runtime_Data.Locale_Text (Locale, "timezone_display." & Zone, Plain_Found)
+         else "");
+   begin
+      if Found then
+         return Override;
+      elsif Plain_Found then
+         return Plain;
+      elsif Specific then
+         declare
+            Name : constant String :=
+              Specific_Zone_Name
+                (Locale, Zone, True, Daylight,
+                 I18N.TZ_Rules.Epoch_Seconds (Year, Month, Day, Hour, Minute, Second));
+            Pattern_Found, City_Found : Boolean;
+            Pattern : constant String :=
+              (if Name /= "" then ""
+               else I18N.Runtime_Data.Locale_Text
+                      (Locale,
+                       (if Daylight then "timezone_location_pattern_daylight"
+                        else "timezone_location_pattern_standard"),
+                       Pattern_Found));
+            City    : constant String :=
+              (if Name /= "" or else not Pattern_Found then ""
+               else I18N.Runtime_Data.Locale_Text (Locale, "timezone_exemplar." & Zone, City_Found));
+         begin
+            --  A zone known only from a locale's runtime data, given a city
+            --  and a standard or daylight region format, is named by them.
+            if Name = "" and then Pattern_Found and then City_Found then
+               for Index in Pattern'First .. Pattern'Last - 2 loop
+                  if Pattern (Index .. Index + 2) = "{0}" then
+                     return Pattern (Pattern'First .. Index - 1) & City & Pattern (Index + 3 .. Pattern'Last);
+                  end if;
+               end loop;
+            end if;
+            return Name;
+         end;
+      else
+         declare
+            Name : constant String :=
+              Generic_Zone_Name (Locale, Zone, True, Year, Month, Day, Hour, Minute, Second);
+         begin
+            return (if Name /= "" then Name else Generic_Location_Name (Locale, Zone));
+         end;
+      end if;
+   end Long_Zone_Name;
 
    procedure Format_Skeleton_Into
      (Skeleton   : String;
@@ -2832,77 +3007,76 @@ package body I18N.Date_Time_Format is
          end loop;
       end Put_Fractional_Second;
 
+      --  The instant in UTC. Year .. Second are its local time in the zone,
+      --  so the zone's offset is taken off again -- and once more when the
+      --  offset at the instant first found differs, near a change.
+      type UTC_Time is record
+         Year, Month, Day, Hour, Minute, Second : Natural := 0;
+      end record;
+
+      function To_UTC return UTC_Time is
+         Zone  : constant String := Zone_Name (Style, Locale);
+         Local : constant Long_Long_Integer :=
+           I18N.TZ_Rules.Epoch_Seconds (Year, Month, Day, Hour, Minute, Second);
+
+         function Offset_At (Instant : Long_Long_Integer) return Long_Long_Integer is
+            Y, Mo, D, H, Mi, S : Integer;
+            Valid : Boolean;
+            Offset : Integer;
+         begin
+            I18N.TZ_Rules.Civil_Of (Instant, Y, Mo, D, H, Mi, S);
+            Offset := Zone_Offset_Seconds_At (Zone, Y, Mo, D, H, Mi, S, Valid);
+            return (if Valid then Long_Long_Integer (Offset) else 0);
+         end Offset_At;
+
+         Guess  : constant Long_Long_Integer := Local - Offset_At (Local);
+         Result : constant Long_Long_Integer := Local - Offset_At (Guess);
+         Y, Mo, D, H, Mi, S : Integer;
+      begin
+         I18N.TZ_Rules.Civil_Of (Result, Y, Mo, D, H, Mi, S);
+         return (Natural (Y), Natural (Mo), Natural (D), Natural (H), Natural (Mi), Natural (S));
+      exception
+         when Constraint_Error =>
+            return (Year, Month, Day, Hour, Minute, Second);
+      end To_UTC;
+
+      UTC : constant UTC_Time := To_UTC;
+
+      function UTC_Instant return Long_Long_Integer is
+        (I18N.TZ_Rules.Epoch_Seconds (UTC.Year, UTC.Month, UTC.Day, UTC.Hour, UTC.Minute, UTC.Second));
+
+      --  z: a runtime override, else TR35's short specific name; "" for the
+      --  localized GMT format.
       function Short_Zone_Display return String is
-         Zone          : constant String := Zone_Name (Style, Locale);
-         Family        : constant String :=
-           I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
-         Current_Valid : Boolean;
-         Base_Valid    : Boolean;
-         Current       : constant Integer :=
-           Zone_Offset_Minutes_At
-             (Zone, Year, Month, Day, Hour, Minute, Current_Valid);
-         Base          : constant Integer :=
-           Zone_Offset_Minutes (Zone, Base_Valid);
-         Daylight      : constant Boolean :=
-           Current_Valid and then Base_Valid and then Current /= Base;
-         Override_Name : constant String :=
-           Time_Zone_Short_Name (Locale, Zone, Daylight);
-         Short_Found   : Boolean;
-         Short_Store   : constant String :=
-           I18N.Locale_Data.Lookup
-             ((if Daylight then "zone_short_dst" else "zone_short_std"),
-              Locale, Family, Short_Found);
-         CLDR_Name     : constant String :=
-           (if Short_Found then Short_Store
-            else I18N.CLDR_Data.Time_Zone_Short_Name
-                   (Locale, Family, Daylight));
+         Zone     : constant String := Zone_Name (Style, Locale);
+         D_Valid  : Boolean;
+         Daylight : constant Boolean :=
+           I18N.Time_Zone_Data.Daylight_At_UTC
+             (Zone, UTC.Year, UTC.Month, UTC.Day, UTC.Hour, UTC.Minute, UTC.Second, D_Valid);
+         Override_Name : constant String := Time_Zone_Short_Name (Locale, Zone, Daylight);
       begin
          if Override_Name /= "" then
             return Override_Name;
-         elsif Zone = ""
-           or else Zone = "UTC"
-           or else Zone = "Z"
-           or else Zone = "GMT"
-           or else Zone = "Etc/UTC"
-           or else Zone = "Etc/GMT"
-         then
-            return "UTC";
-         elsif CLDR_Name /= "" then
-            return CLDR_Name;
-         else
-            return "";
          end if;
+         return Specific_Zone_Name (Locale, Zone, False, Daylight, UTC_Instant);
       end Short_Zone_Display;
 
+      --  v: a runtime override, else TR35's short generic name, else the
+      --  generic location name; "" for the localized GMT format.
       function Short_Generic_Zone_Display return String is
-         Zone   : constant String := Zone_Name (Style, Locale);
-         Family : constant String :=
-           I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
-         Override_Name : constant String :=
-           Time_Zone_Generic_Short_Name (Locale, Zone);
-         Gen_Found     : Boolean;
-         Gen_Store     : constant String :=
-           I18N.Locale_Data.Lookup
-             ("zone_short_generic", Locale, Family, Gen_Found);
-         CLDR_Name     : constant String :=
-           (if Gen_Found then Gen_Store
-            else I18N.CLDR_Data.Time_Zone_Generic_Short_Name (Locale, Family));
+         Zone          : constant String := Zone_Name (Style, Locale);
+         Override_Name : constant String := Time_Zone_Generic_Short_Name (Locale, Zone);
       begin
          if Override_Name /= "" then
             return Override_Name;
-         elsif Zone = ""
-           or else Zone = "UTC"
-           or else Zone = "Z"
-           or else Zone = "GMT"
-           or else Zone = "Etc/UTC"
-           or else Zone = "Etc/GMT"
-         then
-            return "UTC";
-         elsif CLDR_Name /= "" then
-            return CLDR_Name;
-         else
-            return "";
          end if;
+         declare
+            Name : constant String :=
+              Generic_Zone_Name
+                (Locale, Zone, False, UTC.Year, UTC.Month, UTC.Day, UTC.Hour, UTC.Minute, UTC.Second);
+         begin
+            return (if Name /= "" then Name else Generic_Location_Name (Locale, Zone));
+         end;
       end Short_Generic_Zone_Display;
 
       procedure Put_Offset
@@ -2912,8 +3086,8 @@ package body I18N.Date_Time_Format is
          Valid        : Boolean;
          Offset       : constant Integer :=
            Zone_Offset_Seconds_At
-             (Zone_Name (Style, Locale), Year, Month, Day, Hour, Minute,
-              Second, Valid);
+             (Zone_Name (Style, Locale), UTC.Year, UTC.Month, UTC.Day, UTC.Hour, UTC.Minute,
+              UTC.Second, Valid);
          Abs_Offset   : Natural;
          Hours        : Natural;
          Minutes      : Natural;
@@ -2941,13 +3115,20 @@ package body I18N.Date_Time_Format is
          end if;
 
          if Use_GMT then
+            --  No offset is the locale's zero format ("GMT", "UTC"), short or
+            --  long alike.
+            if Offset = 0 then
+               declare
+                  Found : Boolean;
+                  Zero  : constant String := I18N.Locale_Data.Lookup ("zone_text", Locale, "gmt_zero", Found);
+               begin
+                  Put (Target, Last, Overflow, (if Found then Zero else GMT_Offset_Prefix (Locale)));
+                  return;
+               end;
+            end if;
             Put
               (Target, Last, Overflow,
                GMT_Offset_Prefix (Locale));
-
-            if Short_GMT and then Offset = 0 then
-               return;
-            end if;
          end if;
 
          Abs_Offset := Natural (abs Offset);
@@ -2959,15 +3140,33 @@ package body I18N.Date_Time_Format is
              or else (Field = 'Z' and then Width = 5))
             and then Seconds /= 0);
 
-         if Offset < 0 then
-            Put
-              (Target, Last, Overflow,
-               Number_Minus_Sign (Locale));
-         else
-            Put
-              (Target, Last, Overflow,
-               Number_Plus_Sign (Locale));
-         end if;
+         --  The localized GMT format takes its signs from the locale's hour
+         --  format (U+2212 in French); the ISO formats keep the number signs,
+         --  as does a locale whose runtime data gives its own.
+         declare
+            Overridden : Boolean;
+            Unused     : constant String :=
+              I18N.Runtime_Data.Locale_Text
+                (Locale, (if Offset < 0 then "number_minus_sign" else "number_plus_sign"), Overridden);
+            pragma Unreferenced (Unused);
+            Found : Boolean := False;
+            Sign  : constant String :=
+              (if Use_GMT and then not Overridden
+               then I18N.Locale_Data.Lookup ("zone_text", Locale, (if Offset < 0 then "minus" else "plus"), Found)
+               else "");
+         begin
+            if Found then
+               Put (Target, Last, Overflow, Sign);
+            elsif Offset < 0 then
+               Put
+                 (Target, Last, Overflow,
+                  Number_Minus_Sign (Locale));
+            else
+               Put
+                 (Target, Last, Overflow,
+                  Number_Plus_Sign (Locale));
+            end if;
+         end;
          Put_Number
            (Target, Last, Overflow, Locale, Hours,
             (if Short_GMT then 1 else 2));
@@ -3003,24 +3202,30 @@ package body I18N.Date_Time_Format is
                  (Target, Last, Overflow,
                   Time_Zone_Exemplar_Location (Locale, Zone));
             else
+               --  VVVV: the generic location name ("United Kingdom Time").
                declare
-                  Location : constant String :=
-                    Time_Zone_Exemplar_Location (Locale, Zone);
+                  Name : constant String := Generic_Location_Name (Locale, Zone);
                begin
-                  if Location = "UTC" then
-                     Put (Target, Last, Overflow, Location);
+                  if Name = "" then
+                     Put_Offset (4, 'O');
                   else
-                     Put
-                       (Target, Last, Overflow,
-                        Apply_Time_Zone_Location_Pattern
-                          (Locale, Location));
+                     Put (Target, Last, Overflow, Name);
                   end if;
                end;
             end if;
          else
-            Put_Zone
-              (Target, Last, Overflow, Style, Locale,
-               Specific => False, Daylight => False);
+            --  vvvv: the long generic name, else the location name.
+            declare
+               Name : constant String :=
+                 Long_Zone_Name
+                   (Style, Locale, False, UTC.Year, UTC.Month, UTC.Day, UTC.Hour, UTC.Minute, UTC.Second);
+            begin
+               if Name = "" then
+                  Put_Offset (4, 'O');
+               else
+                  Put (Target, Last, Overflow, Name);
+               end if;
+            end;
          end if;
       end Put_Zone_Field;
 
@@ -3241,25 +3446,19 @@ package body I18N.Date_Time_Format is
                      elsif Width <= 3 then
                         Put_Short_Zone;
                      else
+                        --  zzzz: the long specific name, else the localized
+                        --  GMT format ("GMT+01:00").
                         declare
-                           Current_Valid : Boolean;
-                           Base_Valid    : Boolean;
-                           Zone_Id       : constant String :=
-                             Zone_Name (Style, Locale);
-                           Current       : constant Integer :=
-                             Zone_Offset_Minutes_At
-                               (Zone_Id, Year, Month, Day, Hour, Minute,
-                                Current_Valid);
-                           Base          : constant Integer :=
-                             Zone_Offset_Minutes (Zone_Id, Base_Valid);
-                           Daylight      : constant Boolean :=
-                             Current_Valid
-                             and then Base_Valid
-                             and then Current /= Base;
+                           Name : constant String :=
+                             Long_Zone_Name
+                               (Style, Locale, True, UTC.Year, UTC.Month, UTC.Day,
+                                UTC.Hour, UTC.Minute, UTC.Second);
                         begin
-                           Put_Zone
-                             (Target, Last, Overflow, Style, Locale,
-                              Specific => True, Daylight => Daylight);
+                           if Name = "" then
+                              Put_Offset (4, 'O');
+                           else
+                              Put (Target, Last, Overflow, Name);
+                           end if;
                         end;
                      end if;
                   when 'O' | 'X' | 'x' =>
@@ -3535,75 +3734,6 @@ package body I18N.Date_Time_Format is
       end;
    end Zone_Offset_Minutes;
 
-   function Last_Sunday (Year : Natural; Month : Natural) return Natural is
-      Day : Natural := Days_In_Month (Year, Month);
-   begin
-      while Day_Of_Week (Year, Month, Day) /= 0 loop
-         Day := Day - 1;
-      end loop;
-      return Day;
-   end Last_Sunday;
-
-   function Nth_Sunday
-     (Year  : Natural;
-      Month : Natural;
-      N     : Positive)
-      return Natural
-   is
-      Day   : Natural := 1;
-      Count : Natural := 0;
-   begin
-      while Day <= Days_In_Month (Year, Month) loop
-         if Day_Of_Week (Year, Month, Day) = 0 then
-            Count := Count + 1;
-            if Count = N then
-               return Day;
-            end if;
-         end if;
-         Day := Day + 1;
-      end loop;
-      return 0;
-   end Nth_Sunday;
-
-   function On_Or_After
-     (Year   : Natural;
-      Month  : Natural;
-      Day    : Natural;
-      Hour   : Natural;
-      Minute : Natural;
-      Ref_Month : Natural;
-      Ref_Day   : Natural;
-      Ref_Hour  : Natural)
-      return Boolean
-   is
-      pragma Unreferenced (Year, Minute);
-   begin
-      return Month > Ref_Month
-        or else (Month = Ref_Month
-                 and then
-                   (Day > Ref_Day
-                    or else (Day = Ref_Day
-                             and then
-                               Hour >= Ref_Hour)));
-   end On_Or_After;
-
-   function Before
-     (Month  : Natural;
-      Day    : Natural;
-      Hour   : Natural;
-      Ref_Month : Natural;
-      Ref_Day   : Natural;
-      Ref_Hour  : Natural)
-      return Boolean
-   is
-   begin
-      return Month < Ref_Month
-        or else (Month = Ref_Month
-                 and then
-                   (Day < Ref_Day
-                    or else (Day = Ref_Day and then Hour < Ref_Hour)));
-   end Before;
-
    function Zone_Offset_Minutes_At
      (Zone   : String;
       Year   : Natural;
@@ -3614,9 +3744,6 @@ package body I18N.Date_Time_Format is
       Valid  : out Boolean)
       return Integer
    is
-      Start_Day : Natural;
-      End_Day   : Natural;
-      Family    : constant String := I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
    begin
       declare
          Runtime_Valid : Boolean;
@@ -3630,221 +3757,21 @@ package body I18N.Date_Time_Format is
          end if;
       end;
 
-      if Family = "europe-central" then
-         Valid := True;
-         Start_Day := Last_Sunday (Year, 3);
-         End_Day := Last_Sunday (Year, 10);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 1)
-           and then Before (Month, Day, Hour, 10, End_Day, 1)
-         then
-            return 120;
-         else
-            return 60;
+      --  The tz database: the hand-written per-family rules that stood here
+      --  applied today's daylight dates to every year.
+      declare
+         Generated_Valid : Boolean;
+         Generated       : constant Integer :=
+           I18N.Time_Zone_Data.Offset_Seconds_At_UTC
+             (Zone, Year, Month, Day, Hour, Minute, 0, Generated_Valid);
+      begin
+         if Generated_Valid then
+            Valid := True;
+            return Generated / 60;
          end if;
-      elsif Family = "europe-london" then
-         Valid := True;
-         Start_Day := Last_Sunday (Year, 3);
-         End_Day := Last_Sunday (Year, 10);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 1)
-           and then Before (Month, Day, Hour, 10, End_Day, 1)
-         then
-            return 60;
-         else
-            return 0;
-         end if;
-      elsif Family = "europe-eastern" then
-         Valid := True;
-         Start_Day := Last_Sunday (Year, 3);
-         End_Day := Last_Sunday (Year, 10);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 1)
-           and then Before (Month, Day, Hour, 10, End_Day, 1)
-         then
-            return 180;
-         else
-            return 120;
-         end if;
-      elsif Family = "america-eastern" then
-         Valid := True;
-         Start_Day := Nth_Sunday (Year, 3, 2);
-         End_Day := Nth_Sunday (Year, 11, 1);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 7)
-           and then Before (Month, Day, Hour, 11, End_Day, 6)
-         then
-            return -240;
-         else
-            return -300;
-         end if;
-      elsif Family = "america-central" then
-         Valid := True;
-         Start_Day := Nth_Sunday (Year, 3, 2);
-         End_Day := Nth_Sunday (Year, 11, 1);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 8)
-           and then Before (Month, Day, Hour, 11, End_Day, 7)
-         then
-            return -300;
-         else
-            return -360;
-         end if;
-      elsif Family = "america-mexico-city" then
-         Valid := True;
-         if Year in 1996 .. 2022 then
-            Start_Day := Nth_Sunday (Year, 4, 1);
-            End_Day := Last_Sunday (Year, 10);
-            if On_Or_After
-                 (Year, Month, Day, Hour, Minute, 4, Start_Day, 8)
-              and then Before (Month, Day, Hour, 10, End_Day, 7)
-            then
-               return -300;
-            end if;
-         end if;
-         return -360;
-      elsif Family = "america-sao-paulo" then
-         Valid := True;
-         if Year in 2008 .. 2018 then
-            if Year = 2018 then
-               Start_Day := Nth_Sunday (Year, 11, 1);
-               if On_Or_After
-                    (Year, Month, Day, Hour, Minute, 11, Start_Day, 3)
-               then
-                  return -120;
-               end if;
-            else
-               Start_Day := Nth_Sunday (Year, 10, 3);
-               if On_Or_After
-                    (Year, Month, Day, Hour, Minute, 10, Start_Day, 3)
-               then
-                  return -120;
-               end if;
-            end if;
-         end if;
+      end;
 
-         if Year in 2009 .. 2019 then
-            End_Day := Nth_Sunday (Year, 2, 3);
-            if Before (Month, Day, Hour, 2, End_Day, 2) then
-               return -120;
-            end if;
-         end if;
-
-         return -180;
-      elsif Family = "america-mountain" then
-         Valid := True;
-         Start_Day := Nth_Sunday (Year, 3, 2);
-         End_Day := Nth_Sunday (Year, 11, 1);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 9)
-           and then Before (Month, Day, Hour, 11, End_Day, 8)
-         then
-            return -360;
-         else
-            return -420;
-         end if;
-      elsif Family = "america-pacific" then
-         Valid := True;
-         Start_Day := Nth_Sunday (Year, 3, 2);
-         End_Day := Nth_Sunday (Year, 11, 1);
-         if On_Or_After
-              (Year, Month, Day, Hour, Minute, 3, Start_Day, 10)
-           and then Before (Month, Day, Hour, 11, End_Day, 9)
-         then
-            return -420;
-         else
-            return -480;
-         end if;
-      elsif Family = "pacific-new-zealand" then
-         Valid := True;
-         Start_Day := Last_Sunday (Year, 9);
-         End_Day := Nth_Sunday (Year, 4, 1);
-         if Month < 4
-           or else Month > 9
-           or else (Month = 4 and then Day < End_Day)
-           or else (Month = 9 and then Day >= Start_Day)
-         then
-            return 780;
-         else
-            return 720;
-         end if;
-      elsif Family = "australia-eastern" then
-         Valid := True;
-         Start_Day := Nth_Sunday (Year, 10, 1) - 1;
-         End_Day := Nth_Sunday (Year, 4, 1) - 1;
-         if Month < 4
-           or else Month > 10
-           or else (Month = 4
-                    and then
-                      (Day < End_Day
-                       or else (Day = End_Day and then Hour < 16)))
-           or else (Month = 10
-                    and then
-                      (Day > Start_Day
-                       or else (Day = Start_Day and then Hour >= 16)))
-         then
-            return 660;
-         else
-            return 600;
-         end if;
-      elsif Family = "australia-central" then
-         Valid := True;
-         Start_Day := Nth_Sunday (Year, 10, 1) - 1;
-         End_Day := Nth_Sunday (Year, 4, 1) - 1;
-         if Month < 4
-           or else Month > 10
-           or else (Month = 4
-                    and then
-                      (Day < End_Day
-                       or else (Day = End_Day and then Hour < 16)))
-           or else (Month = 10
-                    and then
-                      (Day > Start_Day
-                       or else (Day = Start_Day and then Hour >= 16)))
-         then
-            return 630;
-         else
-            return 570;
-         end if;
-      elsif Family = "asia-jerusalem" then
-         Valid := True;
-         if Year >= 2013 then
-            Start_Day := Last_Sunday (Year, 3) - 2;
-            End_Day := Last_Sunday (Year, 10);
-            if On_Or_After
-                 (Year, Month, Day, Hour, Minute, 3, Start_Day, 0)
-              and then Before (Month, Day, Hour, 10, End_Day, 23)
-            then
-               return 180;
-            end if;
-         end if;
-         return 120;
-      elsif Family = "asia-tehran" then
-         Valid := True;
-         if Year in 2008 .. 2022
-           and then
-             ((Month > 3 and then Month < 9)
-              or else (Month = 3 and then Day >= 22)
-              or else (Month = 9 and then Day < 22))
-         then
-            return 270;
-         end if;
-         return 210;
-      else
-         declare
-            Generated_Valid : Boolean;
-            Generated       : constant Integer :=
-              I18N.Time_Zone_Data.Offset_Seconds_At_UTC
-                (Zone, Year, Month, Day, Hour, Minute, 0, Generated_Valid);
-         begin
-            if Generated_Valid then
-               Valid := True;
-               return Generated / 60;
-            end if;
-         end;
-
-         return Zone_Offset_Minutes (Zone, Valid);
-      end if;
+      return Zone_Offset_Minutes (Zone, Valid);
    end Zone_Offset_Minutes_At;
 
    function Zone_Offset_Seconds_At

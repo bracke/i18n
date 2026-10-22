@@ -48,6 +48,30 @@ package body I18N.TZ_Rules is
         + Long_Long_Integer (Second);
    end Epoch_Seconds;
 
+   procedure Civil_Of
+     (Instant : Long_Long_Integer;
+      Year, Month, Day, Hour, Minute, Second : out Integer)
+   is
+      --  Howard Hinnant's civil_from_days.
+      Days   : constant Long_Long_Integer :=
+        (if Instant >= 0 then Instant / 86_400 else (Instant - 86_399) / 86_400);
+      Within : constant Long_Long_Integer := Instant - Days * 86_400;
+      Z      : constant Long_Long_Integer := Days + 719_468;
+      Era    : constant Long_Long_Integer := (if Z >= 0 then Z else Z - 146_096) / 146_097;
+      DoE    : constant Long_Long_Integer := Z - Era * 146_097;
+      YoE    : constant Long_Long_Integer := (DoE - DoE / 1_460 + DoE / 36_524 - DoE / 146_096) / 365;
+      DoY    : constant Long_Long_Integer := DoE - (365 * YoE + YoE / 4 - YoE / 100);
+      MP     : constant Long_Long_Integer := (5 * DoY + 2) / 153;
+      M      : constant Long_Long_Integer := (if MP < 10 then MP + 3 else MP - 9);
+   begin
+      Year   := Integer (YoE + Era * 400 + (if M <= 2 then 1 else 0));
+      Month  := Integer (M);
+      Day    := Integer (DoY - (153 * MP + 2) / 5 + 1);
+      Hour   := Integer (Within / 3_600);
+      Minute := Integer ((Within mod 3_600) / 60);
+      Second := Integer (Within mod 60);
+   end Civil_Of;
+
    function Is_Leap (Year : Integer) return Boolean is
      (Year mod 4 = 0 and then (Year mod 100 /= 0 or else Year mod 400 = 0));
 
@@ -287,6 +311,41 @@ package body I18N.TZ_Rules is
       return Year;
    end Year_Of;
 
+   --  Whether daylight time is in effect at Instant under a read rule: the
+   --  latest change among the year before, this one and the next, at or
+   --  before the instant, decides. A rule may end daylight time on the last
+   --  evening of one year and start it again at the same moment for the next
+   --  (Casablanca, written by an older zic as "XXX-2<+01>-1,0/0,J365/23"),
+   --  so a year's own two changes alone do not decide its last hours; at a
+   --  tie the start wins.
+   function In_Daylight (Read_Rule : Parsed; Instant : Long_Long_Integer) return Boolean is
+      Year        : constant Integer := Year_Of (Instant);
+      Latest      : Long_Long_Integer := Long_Long_Integer'First;
+      Daylight    : Boolean := False;
+   begin
+      if not Read_Rule.Has_Daylight then
+         return False;
+      end if;
+      for Around in Year - 1 .. Year + 1 loop
+         declare
+            Starts : constant Long_Long_Integer :=
+              Instant_Of (Read_Rule.Start_Rule, Around, Read_Rule.Standard);
+            Ends   : constant Long_Long_Integer :=
+              Instant_Of (Read_Rule.End_Rule, Around, Read_Rule.Daylight);
+         begin
+            if Ends <= Instant and then Ends > Latest then
+               Latest := Ends;
+               Daylight := False;
+            end if;
+            if Starts <= Instant and then Starts >= Latest then
+               Latest := Starts;
+               Daylight := True;
+            end if;
+         end;
+      end loop;
+      return Daylight;
+   end In_Daylight;
+
    function Offset_At
      (Rule    : String;
       Instant : Long_Long_Integer;
@@ -298,40 +357,49 @@ package body I18N.TZ_Rules is
       Valid := Read_Rule.Ok;
       if not Read_Rule.Ok then
          return 0;
-      elsif not Read_Rule.Has_Daylight then
-         return Read_Rule.Standard;
       end if;
-
-      --  The changes of the year before, this year and the year after: the
-      --  one in force is the latest at or before the instant. A rule may end
-      --  daylight time on the last evening of one year and start it again at
-      --  the same moment for the next (Casablanca, written by an older zic as
-      --  "XXX-2<+01>-1,0/0,J365/23"), so a year's own two changes alone do not
-      --  decide its last hours; at a tie the start wins.
-      declare
-         Year        : constant Integer := Year_Of (Instant);
-         Latest      : Long_Long_Integer := Long_Long_Integer'First;
-         In_Daylight : Boolean := False;
-      begin
-         for Around in Year - 1 .. Year + 1 loop
-            declare
-               Starts : constant Long_Long_Integer :=
-                 Instant_Of (Read_Rule.Start_Rule, Around, Read_Rule.Standard);
-               Ends   : constant Long_Long_Integer :=
-                 Instant_Of (Read_Rule.End_Rule, Around, Read_Rule.Daylight);
-            begin
-               if Ends <= Instant and then Ends > Latest then
-                  Latest := Ends;
-                  In_Daylight := False;
-               end if;
-               if Starts <= Instant and then Starts >= Latest then
-                  Latest := Starts;
-                  In_Daylight := True;
-               end if;
-            end;
-         end loop;
-         return (if In_Daylight then Read_Rule.Daylight else Read_Rule.Standard);
-      end;
+      return (if In_Daylight (Read_Rule, Instant) then Read_Rule.Daylight else Read_Rule.Standard);
    end Offset_At;
+
+   function Daylight_At
+     (Rule    : String;
+      Instant : Long_Long_Integer;
+      Valid   : out Boolean)
+      return Boolean
+   is
+      Read_Rule : constant Parsed := Read (Rule);
+   begin
+      Valid := Read_Rule.Ok;
+      return Read_Rule.Ok and then In_Daylight (Read_Rule, Instant);
+   end Daylight_At;
+
+   function Daylight_Within
+     (Rule     : String;
+      From, To : Long_Long_Integer;
+      Valid    : out Boolean)
+      return Boolean
+   is
+      Read_Rule : constant Parsed := Read (Rule);
+   begin
+      Valid := Read_Rule.Ok;
+      if not Read_Rule.Ok or else not Read_Rule.Has_Daylight then
+         return False;
+      elsif In_Daylight (Read_Rule, From) then
+         return True;
+      end if;
+      --  Otherwise daylight time is in effect in the span exactly when one
+      --  of its starts falls in it.
+      for Year in Year_Of (From) - 1 .. Year_Of (To) + 1 loop
+         declare
+            Starts : constant Long_Long_Integer :=
+              Instant_Of (Read_Rule.Start_Rule, Year, Read_Rule.Standard);
+         begin
+            if Starts > From and then Starts <= To and then In_Daylight (Read_Rule, Starts) then
+               return True;
+            end if;
+         end;
+      end loop;
+      return False;
+   end Daylight_Within;
 
 end I18N.TZ_Rules;
