@@ -84,26 +84,6 @@ package I18N.CLDR_Data is
       Calendar : String)
       return String;
 
-   --  Return ISO 4217 minor units for built-in currency metadata.
-   --  @param Code Three-letter uppercase currency code.
-   --  @return Number of fractional digits used for normal rounding.
-   function Currency_Minor_Units (Code : String) return Natural;
-
-   --  Return the integer cash increment in minor units.
-   --  @param Code Three-letter uppercase currency code.
-   --  @return Cash rounding increment in minor units.
-   function Currency_Cash_Increment (Code : String) return Natural;
-
-   --  Return the standard currency symbol.
-   --  @param Code Three-letter uppercase currency code.
-   --  @return UTF-8 symbol text, or Code when no symbol is built in.
-   function Currency_Symbol (Code : String) return String;
-
-   --  Return the narrow currency symbol.
-   --  @param Code Three-letter uppercase currency code.
-   --  @return UTF-8 narrow symbol text, or the standard symbol fallback.
-   function Currency_Narrow_Symbol (Code : String) return String;
-
    --  Return a deterministic byte-size unit label.
    --  @param Scale Binary byte scale from B through PiB.
    --  @return Display label for the byte-size formatter.

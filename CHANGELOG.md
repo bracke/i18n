@@ -17,6 +17,11 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Currency symbols, narrow symbols, minor units and cash increments come
+  from `formats.i18ndata`**, keyed by currency code, with the same defaults
+  (2, 1, the code, the symbol); `I18N.CLDR_Data` loses the four accessors and
+  the generator its packed-table encoders. All 307 codes match;
+  `i18n-cldr_data.adb` is 16 KB.
 - **Plural rule families, Indian grouping, symbol-first currency and
   day-month-year order come from `formats.i18ndata` only.** A plural family
   is the exact locale's, else its language's, else other-only, which

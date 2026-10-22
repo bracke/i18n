@@ -35,21 +35,6 @@ procedure Generate_CLDR_Data is
    Zones_Dir      : constant String := "../share/i18n/zones";
    Currency_Dir   : constant String := "../share/i18n/currency";
 
-   --  The two largest lookup functions are emitted as subunits: inline they made the
-   --  single body file exceed GitHub's 100 MB per-file limit, so each goes in its own
-   --  source file (each well under the limit).
-
-   --  Packed literals are wrapped one chunk to a line, and each line costs
-   --  about a dozen characters of "& """ around it. At 72 that framing was
-   --  2.6 MB across the generated sources -- 15% of those lines, and pure
-   --  syntax. Nothing reads them by eye, and they carry Style_Checks (Off).
-   --
-   --  GNAT rejects a source line over 32,766 characters, so this leaves an
-   --  eightfold margin; the file already holds hand-emitted lines of 2,703.
-   --  Past 4096 there is only about 35 KB left to win, which is not worth
-   --  spending the margin on.
-   Data_Chunk : constant := 4096;
-
    Max_Rules : constant := 2_000_000;
    Max_TZDB_Zones : constant := 600;
    Max_TZDB_Links : constant := 1000;
@@ -299,61 +284,6 @@ procedure Generate_CLDR_Data is
       return Result;
    end Hex_Value;
 
-   --  Values were held as hex: two characters a byte. Base64 spends 1.33,
-   --  is pure ASCII so -gnatW8 never sees a wide character, and its
-   --  alphabet holds none of the separators the packed records use -- so a
-   --  value cannot collide with a delimiter by construction rather than by
-   --  audit. No padding: the index offsets already say where a value ends.
-   Base64_Alphabet : constant String :=
-     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-   function To_Base64 (Bytes : String) return String is
-      Result : US.Unbounded_String;
-      Index  : Natural := Bytes'First;
-
-      function Symbol (Value : Natural) return Character is
-        (Base64_Alphabet (Base64_Alphabet'First + Value));
-   begin
-      while Index <= Bytes'Last loop
-         declare
-            Left : constant Natural := Bytes'Last - Index + 1;
-            B0 : constant Natural := Character'Pos (Bytes (Index));
-            B1 : constant Natural :=
-              (if Left >= 2 then Character'Pos (Bytes (Index + 1)) else 0);
-            B2 : constant Natural :=
-              (if Left >= 3 then Character'Pos (Bytes (Index + 2)) else 0);
-         begin
-            US.Append (Result, Symbol (B0 / 4));
-            US.Append (Result, Symbol ((B0 mod 4) * 16 + B1 / 16));
-            if Left >= 2 then
-               US.Append (Result, Symbol ((B1 mod 16) * 4 + B2 / 64));
-            end if;
-            if Left >= 3 then
-               US.Append (Result, Symbol (B2 mod 64));
-            end if;
-            Index := Index + 3;
-         end;
-      end loop;
-
-      return S (Result);
-   end To_Base64;
-
-   --  Rows that arrive already hex-encoded, a byte to two characters.
-   function Hex_Bytes_To_Base64 (Hex : String) return String is
-      Bytes : String (1 .. Hex'Length / 2);
-      Source : Natural;
-   begin
-      for Index in Bytes'Range loop
-         Source := Hex'First + (Index - 1) * 2;
-         Bytes (Index) :=
-           Character'Val
-             (Hex_Value (Hex (Source .. Source)) * 16
-              + Hex_Value (Hex (Source + 1 .. Source + 1)));
-      end loop;
-
-      return To_Base64 (Bytes);
-   end Hex_Bytes_To_Base64;
-
    --  Rows that arrive as four hex digits a code point.
    --  One Unicode code point as raw UTF-8 bytes.
    function Code_Point_UTF8 (Point : Natural) return String is
@@ -391,29 +321,6 @@ procedure Generate_CLDR_Data is
 
       return S (Bytes);
    end Hex_Points_To_UTF8;
-
-   --  Codes and base-62 offsets share one alphabet.
-   Code_Alphabet : constant String :=
-     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-   --  Offsets as base 62 rather than eight decimal digits: five characters
-   --  reach 916 million, and the alphabet is the one the labels already use.
-   function To_Base62 (Value : Natural; Width : Positive) return String is
-      Result : String (1 .. Width);
-      Left   : Natural := Value;
-   begin
-      for Index in reverse Result'Range loop
-         Result (Index) :=
-           Code_Alphabet (Code_Alphabet'First + Left mod 62);
-         Left := Left / 62;
-      end loop;
-
-      if Left /= 0 then
-         Add_Error ("offset outgrew the index field");
-      end if;
-
-      return Result;
-   end To_Base62;
 
    function Ada_Expression_UTF8_Hex_Digits (Expr : String) return String is
       Output : US.Unbounded_String;
@@ -468,9 +375,6 @@ procedure Generate_CLDR_Data is
 
       return S (Output);
    end Ada_Expression_UTF8_Hex_Digits;
-
-   function Ada_Expression_UTF8_Hex (Expr : String) return String is
-     (Hex_Bytes_To_Base64 (Ada_Expression_UTF8_Hex_Digits (Expr)));
 
    --  The same, stopping at the bytes.
    function Ada_Expression_UTF8_Bytes (Expr : String) return String is
@@ -1844,6 +1748,21 @@ procedure Generate_CLDR_Data is
             Field (Line, 5),
             Field (Line, 6),
             Field (Line, 7));
+         --  The currency's own data, keyed by its code under und: minor units
+         --  and cash increment (kept only where they are not 2 and 1), its
+         --  symbol and its narrow symbol.
+         declare
+            Code : constant String := Field (Line, 2);
+         begin
+            if Field (Line, 3) /= "2" then
+               Add_Format ("currency_minor_units", "und", Field (Line, 3), Sub => Code);
+            end if;
+            if Field (Line, 4) /= "1" then
+               Add_Format ("currency_cash_increment", "und", Field (Line, 4), Sub => Code);
+            end if;
+            Add_Format ("currency_symbol", "und", Ada_Expression_UTF8_Bytes (Field (Line, 5)), Sub => Code);
+            Add_Format ("currency_narrow_symbol", "und", Ada_Expression_UTF8_Bytes (Field (Line, 6)), Sub => Code);
+         end;
       elsif Kind = "currency_name_payload" then
          if Field_Count (Line) /= 3
            or else Field (Line, 2) = ""
@@ -2850,69 +2769,6 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L ("   end U;");
          L;
-         L ("   function B62_Value (C : Character) return Natural is");
-         L ("     (if C in 'a' .. 'z' then Character'Pos (C) - Character'Pos ('a')");
-         L ("      elsif C in 'A' .. 'Z'");
-         L ("      then 26 + Character'Pos (C) - Character'Pos ('A')");
-         L ("      else 52 + Character'Pos (C) - Character'Pos ('0'));");
-         L;
-         L ("   function N62 (Text : String) return Natural is");
-         L ("      Value : Natural := 0;");
-         L ("   begin");
-         L ("      for C of Text loop");
-         L ("         Value := Value * 62 + B62_Value (C);");
-         L ("      end loop;");
-         L;
-         L ("      return Value;");
-         L ("   end N62;");
-         L;
-         L ("   --  Values are base64 of UTF-8 bytes, without padding: the");
-         L ("   --  offsets and the separators already say where one ends.");
-         L ("   function B64_Value (C : Character) return Natural is");
-         L ("     (if C in 'A' .. 'Z' then Character'Pos (C) - Character'Pos ('A')");
-         L ("      elsif C in 'a' .. 'z'");
-         L ("      then 26 + Character'Pos (C) - Character'Pos ('a')");
-         L ("      elsif C in '0' .. '9'");
-         L ("      then 52 + Character'Pos (C) - Character'Pos ('0')");
-         L ("      elsif C = '+' then 62");
-         L ("      else 63);");
-         L;
-         L ("   function VB (Text : String) return String is");
-         L ("      Result : String (1 .. Text'Length * 3 / 4);");
-         L ("      Filled : Natural := 0;");
-         L ("      Index : Natural := Text'First;");
-         L ("   begin");
-         L ("      while Index <= Text'Last loop");
-         L ("         declare");
-         L ("            Left : constant Natural := Text'Last - Index + 1;");
-         L ("            C0 : constant Natural := B64_Value (Text (Index));");
-         L ("            C1 : constant Natural :=");
-         L ("              (if Left >= 2 then B64_Value (Text (Index + 1)) else 0);");
-         L ("            C2 : constant Natural :=");
-         L ("              (if Left >= 3 then B64_Value (Text (Index + 2)) else 0);");
-         L ("            C3 : constant Natural :=");
-         L ("              (if Left >= 4 then B64_Value (Text (Index + 3)) else 0);");
-         L ("         begin");
-         L ("            exit when Left < 2;");
-         L ("            Filled := Filled + 1;");
-         L ("            Result (Filled) := Character'Val (C0 * 4 + C1 / 16);");
-         L ("            if Left >= 3 then");
-         L ("               Filled := Filled + 1;");
-         L ("               Result (Filled) :=");
-         L ("                 Character'Val ((C1 mod 16) * 16 + C2 / 4);");
-         L ("            end if;");
-         L ("            if Left >= 4 then");
-         L ("               Filled := Filled + 1;");
-         L ("               Result (Filled) :=");
-         L ("                 Character'Val ((C2 mod 4) * 64 + C3);");
-         L ("            end if;");
-         L ("            Index := Index + 4;");
-         L ("         end;");
-         L ("      end loop;");
-         L;
-         L ("      return Result (1 .. Filled);");
-         L ("   end VB;");
-         L;
          L ("   function Lower (C : Character) return Character is");
          L ("   begin");
          L ("      if C in 'A' .. 'Z' then");
@@ -3032,31 +2888,6 @@ procedure Generate_CLDR_Data is
          L ("      return Matches (List (Start .. List'Last));");
          L ("   end Locale_In_List;");
       end Emit_Static_Prelude;
-
-      procedure Emit_Unit_String_Expression
-        (Indent : String;
-         Value  : String;
-         Suffix : String := "")
-      is
-         Chunk : constant := Data_Chunk;
-         Start : Positive := Value'First;
-         Stop  : Natural;
-         Term  : Positive := 1;
-      begin
-         if Value'Length = 0 then
-            L (Indent & """""" & Suffix);
-            return;
-         end if;
-
-         while Start <= Value'Last loop
-            Stop := Natural'Min (Start + Chunk - 1, Value'Last);
-            L (Indent & (if Term = 1 then "" else "& ")
-               & """" & Value (Start .. Stop) & """"
-               & (if Stop = Value'Last then Suffix else ""));
-            Start := Stop + 1;
-            Term := Term + 1;
-         end loop;
-      end Emit_Unit_String_Expression;
 
       procedure Emit_Week_Data is
       begin
@@ -3252,176 +3083,6 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L ("   end Number_Compact_Suffix;");
       end Emit_Number_Display_Affixes;
-
-      --  The currency accessors were the last linear Code = "..." chains: a
-      --  miss walked all 307 rows, comparing the argument to each in turn.
-      --  Each field becomes a currency-code-keyed table the emitted body
-      --  bisects instead. A String field packs its evaluated UTF-8 value once
-      --  (VB decodes it, and repeats -- most symbols are their own code --
-      --  collapse to a single copy) and keeps a 3+5+5 record per code; the two
-      --  Natural fields keep the small value inline as a base-62 pair, a 3+2
-      --  record. Rows whose value is the default are left out and answered by
-      --  the default arm, exactly as the chain skipped them.
-      procedure Emit_Currency_Field
-        (Name         : String;
-         Field_Number : Positive;
-         Return_Type  : String;
-         Default_Expr : String)
-      is
-         Is_String : constant Boolean := Return_Type = "String";
-
-         Max_Currency : constant := 512;
-         type Currency_Entry is record
-            Code  : US.Unbounded_String;
-            Value : US.Unbounded_String;
-            First : Natural := 0;
-            Last  : Natural := 0;
-         end record;
-
-         Items : array (1 .. Max_Currency) of Currency_Entry;
-         Count : Natural := 0;
-
-         Values     : US.Unbounded_String;
-         Index_Data : US.Unbounded_String;
-
-         function Field_Value (Index : Positive) return String is
-           (case Field_Number is
-               when 2 => S (Rules (Index).B),
-               when 3 => S (Rules (Index).C),
-               when 4 => S (Rules (Index).D),
-               when 5 => S (Rules (Index).E),
-               when 6 => S (Rules (Index).F),
-               when others => "");
-      begin
-         --  Collect the rows this field keeps. A String field has no literal
-         --  default to compare against (the default is the Code itself, or the
-         --  symbol accessor), so it keeps every row; the Natural fields drop
-         --  the rows the default already answers.
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "currency") then
-               declare
-                  Raw : constant String := Field_Value (Index);
-               begin
-                  if Is_String or else Raw /= Default_Expr then
-                     if Count = Max_Currency then
-                        Add_Error ("too many currency rows for " & Name);
-                     else
-                        Count := Count + 1;
-                        Items (Count).Code := Rules (Index).A;
-                        Items (Count).Value :=
-                          US.To_Unbounded_String
-                            (if Is_String
-                             then Ada_Expression_UTF8_Hex (Raw)
-                             else Raw);
-                     end if;
-                  end if;
-               end;
-            end if;
-         end loop;
-
-         --  Sorted so the emitted body can bisect on the code.
-         for Outer in 2 .. Count loop
-            declare
-               Current      : constant Currency_Entry := Items (Outer);
-               Current_Code : constant String := S (Current.Code);
-               Probe        : Natural := Outer - 1;
-            begin
-               while Probe >= 1
-                 and then S (Items (Probe).Code) > Current_Code
-               loop
-                  Items (Probe + 1) := Items (Probe);
-                  Probe := Probe - 1;
-               end loop;
-               Items (Probe + 1) := Current;
-            end;
-         end loop;
-
-         --  Pack the index (and, for a String field, the value store).
-         for N in 1 .. Count loop
-            US.Append (Index_Data, S (Items (N).Code));
-            if Is_String then
-               --  Point a repeated value at the copy already packed.
-               for Prior in 1 .. N - 1 loop
-                  if US."=" (Items (Prior).Value, Items (N).Value) then
-                     Items (N).First := Items (Prior).First;
-                     Items (N).Last := Items (Prior).Last;
-                     exit;
-                  end if;
-               end loop;
-
-               if Items (N).First = 0 then
-                  declare
-                     Packed : constant String := S (Items (N).Value);
-                  begin
-                     Items (N).First := US.Length (Values) + 1;
-                     Items (N).Last := US.Length (Values) + Packed'Length;
-                     US.Append (Values, Packed);
-                  end;
-               end if;
-
-               US.Append (Index_Data, To_Base62 (Items (N).First, 5));
-               US.Append (Index_Data, To_Base62 (Items (N).Last, 5));
-            else
-               US.Append
-                 (Index_Data,
-                  To_Base62 (Natural'Value (S (Items (N).Value)), 2));
-            end if;
-         end loop;
-
-         L;
-         L ("   function " & Name & " (Code : String) return " & Return_Type
-            & " is");
-         if Is_String then
-            L ("      Values : constant String :=");
-            Emit_Unit_String_Expression ("        ", S (Values), ";");
-         end if;
-         L ("      Index_Data : constant String :=");
-         Emit_Unit_String_Expression ("        ", S (Index_Data), ";");
-         L ("      Width : constant := " & (if Is_String then "13" else "5")
-            & ";");
-         L ("      Count : constant Natural := Index_Data'Length / Width;");
-         L;
-         L ("      function Key (N : Positive) return String is");
-         L ("        (Index_Data (Index_Data'First + (N - 1) * Width ..");
-         L ("                     Index_Data'First + (N - 1) * Width + 2));");
-         L;
-         if Is_String then
-            L ("      function Value_At (N : Positive) return String is");
-            L ("         Base : constant Natural :=");
-            L ("           Index_Data'First + (N - 1) * Width + 3;");
-            L ("         F : constant Natural :=");
-            L ("           N62 (Index_Data (Base .. Base + 4));");
-            L ("         T : constant Natural :=");
-            L ("           N62 (Index_Data (Base + 5 .. Base + 9));");
-            L ("      begin");
-            L ("         return VB (Values (F .. T));");
-            L ("      end Value_At;");
-         else
-            L ("      function Value_At (N : Positive) return Natural is");
-            L ("         Base : constant Natural :=");
-            L ("           Index_Data'First + (N - 1) * Width + 3;");
-            L ("      begin");
-            L ("         return N62 (Index_Data (Base .. Base + 1));");
-            L ("      end Value_At;");
-         end if;
-         L;
-         L ("      Low : Natural := 1;");
-         L ("      High : Natural := Count;");
-         L ("      Mid : Natural;");
-         L ("   begin");
-         L ("      while Low <= High loop");
-         L ("         Mid := (Low + High) / 2;");
-         L ("         if Key (Mid) = Code then");
-         L ("            return Value_At (Mid);");
-         L ("         elsif Key (Mid) < Code then");
-         L ("            Low := Mid + 1;");
-         L ("         else");
-         L ("            High := Mid - 1;");
-         L ("         end if;");
-         L ("      end loop;");
-         L ("      return " & Default_Expr & ";");
-         L ("   end " & Name & ";");
-      end Emit_Currency_Field;
 
       procedure Emit_Era_Name is
       begin
@@ -3691,10 +3352,6 @@ procedure Generate_CLDR_Data is
       Emit_Date_Time_Style_Separator;
       Emit_Number_Display_Affixes;
       Emit_Era_Name;
-      Emit_Currency_Field ("Currency_Minor_Units", 2, "Natural", "2");
-      Emit_Currency_Field ("Currency_Cash_Increment", 3, "Natural", "1");
-      Emit_Currency_Field ("Currency_Symbol", 4, "String", "Code");
-      Emit_Currency_Field ("Currency_Narrow_Symbol", 5, "String", "Currency_Symbol (Code)");
       Emit_Unit_Separators;
       Emit_Byte_Size_Unit_Label;
       Emit_Number_Spellout_Words;

@@ -1,5 +1,4 @@
 with I18N.Number_Format;
-with I18N.CLDR_Data;
 with I18N.Locale_Data;
 with I18N.Plurals;
 with I18N.Runtime_Data;
@@ -133,12 +132,21 @@ package body I18N.Currency is
       return Parse_Style (Code, Style);
    end Is_Valid_Code;
 
+   --  A currency's own data, keyed by its code, from the formats file;
+   --  Default where the file has none.
+   function Currency_Data (Section : String; Code : String; Default : String) return String is
+      Found : Boolean;
+      Value : constant String := I18N.Locale_Data.Lookup (Section, "und", Code, Found);
+   begin
+      return (if Found then Value else Default);
+   end Currency_Data;
+
    function Minor_Units (Code : String) return Natural is
       Found : Boolean;
       Value : constant Natural :=
         I18N.Runtime_Data.Currency_Natural (Code, "minor_units", Found);
    begin
-      return (if Found then Value else I18N.CLDR_Data.Currency_Minor_Units (Code));
+      return (if Found then Value else Natural'Value (Currency_Data ("currency_minor_units", Code, "2")));
    end Minor_Units;
 
    function Cash_Increment (Code : String) return Natural is
@@ -147,7 +155,7 @@ package body I18N.Currency is
         I18N.Runtime_Data.Currency_Natural (Code, "cash_increment", Found);
    begin
       return
-        (if Found then Value else I18N.CLDR_Data.Currency_Cash_Increment (Code));
+        (if Found then Value else Natural'Value (Currency_Data ("currency_cash_increment", Code, "1")));
    end Cash_Increment;
 
    function Decimal_Separator (Locale : String) return String is
@@ -196,7 +204,7 @@ package body I18N.Currency is
       Value : constant String :=
         I18N.Runtime_Data.Currency_Text (Code, "symbol", Found);
    begin
-      return (if Found then Value else I18N.CLDR_Data.Currency_Symbol (Code));
+      return (if Found then Value else Currency_Data ("currency_symbol", Code, Code));
    end Currency_Symbol;
 
    function Currency_Narrow_Symbol (Code : String) return String is
@@ -205,7 +213,8 @@ package body I18N.Currency is
         I18N.Runtime_Data.Currency_Text (Code, "narrow_symbol", Found);
    begin
       return
-        (if Found then Value else I18N.CLDR_Data.Currency_Narrow_Symbol (Code));
+        (if Found then Value
+         else Currency_Data ("currency_narrow_symbol", Code, Currency_Symbol (Code)));
    end Currency_Narrow_Symbol;
 
    function Currency_Display_Name
