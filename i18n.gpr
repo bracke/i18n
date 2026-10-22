@@ -4,7 +4,9 @@ project I18n is
    for Library_Name use "I18n";
    for Library_Version use Project'Library_Name & ".so." & I18n_Config.Crate_Version;
 
-   for Source_Dirs use ("src/", "config/");
+   --  src/shared/ holds the units the CLDR generator compiles too (the
+   --  root I18N spec and I18N.TZ_Rules), so both read a rule the same way.
+   for Source_Dirs use ("src/", "src/shared/", "config/");
    for Object_Dir use "obj/" & I18n_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Library_Dir use "lib";

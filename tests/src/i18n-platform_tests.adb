@@ -31,6 +31,8 @@ package body I18N.Platform_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
    procedure Test_Spellout
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+   procedure Test_Time_Zone_Rules
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
 
    ---------------------------------------------------------------------------
    --  AUnit plumbing.
@@ -74,6 +76,9 @@ package body I18N.Platform_Tests is
       Register_Routine (T, Test_Spellout'Access,
                         "RBNF spellout: numbers to words via the recursive "
                         & "rule interpreter");
+      Register_Routine (T, Test_Time_Zone_Rules'Access,
+                        "Time zones follow their final rule after the "
+                        & "recorded transitions end");
    end Register_Tests;
 
 end I18N.Platform_Tests;

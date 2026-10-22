@@ -10,6 +10,23 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- **Daylight saving time no longer stops after 2050.** The compiled zone
+  table ran to 2050 and the last offset in it then held for ever, so summer
+  dates from 2051 on were an hour off in every zone with daylight time (and
+  Casablanca's predicted Ramadan changes, which run to 2087, were missing).
+  Each zone now carries its final rule -- the POSIX TZ string zic writes at
+  the end of a compiled zone -- and `I18N.TZ_Rules` answers from it once the
+  recorded transitions end. The generator reads transitions through 2100 and
+  keeps each zone's only until its rule reproduces them exactly, checked at
+  every change of either: offsets through 2050 are unchanged in every zone,
+  2051-2100 match zdump at all 40,256 of its transitions, and the table
+  shrank from 57,442 to 36,214 entries (`i18n-cldr_data.adb` 2.0 MB to 1.4 MB).
+- Time-zone display names come from the data files only (the compiled
+  `Zone_Display_Row` / `Zone_Family_Display_Row` tables, 366 KB, are gone).
+  Output is unchanged except in 23 locales written in a non-default script
+  (az-Arab, mn-Mong, uz-Cyrl, ...), which the compiled rows answered in the
+  wrong script and which now get the English fallback names, as their units,
+  currencies and city names already did.
 - **A fresh clone produces `share/i18n/formats.i18ndata` again.** The
   regeneration's fast path returns early when the generated body is present and
   newer than the subset — which stopped being safe when the body itself was

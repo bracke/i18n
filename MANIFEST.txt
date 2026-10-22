@@ -189,7 +189,9 @@ src/i18n-runtime.adb
 src/i18n-runtime.ads
 src/i18n-validation.adb
 src/i18n-validation.ads
-src/i18n.ads
+src/shared/i18n-tz_rules.adb
+src/shared/i18n-tz_rules.ads
+src/shared/i18n.ads
 release_locale_fallback.catalog
 tests/.gitignore
 tests/alire.toml

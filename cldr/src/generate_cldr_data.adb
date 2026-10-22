@@ -11,6 +11,7 @@ with GNAT.OS_Lib;
 
 with Project_Tools.Files;
 with Hostkit.Fs;
+with I18N.TZ_Rules;
 with Project_Tools.Processes;
 
 procedure Generate_CLDR_Data is
@@ -124,6 +125,11 @@ procedure Generate_CLDR_Data is
    TZDB_Transition_Keys : array (1 .. Max_TZDB_Transitions) of Long_Long_Integer;
    TZDB_Transition_Offsets : array (1 .. Max_TZDB_Transitions) of Integer;
    TZDB_Transition_Count : Natural := 0;
+   --  Each zone's final rule (the POSIX TZ string zic ends its file with), and
+   --  the key from which that rule answers instead of the transitions; 0 when
+   --  the zone has no rule this can read and the transitions answer always.
+   TZDB_Zone_Rules     : array (1 .. Max_TZDB_Zones) of US.Unbounded_String;
+   TZDB_Zone_Rule_From : array (1 .. Max_TZDB_Zones) of Long_Long_Integer := [others => 0];
    Errors     : Natural := 0;
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
@@ -1935,6 +1941,12 @@ procedure Generate_CLDR_Data is
       TZDB_Transition_Offsets (TZDB_Transition_Count) := Offset;
    end Add_TZDB_Transition;
 
+   --  Transitions are read through this year, past any zone's predicted
+   --  ones (Casablanca's Ramadan changes run into the 2080s), so each zone's
+   --  final rule can be checked against them before it replaces them.
+   TZDB_Last_Year : constant := 2100;
+   TZDB_Range     : constant String := "1900,2101";
+
    procedure Load_TZDB_Transitions is
 
       Zic   : constant String := Project_Tools.Processes.Locate_Command ("zic");
@@ -2046,7 +2058,7 @@ procedure Generate_CLDR_Data is
                         Offset      : constant Integer :=
                           Signed_Decimal_Value (Offset_Text);
                      begin
-                        if Year in 1900 .. 2050
+                        if Year in 1900 .. TZDB_Last_Year
                           and then Month in 1 .. 12
                           and then Day in 1 .. 31
                           and then Hour <= 23
@@ -2099,10 +2111,10 @@ procedure Generate_CLDR_Data is
             Zone_Path : constant String := Tool_Out_Dir & "/" & S (TZDB_Zone_Names (Zone_Index));
             Output    : US.Unbounded_String;
             Args_I    : constant GNAT.OS_Lib.Argument_List (1 .. 4) :=
-              [new String'("-i"), new String'("-c"), new String'("1900,2051"),
+              [new String'("-i"), new String'("-c"), new String'(TZDB_Range),
                new String'(Zone_Path)];
             Args_V    : constant GNAT.OS_Lib.Argument_List (1 .. 4) :=
-              [new String'("-v"), new String'("-c"), new String'("1900,2051"),
+              [new String'("-v"), new String'("-c"), new String'(TZDB_Range),
                new String'(Zone_Path)];
          begin
             if Project_Tools.Processes.Run_Status
@@ -2123,10 +2135,167 @@ procedure Generate_CLDR_Data is
          end;
       end loop;
 
+      --  The final rule: zic ends each compiled file with it, between the
+      --  last two newlines.
+      for Zone_Index in 1 .. TZDB_Zone_Count loop
+         declare
+            Raw  : constant String :=
+              Project_Tools.Files.Read_Raw_File (Out_Dir & "/" & S (TZDB_Zone_Names (Zone_Index)));
+            Stop  : Natural := Raw'Last;
+            Start : Natural;
+         begin
+            if Stop >= Raw'First and then Raw (Stop) = ASCII.LF then
+               Stop := Stop - 1;
+               Start := Stop;
+               while Start >= Raw'First and then Raw (Start) /= ASCII.LF loop
+                  Start := Start - 1;
+               end loop;
+               TZDB_Zone_Rules (Zone_Index) := US.To_Unbounded_String (Raw (Start + 1 .. Stop));
+            end if;
+         exception
+            when others =>
+               Add_Error ("failed to read the final tzdb rule for " & S (TZDB_Zone_Names (Zone_Index)));
+         end;
+      end loop;
+
       if TZDB_Transition_Count < 20000 then
          Add_Error ("generated tzdb transition table is unexpectedly small");
       end if;
    end Load_TZDB_Transitions;
+
+   --  Let each zone's final rule answer from the earliest year from which it
+   --  gives every offset the transitions give, through TZDB_Last_Year, and drop
+   --  the transitions it makes redundant. Agreement is checked at every
+   --  change of either -- each transition, each change the rule makes, a
+   --  second before each, and each new year -- so between them the two agree
+   --  at every instant.
+   procedure Fit_TZDB_Rules is
+      Kept_Zones   : array (1 .. Max_TZDB_Transitions) of Natural;
+      Kept_Keys    : array (1 .. Max_TZDB_Transitions) of Long_Long_Integer;
+      Kept_Offsets : array (1 .. Max_TZDB_Transitions) of Integer;
+      Kept         : Natural := 0;
+
+      function Epoch_Of (Key : Long_Long_Integer) return Long_Long_Integer is
+         Second : constant Integer := Integer (Key mod 100);
+         Minute : constant Integer := Integer ((Key / 100) mod 100);
+         Hour   : constant Integer := Integer ((Key / 10_000) mod 100);
+         Day    : constant Integer := Integer ((Key / 1_000_000) mod 100);
+         Month  : constant Integer := Integer ((Key / 100_000_000) mod 100);
+         Year   : constant Integer := Integer (Key / 10_000_000_000);
+      begin
+         return I18N.TZ_Rules.Epoch_Seconds (Year, Month, Day, Hour, Minute, Second);
+      end Epoch_Of;
+   begin
+      for Zone_Index in 1 .. TZDB_Zone_Count loop
+         declare
+            Rule  : constant String := S (TZDB_Zone_Rules (Zone_Index));
+            First : Natural := 0;
+            Last  : Natural := 0;
+            Valid : Boolean := False;
+            From  : Integer := TZDB_Last_Year + 1;
+
+            --  What the transitions give at an instant.
+            function Table_Offset (Instant : Long_Long_Integer) return Integer is
+               Result : Integer := TZDB_Zone_Initial_Offsets (Zone_Index);
+            begin
+               if First /= 0 then
+                  for Index in First .. Last loop
+                     exit when Epoch_Of (TZDB_Transition_Keys (Index)) > Instant;
+                     Result := TZDB_Transition_Offsets (Index);
+                  end loop;
+               end if;
+               return Result;
+            end Table_Offset;
+
+            function Agrees (Instant : Long_Long_Integer) return Boolean is
+               Rule_Valid : Boolean;
+               Offset     : constant Integer := I18N.TZ_Rules.Offset_At (Rule, Instant, Rule_Valid);
+            begin
+               return Rule_Valid and then Offset = Table_Offset (Instant);
+            end Agrees;
+
+            function Year_Agrees (Year : Integer) return Boolean is
+               Starts, Ends : Long_Long_Integer;
+               Daylight, Rule_Valid : Boolean;
+            begin
+               if not Agrees (I18N.TZ_Rules.Epoch_Seconds (Year, 1, 1)) then
+                  return False;
+               end if;
+               if First /= 0 then
+                  for Index in First .. Last loop
+                     if Integer (TZDB_Transition_Keys (Index) / 10_000_000_000) = Year
+                       and then not Agrees (Epoch_Of (TZDB_Transition_Keys (Index)))
+                     then
+                        return False;
+                     end if;
+                  end loop;
+               end if;
+               I18N.TZ_Rules.Changes_In (Rule, Year, Starts, Ends, Daylight, Rule_Valid);
+               return Rule_Valid
+                 and then (not Daylight
+                           or else (Agrees (Starts) and then Agrees (Starts - 1)
+                                    and then Agrees (Ends) and then Agrees (Ends - 1)));
+            end Year_Agrees;
+         begin
+            for Index in 1 .. TZDB_Transition_Count loop
+               if TZDB_Transition_Zones (Index) = Zone_Index then
+                  if First = 0 then
+                     First := Index;
+                  end if;
+                  Last := Index;
+               end if;
+            end loop;
+
+            if Rule /= "" then
+               declare
+                  Unused : constant Integer := I18N.TZ_Rules.Offset_At (Rule, 0, Valid);
+                  pragma Unreferenced (Unused);
+               begin
+                  null;
+               end;
+            end if;
+
+            if Valid then
+               for Year in reverse 1900 .. TZDB_Last_Year loop
+                  exit when not Year_Agrees (Year);
+                  From := Year;
+               end loop;
+
+               if From > TZDB_Last_Year then
+                  --  The rule zdump itself applied does not give what zdump
+                  --  wrote out: the two readings of it differ, and neither can
+                  --  be trusted to answer alone.
+                  Add_Error ("tzdb final rule " & Rule & " disagrees with the transitions of "
+                             & S (TZDB_Zone_Names (Zone_Index)) & " in" & Integer'Image (TZDB_Last_Year));
+               else
+                  TZDB_Zone_Rule_From (Zone_Index) := TZDB_Key (From, 1, 1, 0, 0, 0);
+               end if;
+            elsif Rule /= "" then
+               Add_Error ("unreadable tzdb final rule " & Rule & " for " & S (TZDB_Zone_Names (Zone_Index)));
+            end if;
+
+            if First /= 0 then
+               for Index in First .. Last loop
+                  if TZDB_Zone_Rule_From (Zone_Index) = 0
+                    or else TZDB_Transition_Keys (Index) < TZDB_Zone_Rule_From (Zone_Index)
+                  then
+                     Kept := Kept + 1;
+                     Kept_Zones (Kept) := Zone_Index;
+                     Kept_Keys (Kept) := TZDB_Transition_Keys (Index);
+                     Kept_Offsets (Kept) := TZDB_Transition_Offsets (Index);
+                  end if;
+               end loop;
+            end if;
+         end;
+      end loop;
+
+      TZDB_Transition_Count := Kept;
+      for Index in 1 .. Kept loop
+         TZDB_Transition_Zones (Index) := Kept_Zones (Index);
+         TZDB_Transition_Keys (Index) := Kept_Keys (Index);
+         TZDB_Transition_Offsets (Index) := Kept_Offsets (Index);
+      end loop;
+   end Fit_TZDB_Rules;
 
    function File_Equals_Content (Path : String; Content : String) return Boolean is
       use Ada.Streams;
@@ -2380,6 +2549,8 @@ procedure Generate_CLDR_Data is
       --  Write the standard subunit header (L must already point at the subunit file).
       procedure Emit_Static_Prelude is
       begin
+         L ("with I18N.TZ_Rules;");
+         L;
          L ("package body I18N.CLDR_Data is");
          L;
          L ("   --  Generated by cldr/src/generate_cldr_data.adb.");
@@ -2687,7 +2858,7 @@ procedure Generate_CLDR_Data is
 
       function Padded_Key (Value : String) return String is
         (if Value'Length >= 14 then Value (Value'First .. Value'First + 13)
-         else Value & (1 .. 14 - Value'Length => ' '));
+         else Value & [1 .. 14 - Value'Length => ' ']);
 
       function Key_Less (Left, Right : Table_Entry) return Boolean is
         (Padded_Key (S (Left.Key)) < Padded_Key (S (Right.Key)));
@@ -3779,10 +3950,16 @@ procedure Generate_CLDR_Data is
          pragma Unreferenced (Zone_Exemplar_Data);
       begin
          L;
+         L ("   --  Rule_From is the key from which the zone's final rule, the slice");
+         L ("   --  Rule_First .. Rule_Last of TZDB_Rules, answers instead of the");
+         L ("   --  transitions; 0 when the transitions answer always.");
          L ("   type TZDB_Zone_Data is record");
          L ("      Initial_Offset : Integer;");
          L ("      First          : Natural;");
          L ("      Last           : Natural;");
+         L ("      Rule_From      : Long_Long_Integer;");
+         L ("      Rule_First     : Positive;");
+         L ("      Rule_Last      : Natural;");
          L ("   end record;");
          L;
          L ("   type TZDB_Transition is record");
@@ -3795,6 +3972,48 @@ procedure Generate_CLDR_Data is
          --  repeated per row cost more than the data. Order follows the record
          --  above: Initial_Offset, First, Last -- and Key, Offset for the
          --  transitions.
+         declare
+            --  The rules, each written once however many zones share it.
+            Text        : US.Unbounded_String;
+            Rule_First  : array (1 .. Max_TZDB_Zones) of Positive := [others => 1];
+            Rule_Last   : array (1 .. Max_TZDB_Zones) of Natural := [others => 0];
+         begin
+            for Zone_Index in 1 .. TZDB_Zone_Count loop
+               if TZDB_Zone_Rule_From (Zone_Index) /= 0 then
+                  declare
+                     Rule  : constant String := S (TZDB_Zone_Rules (Zone_Index));
+                     Found : constant Natural := US.Index (Text, Rule);
+                  begin
+                     if Found /= 0 then
+                        Rule_First (Zone_Index) := Found;
+                     else
+                        Rule_First (Zone_Index) := US.Length (Text) + 1;
+                        US.Append (Text, Rule);
+                     end if;
+                     Rule_Last (Zone_Index) := Rule_First (Zone_Index) + Rule'Length - 1;
+                  end;
+               end if;
+            end loop;
+            L ("   TZDB_Rules : constant String :=");
+            declare
+               All_Text : constant String := S (Text);
+               Start    : Positive := All_Text'First;
+            begin
+               if All_Text'Length = 0 then
+                  L ("     """";");
+               end if;
+               while Start <= All_Text'Last loop
+                  declare
+                     Stop : constant Natural := Natural'Min (Start + 69, All_Text'Last);
+                  begin
+                     L ("     " & (if Start = All_Text'First then "" else "& ")
+                        & """" & All_Text (Start .. Stop) & """"
+                        & (if Stop = All_Text'Last then ";" else ""));
+                     Start := Stop + 1;
+                  end;
+               end loop;
+            end;
+            L;
          L ("   TZDB_Zones : constant array (Positive range <>) of TZDB_Zone_Data :=");
          L ("     [");
          for Zone_Index in 1 .. TZDB_Zone_Count loop
@@ -3814,11 +4033,15 @@ procedure Generate_CLDR_Data is
                L ("      ("
                   & Trim (Integer'Image (TZDB_Zone_Initial_Offsets (Zone_Index)))
                   & "," & Trim (Natural'Image (First))
-                  & "," & Trim (Natural'Image (Last)) & ")"
+                  & "," & Trim (Natural'Image (Last))
+                  & "," & Trim (Long_Long_Integer'Image (TZDB_Zone_Rule_From (Zone_Index)))
+                  & "," & Trim (Positive'Image (Rule_First (Zone_Index)))
+                  & "," & Trim (Natural'Image (Rule_Last (Zone_Index))) & ")"
                   & (if Zone_Index = TZDB_Zone_Count then "" else ","));
             end;
          end loop;
          L ("     ];");
+         end;
          L;
          L ("   TZDB_Transitions : constant array (Positive range <>) of TZDB_Transition :=");
          L ("     [");
@@ -3868,7 +4091,7 @@ procedure Generate_CLDR_Data is
                   Count := Count + 1;
                   Items (Count).Key :=
                     US.To_Unbounded_String
-                      (Name & (1 .. Link_Width - Name'Length => ' '));
+                      (Name & [1 .. Link_Width - Name'Length => ' ']);
                   Items (Count).Value := TZDB_Link_Targets (Index);
                end;
             end loop;
@@ -4014,7 +4237,7 @@ procedure Generate_CLDR_Data is
                   Count := Count + 1;
                   Items (Count).Key :=
                     US.To_Unbounded_String
-                      (Name & (1 .. Zone_Width - Name'Length => ' '));
+                      (Name & [1 .. Zone_Width - Name'Length => ' ']);
                   Items (Count).Value := Zone_Index;
                end;
             end loop;
@@ -4150,6 +4373,26 @@ procedure Generate_CLDR_Data is
          L ("            Last  : constant Natural := TZDB_Zones (Index).Last;");
          L ("         begin");
          L ("            Valid := True;");
+         L;
+         L ("            --  Past its recorded transitions a zone follows its final");
+         L ("            --  rule, every year from then on.");
+         L ("            if TZDB_Zones (Index).Rule_From /= 0");
+         L ("              and then Key >= TZDB_Zones (Index).Rule_From");
+         L ("            then");
+         L ("               declare");
+         L ("                  Rule_Valid : Boolean;");
+         L ("                  Offset     : constant Integer :=");
+         L ("                    I18N.TZ_Rules.Offset_At");
+         L ("                      (TZDB_Rules (TZDB_Zones (Index).Rule_First .. TZDB_Zones (Index).Rule_Last),");
+         L ("                       I18N.TZ_Rules.Epoch_Seconds (Year, Month, Day, Hour, Minute, Second),");
+         L ("                       Rule_Valid);");
+         L ("               begin");
+         L ("                  if Rule_Valid then");
+         L ("                     return Offset;");
+         L ("                  end if;");
+         L ("               end;");
+         L ("            end if;");
+         L;
          L ("            if First = 0 then");
          L ("               return TZDB_Zones (Index).Initial_Offset;");
          L ("            end if;");
@@ -5366,6 +5609,9 @@ begin
    Load_TZDB_Links;
    if Errors = 0 then
       Load_TZDB_Transitions;
+   end if;
+   if Errors = 0 then
+      Fit_TZDB_Rules;
    end if;
    Validate_Rules;
 
