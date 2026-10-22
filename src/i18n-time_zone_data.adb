@@ -1,7 +1,6 @@
 with Ada.Calendar;
 with Ada.Strings.Unbounded;
 
-with I18N.CLDR_Data;
 with I18N.Data_Store;
 with I18N.TZ_Rules;
 
@@ -63,6 +62,23 @@ package body I18N.Time_Zone_Data is
       end Keep;
    end Cache;
 
+   function Canonical_Zone (Zone : String) return String is
+   begin
+      if Zone = "" or else Zone = "UTC" or else Zone = "UCT" or else Zone = "Universal"
+        or else Zone = "Zulu" or else Zone = "Etc/UTC" or else Zone = "Etc/UCT"
+        or else Zone = "Etc/Universal" or else Zone = "Etc/Zulu"
+      then
+         return "UTC";
+      elsif Zone = "GMT" then
+         return "GMT";
+      end if;
+      declare
+         Target : constant String := I18N.Data_Store.Lookup ("tzdb", "link", Zone);
+      begin
+         return (if Target = "" then Zone else Target);
+      end;
+   end Canonical_Zone;
+
    function Record_Of (Zone : String) return String is
       Found  : Boolean;
       Cached : constant String := Cache.Find (Zone, Found);
@@ -102,7 +118,7 @@ package body I18N.Time_Zone_Data is
       Daylight : out Boolean;
       Valid    : out Boolean)
    is
-      Item  : constant String := Record_Of (I18N.CLDR_Data.Canonical_Time_Zone (Zone));
+      Item  : constant String := Record_Of (Canonical_Zone (Zone));
       Key   : constant Long_Long_Integer := Key_Of (Year, Month, Day, Hour, Minute, Second);
       Semis : array (1 .. 3) of Natural := [others => 0];
       Count : Natural := 0;

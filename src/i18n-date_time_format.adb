@@ -1498,7 +1498,7 @@ package body I18N.Date_Time_Format is
       if Zone_Meta_Has ("mz:" & Zone) or else Zone_Meta_Has ("cc:" & Zone) then
          return Zone;
       end if;
-      return I18N.CLDR_Data.Canonical_Time_Zone (Zone);
+      return I18N.Time_Zone_Data.Canonical_Zone (Zone);
    end Canonical_Zone_Name;
 
    function Zone_Offset_Minutes
@@ -2260,7 +2260,7 @@ package body I18N.Date_Time_Format is
      (if Zone = "" or else Zone = "UTC" or else Zone = "Z" or else Zone = "Etc/UTC"
       then "Etc/UTC"
       elsif Zone_Meta_Has ("mz:" & Zone) or else Zone_Meta_Has ("cc:" & Zone) then Zone
-      else I18N.CLDR_Data.Canonical_Time_Zone (Zone));
+      else I18N.Time_Zone_Data.Canonical_Zone (Zone));
 
    function Zone_Meta_Has (Key : String) return Boolean is
       Found : Boolean;

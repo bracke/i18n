@@ -17,6 +17,10 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Zone aliases come from `tzdb.i18ndata`.** Its new `@link` section maps
+  each tz database alias to its zone, and `I18N.Time_Zone_Data.Canonical_Zone`
+  replaces `I18N.CLDR_Data.Canonical_Time_Zone` (`i18n-cldr_data.adb` is
+  52 KB). Offsets are unchanged for all 553 zone names, aliases included.
 - **Digits come from the data files.** The numbering systems a locale can
   name (`-u-nu-arab`, `@numbers=deva`; 77 of them) are a `numbering_digits`
   section of `formats.i18ndata`, beside each locale's own `digit_text`, and

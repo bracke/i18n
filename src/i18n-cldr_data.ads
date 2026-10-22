@@ -94,11 +94,6 @@ package I18N.CLDR_Data is
       Calendar : String)
       return String;
 
-   --  Return the primary tzdb identifier for a zone alias.
-   --  @param Zone IANA-style zone identifier, alias, or empty UTC default.
-   --  @return Canonical tzdb zone identifier, or Zone unchanged.
-   function Canonical_Time_Zone (Zone : String) return String;
-
    --  Return ISO 4217 minor units for built-in currency metadata.
    --  @param Code Three-letter uppercase currency code.
    --  @return Number of fractional digits used for normal rounding.

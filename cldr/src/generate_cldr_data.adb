@@ -3906,206 +3906,6 @@ procedure Generate_CLDR_Data is
          L ("   end Era_Year_Separator;");
       end Emit_Era_Name;
 
-      procedure Emit_Time_Zone_Data is
-         procedure Emit_String_Expression
-           (Indent : String;
-            Value  : String;
-            Suffix : String := "")
-         is
-            Chunk_Size : constant := Data_Chunk;
-            Start      : Positive := Value'First;
-            Stop       : Natural;
-            Term       : Positive := 1;
-         begin
-            if Value'Length = 0 then
-               L (Indent & """""" & Suffix);
-               return;
-            elsif Value'Length <= Chunk_Size then
-               L (Indent & """" & Value & """" & Suffix);
-               return;
-            end if;
-
-            while Start <= Value'Last loop
-               Stop := Natural'Min (Start + Chunk_Size - 1, Value'Last);
-               L (Indent & (if Term = 1 then "" else "& ")
-                  & """" & Value (Start .. Stop) & """"
-                  & (if Stop = Value'Last then Suffix else ""));
-               Start := Stop + 1;
-               Term := Term + 1;
-            end loop;
-         end Emit_String_Expression;
-         pragma Unreferenced (Emit_String_Expression);
-
-         function Zone_Exemplar_Data return String is
-            Result : US.Unbounded_String;
-         begin
-            for Index in 1 .. Rule_Count loop
-               if Is_Kind (Index, "zone_exemplar_hex") then
-                  US.Append (Result, S (Rules (Index).A));
-                  US.Append (Result, "|");
-                  US.Append (Result, S (Rules (Index).B));
-                  US.Append (Result, "|");
-                  US.Append (Result, S (Rules (Index).C));
-                  US.Append (Result, "~");
-               end if;
-            end loop;
-
-            return S (Result);
-         end Zone_Exemplar_Data;
-         pragma Unreferenced (Zone_Exemplar_Data);
-      begin
-         L;
-         --  Alias -> canonical was a chain of up to 153 Zone = "..." tests.
-         --  It is now a table keyed on the alias name, padded to a fixed field,
-         --  with the target packed once beside it (repeats -- many aliases
-         --  share a target -- collapse to a single copy). The UTC aliases and
-         --  GMT keep their own guards above the table, as the chain tested them
-         --  first, and an unknown zone still returns itself.
-         L ("   function Canonical_Time_Zone (Zone : String) return String is");
-         declare
-            type Link_Entry is record
-               Key   : US.Unbounded_String;
-               Value : US.Unbounded_String;
-               First : Natural := 0;
-               Last  : Natural := 0;
-            end record;
-
-            Items      : array (1 .. Natural'Max (TZDB_Link_Count, 1)) of
-              Link_Entry;
-            Count      : Natural := 0;
-            Link_Width : Natural := 0;
-            Values     : US.Unbounded_String;
-            Index_Data : US.Unbounded_String;
-         begin
-            for Index in 1 .. TZDB_Link_Count loop
-               Link_Width :=
-                 Natural'Max
-                   (Link_Width, S (TZDB_Link_Names (Index))'Length);
-            end loop;
-
-            for Index in 1 .. TZDB_Link_Count loop
-               declare
-                  Name : constant String := S (TZDB_Link_Names (Index));
-               begin
-                  Count := Count + 1;
-                  Items (Count).Key :=
-                    US.To_Unbounded_String
-                      (Name & [1 .. Link_Width - Name'Length => ' ']);
-                  Items (Count).Value := TZDB_Link_Targets (Index);
-               end;
-            end loop;
-
-            --  Sorted by the padded key; the space pad sorts below every
-            --  character an alias contains, so this is the raw-name order too.
-            for Outer in 2 .. Count loop
-               declare
-                  Current     : constant Link_Entry := Items (Outer);
-                  Current_Key : constant String := S (Current.Key);
-                  Probe       : Natural := Outer - 1;
-               begin
-                  while Probe >= 1
-                    and then S (Items (Probe).Key) > Current_Key
-                  loop
-                     Items (Probe + 1) := Items (Probe);
-                     Probe := Probe - 1;
-                  end loop;
-                  Items (Probe + 1) := Current;
-               end;
-            end loop;
-
-            for N in 1 .. Count loop
-               US.Append (Index_Data, S (Items (N).Key));
-               for Prior in 1 .. N - 1 loop
-                  if US."=" (Items (Prior).Value, Items (N).Value) then
-                     Items (N).First := Items (Prior).First;
-                     Items (N).Last := Items (Prior).Last;
-                     exit;
-                  end if;
-               end loop;
-
-               if Items (N).First = 0 then
-                  declare
-                     Target : constant String := S (Items (N).Value);
-                  begin
-                     Items (N).First := US.Length (Values) + 1;
-                     Items (N).Last := US.Length (Values) + Target'Length;
-                     US.Append (Values, Target);
-                  end;
-               end if;
-
-               US.Append (Index_Data, To_Base62 (Items (N).First, 5));
-               US.Append (Index_Data, To_Base62 (Items (N).Last, 5));
-            end loop;
-
-            L ("      Values : constant String :=");
-            Emit_Unit_String_Expression ("        ", S (Values), ";");
-            L ("      Index_Data : constant String :=");
-            Emit_Unit_String_Expression ("        ", S (Index_Data), ";");
-            L ("      Link_Width : constant := "
-               & Trim (Integer'Image (Link_Width)) & ";");
-            L ("      Width : constant := Link_Width + 10;");
-            L ("      Count : constant Natural := Index_Data'Length / Width;");
-            L;
-            L ("      function Key (N : Positive) return String is");
-            L ("        (Index_Data (Index_Data'First + (N - 1) * Width ..");
-            L ("                     Index_Data'First + (N - 1) * Width"
-               & " + Link_Width - 1));");
-            L;
-            L ("      function Value_At (N : Positive) return String is");
-            L ("         Base : constant Natural :=");
-            L ("           Index_Data'First + (N - 1) * Width + Link_Width;");
-            L ("         F : constant Natural :=");
-            L ("           N62 (Index_Data (Base .. Base + 4));");
-            L ("         T : constant Natural :=");
-            L ("           N62 (Index_Data (Base + 5 .. Base + 9));");
-            L ("      begin");
-            L ("         return Values (F .. T);");
-            L ("      end Value_At;");
-            L;
-            L ("      Low : Natural := 1;");
-            L ("      High : Natural := Count;");
-            L ("      Mid : Natural;");
-            L ("   begin");
-            L ("      if Zone = """"");
-            L ("        or else Zone = ""UTC""");
-            L ("        or else Zone = ""UCT""");
-            L ("        or else Zone = ""Universal""");
-            L ("        or else Zone = ""Zulu""");
-            L ("        or else Zone = ""Etc/UTC""");
-            L ("        or else Zone = ""Etc/UCT""");
-            L ("        or else Zone = ""Etc/Universal""");
-            L ("        or else Zone = ""Etc/Zulu""");
-            L ("      then");
-            L ("         return ""UTC"";");
-            L ("      end if;");
-            L;
-            L ("      if Zone = ""GMT"" then");
-            L ("         return ""GMT"";");
-            L ("      end if;");
-            L;
-            L ("      if Zone'Length <= Link_Width then");
-            L ("         declare");
-            L ("            Wanted : constant String :=");
-            L ("              Zone & [1 .. Link_Width - Zone'Length => ' '];");
-            L ("         begin");
-            L ("            while Low <= High loop");
-            L ("               Mid := (Low + High) / 2;");
-            L ("               if Key (Mid) = Wanted then");
-            L ("                  return Value_At (Mid);");
-            L ("               elsif Key (Mid) < Wanted then");
-            L ("                  Low := Mid + 1;");
-            L ("               else");
-            L ("                  High := Mid - 1;");
-            L ("               end if;");
-            L ("            end loop;");
-            L ("         end;");
-            L ("      end if;");
-            L ("      return Zone;");
-            L ("   end Canonical_Time_Zone;");
-         end;
-         L;
-      end Emit_Time_Zone_Data;
-
       --  Every entry carries one form per plural category, and for most
       --  currencies that is the same word repeated six times: 54% of the
       --  entries are all-identical, and the forms across the whole table
@@ -4349,7 +4149,6 @@ procedure Generate_CLDR_Data is
       Emit_Date_Time_Style_Separator;
       Emit_Number_Display_Affixes;
       Emit_Era_Name;
-      Emit_Time_Zone_Data;
       Emit_Currency_Field ("Currency_Minor_Units", 2, "Natural", "2");
       Emit_Currency_Field ("Currency_Cash_Increment", 3, "Natural", "1");
       Emit_Currency_Field ("Currency_Symbol", 4, "String", "Code");
@@ -4484,6 +4283,35 @@ procedure Generate_CLDR_Data is
               (Out_F, S (TZDB_Zone_Names (Zone_Index)) & ASCII.HT & S (Value));
          end;
       end loop;
+
+      --  The aliases, by name, each with the zone it names (Asia/Calcutta ->
+      --  Asia/Kolkata).
+      declare
+         Links : array (1 .. TZDB_Link_Count) of Positive;
+      begin
+         for Index in Links'Range loop
+            Links (Index) := Index;
+         end loop;
+         for Outer in 2 .. Links'Last loop
+            declare
+               Current : constant Positive := Links (Outer);
+               Probe   : Natural := Outer - 1;
+            begin
+               while Probe >= 1
+                 and then S (TZDB_Link_Names (Links (Probe))) > S (TZDB_Link_Names (Current))
+               loop
+                  Links (Probe + 1) := Links (Probe);
+                  Probe := Probe - 1;
+               end loop;
+               Links (Probe + 1) := Current;
+            end;
+         end loop;
+         Ada.Text_IO.Put_Line (Out_F, "@link|" & Trim (Natural'Image (TZDB_Link_Count)));
+         for Index of Links loop
+            Ada.Text_IO.Put_Line
+              (Out_F, S (TZDB_Link_Names (Index)) & ASCII.HT & S (TZDB_Link_Targets (Index)));
+         end loop;
+      end;
       Ada.Text_IO.Close (Out_F);
    end Emit_TZDB_File;
 

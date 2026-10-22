@@ -7,6 +7,12 @@
 --  library beyond the alias table that names a zone's canonical id.
 package I18N.Time_Zone_Data is
 
+   --  The tz database's own name for Zone: the zone an alias names
+   --  (Asia/Calcutta -> Asia/Kolkata), "UTC" for its spellings and "", "GMT"
+   --  for GMT, and Zone itself otherwise -- also when the data file is not
+   --  installed.
+   function Canonical_Zone (Zone : String) return String;
+
    --  The UTC offset in seconds, east of Greenwich positive, of Zone at the
    --  given UTC date and time. Valid is False, and 0 returned, for a zone the
    --  data does not know -- or when the data file is not installed.
