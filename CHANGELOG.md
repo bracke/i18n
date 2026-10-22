@@ -10,6 +10,18 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Number, currency, unit and zone symbols come only from the data files.**
+  `I18N.Locale_Data.Field` no longer takes a compiled fallback, and nineteen
+  accessors leave `I18N.CLDR_Data` (`Decimal_Separator`, `Group_Separator`,
+  the number signs and affixes, the currency and unit separators, and the
+  GMT, location and offset zone formats); `i18n-cldr_data.adb` goes from
+  234 KB to 121 KB. Five were already served whole from `formats.i18ndata`;
+  the other fourteen were constants in the generator, now written there as a
+  `und` base with the languages that differ, and CLDR's "no value" marker
+  for an empty one. Every locale answers as before except five where the
+  compiled table matched a language by its first two letters: Mapudungun
+  (`arn`) no longer gets Arabic percent and per-mille signs, and Konkani
+  (`kok`) keeps its space between a value and its unit.
 - **The hand-kept zone-family list is gone.** `I18N.CLDR_Data` loses
   `Time_Zone_DST_Family`, `Time_Zone_Display_Name`, `Time_Zone_Short_Name`,
   `Time_Zone_Generic_Short_Name` and `Time_Zone_Base_Offset_Minutes`, and the

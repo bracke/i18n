@@ -10,16 +10,6 @@ package I18N.CLDR_Data is
    --  @return The first two locale characters, or an empty string.
    function Language (Locale : String) return String;
 
-   --  Return the locale decimal separator.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 decimal separator text.
-   function Decimal_Separator (Locale : String) return String;
-
-   --  Return the locale grouping separator.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 grouping separator text.
-   function Group_Separator (Locale : String) return String;
-
    --  Report whether the locale uses Indian primary/secondary grouping.
    --  @param Locale Locale identifier or catalog locale key.
    --  @return True when Indian grouping should be used.
@@ -77,36 +67,6 @@ package I18N.CLDR_Data is
    --  @return UTF-8 digit text, or Digit unchanged for unsupported inputs.
    function Digit_Text (Locale : String; Digit : Character) return String;
 
-   --  Return the localized percent suffix for number formatting.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 suffix text appended to percent-formatted numbers.
-   function Number_Percent_Suffix (Locale : String) return String;
-
-   --  Return the localized plus sign for numeric display.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 plus sign text.
-   function Number_Plus_Sign (Locale : String) return String;
-
-   --  Return the localized minus sign for numeric display.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 minus sign text.
-   function Number_Minus_Sign (Locale : String) return String;
-
-   --  Return the accounting prefix for negative numbers.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 prefix text.
-   function Number_Accounting_Prefix (Locale : String) return String;
-
-   --  Return the accounting suffix for negative numbers.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 suffix text.
-   function Number_Accounting_Suffix (Locale : String) return String;
-
-   --  Return the localized permille suffix for number formatting.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 suffix text appended to permille-formatted numbers.
-   function Number_Permille_Suffix (Locale : String) return String;
-
    --  Return the localized compact-number suffix.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Scale Compact scale value, including 10000 and 100000000 for
@@ -119,11 +79,6 @@ package I18N.CLDR_Data is
       Scale     : Long_Long_Integer;
       Long_Form : Boolean)
       return String;
-
-   --  Return the scientific/engineering exponent separator.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 exponent separator text.
-   function Number_Exponent_Separator (Locale : String) return String;
 
    --  Return a localized era display name.
    --  @param Locale Locale identifier or catalog locale key.
@@ -150,26 +105,6 @@ package I18N.CLDR_Data is
    --  @return Canonical tzdb zone identifier, or Zone unchanged.
    function Canonical_Time_Zone (Zone : String) return String;
 
-   --  Return the localized generic location pattern for VVVV zone output.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return Pattern containing {0} for the exemplar location.
-   function Time_Zone_Location_Pattern (Locale : String) return String;
-
-   --  Return the localized GMT offset prefix.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return Prefix text used by GMT-style offset skeleton fields.
-   function GMT_Offset_Prefix (Locale : String) return String;
-
-   --  Return the UTC zero-offset designator for ISO-style zone fields.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 zone designator text.
-   function Time_Zone_UTC_Designator (Locale : String) return String;
-
-   --  Return the separator between hours and minutes in zone offsets.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 separator text.
-   function Time_Zone_Offset_Separator (Locale : String) return String;
-
    --  Return ISO 4217 minor units for built-in currency metadata.
    --  @param Code Three-letter uppercase currency code.
    --  @return Number of fractional digits used for normal rounding.
@@ -194,36 +129,6 @@ package I18N.CLDR_Data is
    --  @param Locale Locale identifier or catalog locale key.
    --  @return True when symbol-first formatting is built in for Locale.
    function Currency_Symbol_First (Locale : String) return Boolean;
-
-   --  Return the separator between currency display text and amount.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 separator text including spacing when needed.
-   function Currency_Amount_Separator (Locale : String) return String;
-
-   --  Return the accounting prefix for negative currency amounts.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 prefix text.
-   function Currency_Accounting_Prefix (Locale : String) return String;
-
-   --  Return the accounting suffix for negative currency amounts.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 suffix text.
-   function Currency_Accounting_Suffix (Locale : String) return String;
-
-   --  Return the localized separator for compound unit formatting.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 separator text including surrounding spaces.
-   function Per_Unit_Separator (Locale : String) return String;
-
-   --  Return the localized separator between a number and a unit.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 separator text including spacing when needed.
-   function Unit_Value_Separator (Locale : String) return String;
-
-   --  Return the localized short/narrow separator for compound units.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return UTF-8 separator text.
-   function Unit_Short_Per_Separator (Locale : String) return String;
 
    --  Return a deterministic byte-size unit label.
    --  @param Scale Binary byte scale from B through PiB.

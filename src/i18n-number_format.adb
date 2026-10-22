@@ -102,11 +102,11 @@ package body I18N.Number_Format is
 
    function Decimal_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("decimal_separator", Locale, I18N.CLDR_Data.Decimal_Separator'Access));
+        ("decimal_separator", Locale));
 
    function Group_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("group_separator", Locale, I18N.CLDR_Data.Group_Separator'Access));
+        ("group_separator", Locale));
 
    function Uses_Indian_Grouping (Locale : String) return Boolean is
       Found : Boolean;
@@ -139,36 +139,31 @@ package body I18N.Number_Format is
 
    function Number_Percent_Suffix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_percent_suffix", Locale,
-         I18N.CLDR_Data.Number_Percent_Suffix'Access));
+        ("number_percent_suffix", Locale));
 
    function Number_Permille_Suffix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_permille_suffix", Locale,
-         I18N.CLDR_Data.Number_Permille_Suffix'Access));
+        ("number_permille_suffix", Locale));
 
    function Number_Plus_Sign (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_plus_sign", Locale, I18N.CLDR_Data.Number_Plus_Sign'Access));
+        ("number_plus_sign", Locale));
 
    function Number_Minus_Sign (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
+        ("number_minus_sign", Locale));
 
    function Number_Accounting_Prefix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_accounting_prefix", Locale,
-         I18N.CLDR_Data.Number_Accounting_Prefix'Access));
+        ("number_accounting_prefix", Locale));
 
    function Number_Accounting_Suffix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_accounting_suffix", Locale,
-         I18N.CLDR_Data.Number_Accounting_Suffix'Access));
+        ("number_accounting_suffix", Locale));
 
    function Number_Exponent_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_exponent_separator", Locale,
-         I18N.CLDR_Data.Number_Exponent_Separator'Access));
+        ("number_exponent_separator", Locale));
 
    procedure Put
      (Target   : in out String;

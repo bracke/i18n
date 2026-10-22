@@ -71,18 +71,15 @@ package body I18N.Unit_Format is
 
    function Per_Unit_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("per_unit_separator", Locale,
-         I18N.CLDR_Data.Per_Unit_Separator'Access));
+        ("per_unit_separator", Locale));
 
    function Value_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("unit_value_separator", Locale,
-         I18N.CLDR_Data.Unit_Value_Separator'Access));
+        ("unit_value_separator", Locale));
 
    function Short_Per_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("unit_short_per_separator", Locale,
-         I18N.CLDR_Data.Unit_Short_Per_Separator'Access));
+        ("unit_short_per_separator", Locale));
 
    --  The built-in English fallback name for a measurement unit: the
    --  compiled English CLDR name when present, otherwise a hardcoded

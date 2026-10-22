@@ -2035,6 +2035,42 @@ procedure Generate_CLDR_Data is
          Add_Error ("failed to read upstream/tzdb/zone.tab");
    end Add_Zone_Countries;
 
+   --  The number, currency, unit and zone symbols the formatters had from
+   --  constants compiled into I18N.CLDR_Data: the same values, as rows of the
+   --  formats file -- a und base and the languages that differ. A value the
+   --  locale has none of is CLDR's "no value" marker, which the reader maps to
+   --  "" (the store has no empty values).
+   procedure Add_Fixed_Formats is
+      No_Value : constant String := Ada_Expression_UTF8_Bytes ("U (16#2205#) & U (16#2205#) & U (16#2205#)");
+   begin
+      Add_Format ("number_plus_sign", "und", "+");
+      Add_Format ("number_minus_sign", "und", "-");
+      Add_Format ("number_accounting_prefix", "und", "(");
+      Add_Format ("number_accounting_suffix", "und", ")");
+      Add_Format ("number_exponent_separator", "und", "E");
+      Add_Format ("number_percent_suffix", "und", "%");
+      Add_Format ("number_permille_suffix", "und", Ada_Expression_UTF8_Bytes ("U (16#2030#)"));
+      for Arabic_Script in 1 .. 2 loop
+         declare
+            Language : constant String := (if Arabic_Script = 1 then "ar" else "fa");
+         begin
+            Add_Format ("number_percent_suffix", Language, Ada_Expression_UTF8_Bytes ("U (16#66A#)"));
+            Add_Format ("number_permille_suffix", Language, Ada_Expression_UTF8_Bytes ("U (16#609#)"));
+         end;
+      end loop;
+      Add_Format ("currency_amount_separator", "und", " ");
+      Add_Format ("currency_accounting_prefix", "und", "(");
+      Add_Format ("currency_accounting_suffix", "und", ")");
+      Add_Format ("unit_value_separator", "und", " ");
+      Add_Format ("unit_short_per_separator", "und", "/");
+      Add_Format ("unit_value_separator", "ja", No_Value);
+      Add_Format ("unit_value_separator", "zh", No_Value);
+      Add_Format ("unit_value_separator", "zh-Hant", No_Value);
+      Add_Format ("unit_value_separator", "ko", No_Value);
+      Add_Format ("timezone_utc_designator", "und", "Z");
+      Add_Format ("timezone_offset_separator", "und", ":");
+   end Add_Fixed_Formats;
+
    procedure File_CLDR_Zone_Aliases is
 
       Format_Before : constant Natural := Format_Count;
@@ -3337,54 +3373,6 @@ procedure Generate_CLDR_Data is
          L ("   end " & Name & ";");
       end Emit_Locale_Table;
 
-      --  The same table for rows that need more than the kind to select them
-      --  and keep their value in a later field: a list separator is picked by
-      --  family and part, and several families share one kind.
-      --  Rows selected by family alone, with the value in one of the two
-      --  fields after it: a relative offset keeps its prefix in one and its
-      --  suffix in the other, and each becomes its own table.
-      procedure Emit_Family_Locale_Table
-        (Name         : String;
-         Kind         : String;
-         Family       : String;
-         Default_Expr : String;
-         Value_Field  : Character := 'C')
-      is
-      begin
-         Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, Kind)
-              and then S (Rules (Index).B) = Family
-            then
-               Add_Table_Entry
-                 (S (Rules (Index).A),
-                  Ada_Expression_UTF8_Hex
-                    (if Value_Field = 'D'
-                     then S (Rules (Index).D)
-                     else S (Rules (Index).C)));
-            end if;
-         end loop;
-         Emit_Locale_Table (Name, Default_Expr);
-      end Emit_Family_Locale_Table;
-
-      --  One row per locale: the key is the locale, the value the row's text.
-      procedure Emit_Locale_Return_Table
-        (Name         : String;
-         Kind         : String;
-         Default_Expr : String)
-      is
-      begin
-         Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, Kind) then
-               Add_Table_Entry
-                 (S (Rules (Index).A),
-                  Ada_Expression_UTF8_Hex (S (Rules (Index).B)));
-            end if;
-         end loop;
-         Emit_Locale_Table (Name, Default_Expr);
-      end Emit_Locale_Return_Table;
-
       procedure Emit_Grouping is
          Has_Row : Boolean := False;
       begin
@@ -3723,50 +3711,6 @@ procedure Generate_CLDR_Data is
       procedure Emit_Number_Display_Affixes is
       begin
          L;
-         L ("   function Number_Percent_Suffix (Locale : String) return String is");
-         L ("      Lang : constant String := Language (Locale);");
-         L ("   begin");
-         L ("      if Lang = ""ar"" or else Lang = ""fa"" then");
-         L ("         return U (16#66A#);");
-         L ("      end if;");
-         L;
-         L ("      return ""%"";");
-         L ("   end Number_Percent_Suffix;");
-         L;
-         L ("   function Number_Plus_Sign (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""+"";");
-         L ("   end Number_Plus_Sign;");
-         L;
-         L ("   function Number_Minus_Sign (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""-"";");
-         L ("   end Number_Minus_Sign;");
-         L;
-         L ("   function Number_Accounting_Prefix (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""("";");
-         L ("   end Number_Accounting_Prefix;");
-         L;
-         L ("   function Number_Accounting_Suffix (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return "")"";");
-         L ("   end Number_Accounting_Suffix;");
-         L;
-         L ("   function Number_Permille_Suffix (Locale : String) return String is");
-         L ("      Lang : constant String := Language (Locale);");
-         L ("   begin");
-         L ("      if Lang = ""ar"" or else Lang = ""fa"" then");
-         L ("         return U (16#609#);");
-         L ("      end if;");
-         L;
-         L ("      return U (16#2030#);");
-         L ("   end Number_Permille_Suffix;");
-         L;
          L ("   function Number_Compact_Suffix");
          L ("     (Locale    : String;");
          L ("      Scale     : Long_Long_Integer;");
@@ -3823,12 +3767,6 @@ procedure Generate_CLDR_Data is
          L ("         end if;");
          L ("      end if;");
          L ("   end Number_Compact_Suffix;");
-         L;
-         L ("   function Number_Exponent_Separator (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""E"";");
-         L ("   end Number_Exponent_Separator;");
       end Emit_Number_Display_Affixes;
 
       --  The currency accessors were the last linear Code = "..." chains: a
@@ -4297,47 +4235,6 @@ procedure Generate_CLDR_Data is
             L ("   end Canonical_Time_Zone;");
          end;
          L;
-         Emit_Locale_Return_Table
-           ("Time_Zone_Location_Pattern", "zone_location_pattern",
-            """{0} Time""");
-         Emit_Locale_Return_Table
-           ("GMT_Offset_Prefix", "zone_gmt_prefix", """GMT""");
-         L;
-         L ("   function Time_Zone_UTC_Designator (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""Z"";");
-         L ("   end Time_Zone_UTC_Designator;");
-         L;
-         L ("   function Time_Zone_Offset_Separator (Locale : String) return String is");
-         L ("   begin");
-         for Pass in 1 .. 2 loop
-            declare
-               Opened : Boolean := False;
-            begin
-               for Index in 1 .. Rule_Count loop
-                  if Is_Kind (Index, "zone_offset_separator") then
-                     L
-                       ("      "
-                        & (if Opened then "elsif " else "if ")
-                        & (if Pass = 1
-                           then "Locale_Equals"
-                           else "Locale_Fallback_Matches")
-                        & " (Locale, """ & S (Rules (Index).A)
-                        & """) then");
-                     L ("         return " & S (Rules (Index).B) & ";");
-                     Opened := True;
-                  end if;
-               end loop;
-
-               if Opened then
-                  L ("      end if;");
-                  L;
-               end if;
-            end;
-         end loop;
-         L ("      return "":"";");
-         L ("   end Time_Zone_Offset_Separator;");
       end Emit_Time_Zone_Data;
 
       --  Every entry carries one form per plural category, and for most
@@ -4359,55 +4256,8 @@ procedure Generate_CLDR_Data is
          L ("   end Currency_Symbol_First;");
       end Emit_Symbol_First;
 
-      procedure Emit_Currency_Format_Patterns is
-      begin
-         L;
-         L ("   function Currency_Amount_Separator (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return "" "";");
-         L ("   end Currency_Amount_Separator;");
-         L;
-         L ("   function Currency_Accounting_Prefix (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""("";");
-         L ("   end Currency_Accounting_Prefix;");
-         L;
-         L ("   function Currency_Accounting_Suffix (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return "")"";");
-         L ("   end Currency_Accounting_Suffix;");
-      end Emit_Currency_Format_Patterns;
-
-      procedure Emit_Per_Unit_Separator is
-      begin
-         --  CLDR root (und) per-unit separator is "/", not English " per ". Only
-         --  locales without their own unit_separator rule reach this fallback (en has
-         --  an explicit " per " entry), so they must fall back to und, not en.
-         Emit_Family_Locale_Table
-           ("Per_Unit_Separator", "unit_separator", "per", """/""");
-      end Emit_Per_Unit_Separator;
-
       procedure Emit_Unit_Separators is
       begin
-         L;
-         L ("   function Unit_Value_Separator (Locale : String) return String is");
-         L ("      Lang : constant String := Language (Locale);");
-         L ("   begin");
-         L ("      if Lang = ""ja"" or else Lang = ""zh"" or else Lang = ""ko"" then");
-         L ("         return """";");
-         L ("      else");
-         L ("         return "" "";");
-         L ("      end if;");
-         L ("   end Unit_Value_Separator;");
-         L;
-         L ("   function Unit_Short_Per_Separator (Locale : String) return String is");
-         L ("      pragma Unreferenced (Locale);");
-         L ("   begin");
-         L ("      return ""/"";");
-         L ("   end Unit_Short_Per_Separator;");
          L;
          L ("   function Duration_Field_Separator (Locale : String) return String is");
          L ("      pragma Unreferenced (Locale);");
@@ -4622,8 +4472,6 @@ procedure Generate_CLDR_Data is
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
       Current_File := Output'Unchecked_Access;
       Emit_Static_Prelude;
-      Emit_Locale_Return_Table ("Decimal_Separator", "decimal", """.""");
-      Emit_Locale_Return_Table ("Group_Separator", "group", """,""");
       Emit_Grouping;
       Emit_Day_Month_Year;
       Emit_Week_Data;
@@ -4639,8 +4487,6 @@ procedure Generate_CLDR_Data is
       Emit_Currency_Field ("Currency_Symbol", 4, "String", "Code");
       Emit_Currency_Field ("Currency_Narrow_Symbol", 5, "String", "Currency_Symbol (Code)");
       Emit_Symbol_First;
-      Emit_Currency_Format_Patterns;
-      Emit_Per_Unit_Separator;
       Emit_Unit_Separators;
       Emit_Byte_Size_Unit_Label;
       Emit_Number_Spellout_Words;
@@ -4836,6 +4682,7 @@ begin
    end if;
 
    Parse_Source;
+   Add_Fixed_Formats;
    Load_TZDB_Links;
    if Errors = 0 then
       File_CLDR_Zone_Aliases;

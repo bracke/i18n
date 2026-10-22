@@ -152,15 +152,15 @@ package body I18N.Currency is
 
    function Decimal_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("decimal_separator", Locale, I18N.CLDR_Data.Decimal_Separator'Access));
+        ("decimal_separator", Locale));
 
    function Group_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("group_separator", Locale, I18N.CLDR_Data.Group_Separator'Access));
+        ("group_separator", Locale));
 
    function Number_Minus_Sign (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
+        ("number_minus_sign", Locale));
 
    function Uses_Indian_Grouping (Locale : String) return Boolean is
       Found : Boolean;
@@ -338,18 +338,15 @@ package body I18N.Currency is
 
    function Amount_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("currency_amount_separator", Locale,
-         I18N.CLDR_Data.Currency_Amount_Separator'Access));
+        ("currency_amount_separator", Locale));
 
    function Accounting_Prefix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("currency_accounting_prefix", Locale,
-         I18N.CLDR_Data.Currency_Accounting_Prefix'Access));
+        ("currency_accounting_prefix", Locale));
 
    function Accounting_Suffix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("currency_accounting_suffix", Locale,
-         I18N.CLDR_Data.Currency_Accounting_Suffix'Access));
+        ("currency_accounting_suffix", Locale));
 
    procedure Put
      (Target   : in out String;

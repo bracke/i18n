@@ -2202,8 +2202,7 @@ package body I18N.Date_Time_Format is
 
    function Time_Zone_Location_Pattern (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("timezone_location_pattern", Locale,
-         I18N.CLDR_Data.Time_Zone_Location_Pattern'Access));
+        ("timezone_location_pattern", Locale));
 
    function Apply_Time_Zone_Location_Pattern
      (Locale   : String;
@@ -2225,25 +2224,23 @@ package body I18N.Date_Time_Format is
 
    function GMT_Offset_Prefix (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("gmt_offset_prefix", Locale, I18N.CLDR_Data.GMT_Offset_Prefix'Access));
+        ("gmt_offset_prefix", Locale));
 
    function Time_Zone_UTC_Designator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("timezone_utc_designator", Locale,
-         I18N.CLDR_Data.Time_Zone_UTC_Designator'Access));
+        ("timezone_utc_designator", Locale));
 
    function Time_Zone_Offset_Separator (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("timezone_offset_separator", Locale,
-         I18N.CLDR_Data.Time_Zone_Offset_Separator'Access));
+        ("timezone_offset_separator", Locale));
 
    function Number_Plus_Sign (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_plus_sign", Locale, I18N.CLDR_Data.Number_Plus_Sign'Access));
+        ("number_plus_sign", Locale));
 
    function Number_Minus_Sign (Locale : String) return String is
      (I18N.Locale_Data.Field
-        ("number_minus_sign", Locale, I18N.CLDR_Data.Number_Minus_Sign'Access));
+        ("number_minus_sign", Locale));
 
    ---------------------------------------------------------------------
    --  Time zone names, by TR35's rules as ICU applies them. The names come

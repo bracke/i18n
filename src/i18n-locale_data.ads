@@ -19,13 +19,11 @@ private package I18N.Locale_Data is
       return String;
 
    --  Convenience for the common shape: a runtime override keyed by Section,
-   --  else the on-the-fly file, else the compiled accessor. Used by fields
-   --  whose runtime key equals Section and whose compiled fallback is a plain
-   --  (Locale) -> String function.
+   --  else the formats file, walked to its und base; "" when neither has
+   --  it. CLDR's "no value" marker in the file reads as "".
    function Field
-     (Section  : String;
-      Locale   : String;
-      Compiled : not null access function (L : String) return String)
+     (Section : String;
+      Locale  : String)
       return String;
 
    --  Exact per-locale lookup with NO fallback walk -- for fields CLDR keys by

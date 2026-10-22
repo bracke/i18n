@@ -116,11 +116,12 @@ package body I18N.Locale_Data is
    end Lookup_Exact;
 
    function Field
-     (Section  : String;
-      Locale   : String;
-      Compiled : not null access function (L : String) return String)
+     (Section : String;
+      Locale  : String)
       return String
    is
+      No_Value      : constant String :=
+        Character'Val (16#E2#) & Character'Val (16#88#) & Character'Val (16#85#);
       Found         : Boolean;
       Runtime_Value : constant String :=
         I18N.Runtime_Data.Locale_Text (Locale, Section, Found);
@@ -132,12 +133,8 @@ package body I18N.Locale_Data is
       declare
          From_Store : constant String := Lookup (Section, Locale, "", Found);
       begin
-         if Found then
-            return From_Store;
-         end if;
+         return (if From_Store = No_Value & No_Value & No_Value then "" else From_Store);
       end;
-
-      return Compiled (Locale);
    end Field;
 
    function Language_Member
