@@ -2111,8 +2111,8 @@ package body I18N.Date_Time_Format is
          return Store_Value;
       end if;
 
-      --  As the compiled accessor does, fall from the specific zone name to
-      --  the metazone family's long name before the compiled tables.
+      --  Fall from the specific zone name to the metazone family's long
+      --  name, then to the few names compiled in for when no data names it.
       declare
          Family    : constant String :=
            I18N.CLDR_Data.Time_Zone_DST_Family (Zone);
