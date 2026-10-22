@@ -159,27 +159,6 @@ package I18N.CLDR_Data is
       Valid : out Boolean)
       return Integer;
 
-   --  Return generated tzdb offset seconds for a UTC instant.
-   --  @param Zone IANA-style zone identifier or generated alias.
-   --  @param Year UTC Gregorian year.
-   --  @param Month UTC Gregorian month.
-   --  @param Day UTC Gregorian day.
-   --  @param Hour UTC hour.
-   --  @param Minute UTC minute.
-   --  @param Second UTC second.
-   --  @param Valid Set to True when generated tzdb data covers Zone.
-   --  @return Offset seconds east of UTC, or 0 when Zone is unknown.
-   function Time_Zone_Offset_Seconds_At_UTC
-     (Zone   : String;
-      Year   : Natural;
-      Month  : Natural;
-      Day    : Natural;
-      Hour   : Natural;
-      Minute : Natural;
-      Second : Natural;
-      Valid  : out Boolean)
-      return Integer;
-
    --  Return the deterministic DST rule family for a named time zone.
    --  @param Zone IANA-style zone identifier.
    --  @return Stable family key consumed by the date/time formatter.

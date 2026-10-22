@@ -1,5 +1,5 @@
 with Ada.Directories;
-with I18N.CLDR_Data;
+with I18N.Time_Zone_Data;
 with I18N.Data_Store;
 with I18N.Date_Time_Format;
 with I18N.TZ_Rules;
@@ -17,7 +17,7 @@ is
    function Offset (Zone : String; Y, M, D, H : Natural) return Integer is
       Valid  : Boolean;
       Result : constant Integer :=
-        I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC (Zone, Y, M, D, H, 0, 0, Valid);
+        I18N.Time_Zone_Data.Offset_Seconds_At_UTC (Zone, Y, M, D, H, 0, 0, Valid);
    begin
       Assert (Valid, Zone & " is a known zone");
       return Result;

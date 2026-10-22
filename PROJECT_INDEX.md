@@ -25,6 +25,7 @@ ICU Messages Ada is a GNAT/GPRbuild-verified release-candidate Ada 2022 library 
 | Package | File | Purpose |
 | --- | --- | --- |
 | `I18N` | `src/shared/i18n.ads` | Root namespace. |
+| `I18N.Time_Zone_Data` | `src/i18n-time_zone_data.ads` | Time-zone offsets from `share/i18n/tzdb.i18ndata`. |
 | `I18N.TZ_Rules` | `src/shared/i18n-tz_rules.ads` | POSIX TZ final rules: a zone's offset after its recorded transitions end. |
 | `I18N.Runtime` | `src/i18n-runtime.ads` | Catalog/shard loading, validation, resolution, and rendering (`Initialize`, `Load_File`/`Load_Text`, `Validate_Catalog_*`, `Resolve`, `Render`, `Render_Into`). |
 | `I18N.Result` | `src/i18n-result.ads` | Stable render status and result shape. |

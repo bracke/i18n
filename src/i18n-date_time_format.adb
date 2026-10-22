@@ -1,6 +1,7 @@
 with Ada.Strings.Fixed;
 with I18N.CLDR_Data;
 with I18N.Locale_Data;
+with I18N.Time_Zone_Data;
 with I18N.Runtime_Data;
 
 package body I18N.Date_Time_Format is
@@ -3459,7 +3460,7 @@ package body I18N.Date_Time_Format is
 
       declare
          Offset_Seconds : constant Integer :=
-           I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC
+           I18N.Time_Zone_Data.Offset_Seconds_At_UTC
              (Zone, 2000, 1, 1, 0, 0, 0, Valid);
       begin
          if Valid then
@@ -3509,7 +3510,7 @@ package body I18N.Date_Time_Format is
 
       declare
          Offset_Seconds : constant Integer :=
-           I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC
+           I18N.Time_Zone_Data.Offset_Seconds_At_UTC
              (Zone, 2000, 1, 1, 0, 0, 0, Valid);
       begin
          if Valid then
@@ -3833,7 +3834,7 @@ package body I18N.Date_Time_Format is
          declare
             Generated_Valid : Boolean;
             Generated       : constant Integer :=
-              I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC
+              I18N.Time_Zone_Data.Offset_Seconds_At_UTC
                 (Zone, Year, Month, Day, Hour, Minute, 0, Generated_Valid);
          begin
             if Generated_Valid then
@@ -3870,7 +3871,7 @@ package body I18N.Date_Time_Format is
       declare
          Generated_Valid : Boolean;
          Generated_Offset : constant Integer :=
-           I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC
+           I18N.Time_Zone_Data.Offset_Seconds_At_UTC
              (Zone, Year, Month, Day, Hour, Minute, Second, Generated_Valid);
       begin
          if Generated_Valid then
@@ -4208,7 +4209,7 @@ package body I18N.Date_Time_Format is
              (Zone, Year, Month, Day, Hour, Minute, Second, Zone_Valid);
          if not Zone_Valid then
             Target_Off :=
-              I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC
+              I18N.Time_Zone_Data.Offset_Seconds_At_UTC
                 (Zone, Year, Month, Day, Hour, Minute, Second, Zone_Valid);
             if not Zone_Valid then
                Target_Off := Zone_Offset_Seconds_At

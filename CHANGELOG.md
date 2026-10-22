@@ -8,8 +8,24 @@ commit is what a consumer's release records.
 
 ## [Unreleased]
 
+### Changed
+
+- **Time-zone offsets load from `share/i18n/tzdb.i18ndata`**, the last large
+  table compiled into `i18n-cldr_data.adb` (which goes from 1.4 MB to 264 KB).
+  `I18N.Time_Zone_Data.Offset_Seconds_At_UTC` replaces
+  `I18N.CLDR_Data.Time_Zone_Offset_Seconds_At_UTC`: one record per zone,
+  bisected where it lies, the last sixteen zones cached (about 1 us an
+  offset). Offsets are unchanged for every zone and year 1900-2100, except
+  that the GMT aliases (Etc/GMT+0, GMT0, Greenwich, ...) now count as known
+  zones at +00:00, where the compiled index refused them. Without the data
+  file installed, every zone but UTC is unknown.
+
 ### Fixed
 
+- The generator asks zdump for one year past the last it keeps: glibc's
+  zdump reports a change in the last hours of its range that is none
+  (Ubuntu 26.04's zic writes Casablanca's rule in a form that shows it), and
+  the generator stopped on it.
 - **Long specific zone names ("zzzz") are the standard and daylight names.**
   They were the generic name in every locale and season ("Eastern Time" for
   New York in July, where CLDR has "Eastern Daylight Time"): the import never

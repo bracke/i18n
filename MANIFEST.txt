@@ -188,6 +188,8 @@ src/i18n-runtime-compatibility.ads
 src/i18n-runtime.adb
 src/i18n-runtime.ads
 src/i18n-validation.adb
+src/i18n-time_zone_data.adb
+src/i18n-time_zone_data.ads
 src/i18n-validation.ads
 src/shared/i18n-tz_rules.adb
 src/shared/i18n-tz_rules.ads

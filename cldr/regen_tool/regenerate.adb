@@ -415,6 +415,7 @@ begin
    --  separate artifacts, so still (re)generate them when they are missing.
    if File_Here (Body_F)
      and then Data_Here (Share & "/formats.i18ndata")
+     and then Data_Here (Share & "/tzdb.i18ndata")
    then
       if not File_Here (Subset)
         or else Modification_Time (Body_F) > Modification_Time (Subset)
@@ -432,6 +433,8 @@ begin
    --  produced. A consumer's CI found it: `messages` builds, then tests
    --  `test -f ../i18n/share/i18n/formats.i18ndata`, and had been failing on
    --  all three hosts since the body was tracked.
+   --  tzdb.i18ndata is the same generator's too (time-zone offsets left the
+   --  compiled body for it), and is asked about for the same reason.
 
    --  Step 2 -- the pinned subset is the generator's real input.
    if File_Here (Subset) then
