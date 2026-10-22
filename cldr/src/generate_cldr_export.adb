@@ -2590,6 +2590,15 @@ procedure Generate_CLDR_Export is
                      Unit_Name : constant String :=
                        Unit_Name_From_Pattern (Pattern, Base);
                   begin
+                     --  The pattern itself where it is not the value, a space
+                     --  and the name: French's no-break space, Japanese "{0}秒",
+                     --  Arabic's "ساعتان" that names the count in words.
+                     if Unit_Name /= "" and then Pattern /= "{0} " & Unit_Name then
+                        Emit_JSON
+                          ("{""type"":""unit_text"",""locale"":""" & Locale
+                           & """,""key"":""" & Base & ":" & Width & ":" & Category
+                           & """,""value"":""" & JSON_Escape (Pattern) & """}");
+                     end if;
                      if Unit_Name /= "" then
                         Emit_JSON
                           ("{""type"":""unit_name"",""locale"":"""

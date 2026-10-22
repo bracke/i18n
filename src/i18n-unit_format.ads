@@ -22,6 +22,19 @@ package I18N.Unit_Format is
    --  The locale's "per" separator for compound units (miles per hour).
    function Per_Unit_Separator (Locale : String) return String;
 
+   --  CLDR's whole pattern for a value of Base in Width and plural Category
+   --  where it is not the value, a space and Display_Name: "{0} heures" with
+   --  French's no-break space, Japanese narrow "{0}秒", Arabic's "ساعتان"
+   --  that names the count in words. Found is False where the plain
+   --  composition is CLDR's own.
+   function Pattern
+     (Locale   : String;
+      Base     : String;
+      Width    : String;
+      Category : String;
+      Found    : out Boolean)
+      return String;
+
    --  Canonicalize an ICU unit id -- with or without its CLDR category prefix
    --  (length-, volume-, ...) and in British or American spelling -- to the
    --  bare base name Display_Name and English_Name key on. Returns "" for an

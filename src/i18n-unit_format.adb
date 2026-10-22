@@ -11,6 +11,45 @@ package body I18N.Unit_Format is
       then "unit-width-narrow"
       else "unit-width-full-name");
 
+   function Pattern
+     (Locale   : String;
+      Base     : String;
+      Width    : String;
+      Category : String;
+      Found    : out Boolean)
+      return String
+   is
+      CW : constant String := Canonical_Width (Width);
+
+      --  Only from the shard the locale's names come from: each locale's
+      --  shard holds its own patterns, so a parent's must not stand in.
+      function Try (Cat : String; Hit : out Boolean) return String is
+      begin
+         return I18N.Locale_Data.Resolved_Shard_Lookup
+           ("units", "unit", Locale, "p:" & Base & ":" & CW & ":" & Cat, Hit);
+      end Try;
+
+      Value : constant String := Try (Category, Found);
+   begin
+      if Found or else Category = "other" then
+         return Value;
+      end if;
+      --  No name of the category's own either: Display_Name falls back to
+      --  other, and so does its pattern.
+      declare
+         Name_Found : Boolean;
+         Name : constant String :=
+           I18N.Locale_Data.Resolved_Shard_Lookup
+             ("units", "unit", Locale, Base & ":" & CW & ":" & Category, Name_Found);
+         pragma Unreferenced (Name);
+      begin
+         if Name_Found then
+            return "";
+         end if;
+      end;
+      return Try ("other", Found);
+   end Pattern;
+
    function Display_Name
      (Locale   : String;
       Base     : String;

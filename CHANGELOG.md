@@ -88,6 +88,14 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- **Unit values follow CLDR's own patterns.** A unit was the value, a space
+  (none for Japanese, Chinese and Korean) and the name with its `{0}` cut
+  out, which lost French's and German's no-break space, Japanese's space in
+  long forms, narrow "2kg", "Beaufort 2", and Arabic's "ساعة" / "ساعتان"
+  that name the count in words. Each locale's unit shard now keeps the
+  217,163 patterns that are not the plain form, under `p:` keys beside the
+  names, read by `I18N.Unit_Format.Pattern` from the locale's own shard
+  only, and the CJK no-space rule is gone. Output matches ICU.
 - **Relative-time patterns that name their count in words are kept.** The
   exporter dropped every CLDR pattern without a `{0}`, so Arabic's one and
   two forms ("قبل ساعة واحدة", "قبل ساعتين") and other duals fell back to

@@ -679,7 +679,9 @@ procedure Import_CLDR_Raw is
                Add_Key ("zone_meta|" & Key, Line_Number);
                Emit_Record ("zone_meta|" & Key & "|" & Value);
             end;
-         elsif Kind = "zone_text" or else Kind = "number_text" or else Kind = "relative_text" then
+         elsif Kind = "zone_text" or else Kind = "number_text" or else Kind = "relative_text"
+           or else Kind = "unit_text"
+         then
             declare
                Locale : constant String := JSON_Value (Line, "locale");
                Key    : constant String := JSON_Value (Line, "key");

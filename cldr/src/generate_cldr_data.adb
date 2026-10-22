@@ -78,7 +78,7 @@ procedure Generate_CLDR_Data is
    --  are sharded one file per locale (units/<locale>.i18ndata) rather than
    --  bloating formats.i18ndata. Here Section holds the shard locale and Key
    --  the "base:width:category" record key.
-   Max_Unit_Entries : constant := 1_000_000;
+   Max_Unit_Entries : constant := 1_500_000;
    Unit_Entries : constant Format_Entry_Array_Access :=
      new Format_Entry_Array (1 .. Max_Unit_Entries);
    Unit_Count   : Natural := 0;
@@ -1672,6 +1672,14 @@ procedure Generate_CLDR_Data is
               ("zone_text", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                Sub => Field (Line, 3));
          end if;
+      elsif Kind = "unit_text" then
+         --  A unit pattern that is not the value, a space and the name, into
+         --  the locale's unit shard beside the name, keyed p:base:width:category.
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid unit_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            Unit_Add (Field (Line, 2), "p:" & Field (Line, 3), Ada_Expression_UTF8_Bytes (Field (Line, 4)));
+         end if;
       elsif Kind = "relative_text" then
          --  A locale's named relative offset ("yesterday", "last Monday"),
          --  keyed base:width:offset.
@@ -1997,12 +2005,9 @@ procedure Generate_CLDR_Data is
 
    --  The accounting, currency, unit and zone symbols the formatters had from
    --  constants compiled into I18N.CLDR_Data, which CLDR keeps in patterns
-   --  rather than as symbols: the same values, as rows of the formats file --
-   --  a und base and the languages that differ. A value the
-   --  locale has none of is CLDR's "no value" marker, which the reader maps to
-   --  "" (the store has no empty values).
+   --  rather than as symbols: the same values, as und rows of the formats
+   --  file.
    procedure Add_Fixed_Formats is
-      No_Value : constant String := Ada_Expression_UTF8_Bytes ("U (16#2205#) & U (16#2205#) & U (16#2205#)");
    begin
       Add_Format ("number_accounting_prefix", "und", "(");
       Add_Format ("number_accounting_suffix", "und", ")");
@@ -2011,10 +2016,6 @@ procedure Generate_CLDR_Data is
       Add_Format ("currency_accounting_suffix", "und", ")");
       Add_Format ("unit_value_separator", "und", " ");
       Add_Format ("unit_short_per_separator", "und", "/");
-      Add_Format ("unit_value_separator", "ja", No_Value);
-      Add_Format ("unit_value_separator", "zh", No_Value);
-      Add_Format ("unit_value_separator", "zh-Hant", No_Value);
-      Add_Format ("unit_value_separator", "ko", No_Value);
       Add_Format ("timezone_utc_designator", "und", "Z");
       Add_Format ("timezone_offset_separator", "und", ":");
    end Add_Fixed_Formats;
