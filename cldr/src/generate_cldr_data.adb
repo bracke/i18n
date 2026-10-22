@@ -2913,21 +2913,6 @@ procedure Generate_CLDR_Data is
          L ("      return Result (1 .. Filled);");
          L ("   end VB;");
          L;
-         L ("   function Contains (Text : String; Fragment : String) return Boolean is");
-         L ("   begin");
-         L ("      if Fragment'Length = 0 or else Text'Length < Fragment'Length then");
-         L ("         return False;");
-         L ("      end if;");
-         L;
-         L ("      for Index in Text'First .. Text'Last - Fragment'Length + 1 loop");
-         L ("         if Text (Index .. Index + Fragment'Length - 1) = Fragment then");
-         L ("            return True;");
-         L ("         end if;");
-         L ("      end loop;");
-         L;
-         L ("      return False;");
-         L ("   end Contains;");
-         L;
          L ("   function Lower (C : Character) return Character is");
          L ("   begin");
          L ("      if C in 'A' .. 'Z' then");
@@ -2936,21 +2921,6 @@ procedure Generate_CLDR_Data is
          L;
          L ("      return C;");
          L ("   end Lower;");
-         L;
-         L ("   function In_List (Value : String; List : String) return Boolean is");
-         L ("      Start : Positive := List'First;");
-         L ("   begin");
-         L ("      for Index in List'Range loop");
-         L ("         if List (Index) = ',' then");
-         L ("            if Value = List (Start .. Index - 1) then");
-         L ("               return True;");
-         L ("            end if;");
-         L ("            Start := Index + 1;");
-         L ("         end if;");
-         L ("      end loop;");
-         L;
-         L ("      return Value = List (Start .. List'Last);");
-         L ("   end In_List;");
          L;
          L ("   function Language (Locale : String) return String is");
          L ("      First : constant Positive := Locale'First;");
@@ -3063,89 +3033,6 @@ procedure Generate_CLDR_Data is
          L ("   end Locale_In_List;");
       end Emit_Static_Prelude;
 
-      --  Entries for a bisected locale table, shared by the tables below.
-      --  Collected here so the sort and the packing are written once rather
-      --  than once per emitter.
-      Max_Table_Entries : constant := 20_000;
-
-      --  A 14-character key and two 5-character base-62 offsets, which
-      --  reach 916 million; To_Base62 says so if that is ever not enough.
-      Index_Record_Width : constant := 24;
-
-      type Table_Entry is record
-         Key   : US.Unbounded_String;
-         --  Hex, as HB decodes it in the generated body.
-         Value : US.Unbounded_String;
-         First : Natural := 0;
-         Last  : Natural := 0;
-      end record;
-
-      type Table_Entry_Array is array (Positive range <>) of Table_Entry;
-      type Table_Entry_Array_Access is access Table_Entry_Array;
-
-      Table_Entries : constant Table_Entry_Array_Access :=
-        new Table_Entry_Array (1 .. Max_Table_Entries);
-      Table_Entry_Count : Natural := 0;
-
-      --  The same rule as Canonical_Locale in the generated body. Keys are
-      --  stored this way so that a lookup canonicalises its argument once
-      --  and bisects, rather than bisecting the spelling as written and
-      --  walking the whole table when that misses -- which it does for
-      --  every locale a table does not hold, and Digit_Text asks once per
-      --  digit of every number it formats.
-      function Canonical_Key (Value : String) return String is
-         Result : String (Value'Range);
-      begin
-         for Index in Value'Range loop
-            if Value (Index) = '_' then
-               Result (Index) := '-';
-            elsif Value (Index) in 'A' .. 'Z' then
-               Result (Index) :=
-                 Character'Val (Character'Pos (Value (Index)) + 32);
-            else
-               Result (Index) := Value (Index);
-            end if;
-         end loop;
-
-         return Result;
-      end Canonical_Key;
-
-      function Padded_Key (Value : String) return String is
-        (if Value'Length >= 14 then Value (Value'First .. Value'First + 13)
-         else Value & [1 .. 14 - Value'Length => ' ']);
-
-      function Key_Less (Left, Right : Table_Entry) return Boolean is
-        (Padded_Key (S (Left.Key)) < Padded_Key (S (Right.Key)));
-
-      procedure Sort_Entries is new Ada.Containers.Generic_Array_Sort
-        (Index_Type   => Positive,
-         Element_Type => Table_Entry,
-         Array_Type   => Table_Entry_Array,
-         "<"          => Key_Less);
-
-      procedure Reset_Table is
-      begin
-         Table_Entry_Count := 0;
-      end Reset_Table;
-
-      procedure Add_Table_Entry (Key : String; Value : String) is
-      begin
-         if Key'Length = 0 or else Key'Length > 14 then
-            Add_Error ("locale key does not fit the index: " & Key);
-            return;
-         elsif Table_Entry_Count = Max_Table_Entries then
-            Add_Error ("too many entries for a locale table");
-            return;
-         end if;
-
-         Table_Entry_Count := Table_Entry_Count + 1;
-         Table_Entries (Table_Entry_Count) :=
-           (Key   => US.To_Unbounded_String (Canonical_Key (Key)),
-            Value => US.To_Unbounded_String (Value),
-            First => 0,
-            Last  => 0);
-      end Add_Table_Entry;
-
       procedure Emit_Unit_String_Expression
         (Indent : String;
          Value  : String;
@@ -3170,278 +3057,6 @@ procedure Generate_CLDR_Data is
             Term := Term + 1;
          end loop;
       end Emit_Unit_String_Expression;
-
-      --  419 zone names, too many for a chain, so a bisected index of
-      --  padded name to code -- the same shape the unit bases use.
-      --  Sort the collected entries and append them to a packed value string
-      --  and a fixed-width index. Both are in out, so a table built in
-      --  several passes -- one per skeleton, say -- shares one value string
-      --  and one index, and a repeat found in an earlier pass still costs
-      --  nothing.
-      procedure Pack_Table
-        (Values     : in out US.Unbounded_String;
-         Index_Data : in out US.Unbounded_String)
-      is
-      begin
-         --  Bisection needs the padded keys in order, and rows do not always
-         --  arrive that way: a rule family lists its locales, so exploding it
-         --  yields keys in family order.
-         Sort_Entries (Table_Entries (1 .. Table_Entry_Count));
-
-         for N in 1 .. Table_Entry_Count loop
-            declare
-               Key : constant String := S (Table_Entries (N).Key);
-               Hex : constant String := S (Table_Entries (N).Value);
-            begin
-               --  Values repeat heavily -- a rule family has a handful of
-               --  distinct names across hundreds of locales -- so point a
-               --  repeat at the copy already packed.
-               --  Compared unbounded, not as String: converting each prior
-               --  value to compare it copies the whole thing, and a segment
-               --  of relative patterns runs to several kilobytes.
-               for Prior in 1 .. N - 1 loop
-                  if US."=" (Table_Entries (Prior).Value,
-                             Table_Entries (N).Value)
-                  then
-                     Table_Entries (N).First := Table_Entries (Prior).First;
-                     Table_Entries (N).Last := Table_Entries (Prior).Last;
-                     exit;
-                  end if;
-               end loop;
-
-               if Table_Entries (N).First = 0 then
-                  Table_Entries (N).First := US.Length (Values) + 1;
-                  Table_Entries (N).Last :=
-                    US.Length (Values) + Hex'Length;
-                  US.Append (Values, Hex);
-               end if;
-
-               declare
-                  First : constant String :=
-                    To_Base62 (Table_Entries (N).First, 5);
-                  Last : constant String :=
-                    To_Base62 (Table_Entries (N).Last, 5);
-               begin
-                  --  Same fixed-width record and the same space-pad rule as
-                  --  the date-pattern index: the pad must sort below '-'.
-                  --
-                  --  Eight digits, not seven: the unit names pack eleven
-                  --  million characters of values, and a seven-digit field
-                  --  silently widens to eight rather than truncating, which
-                  --  shifts every record after it.
-                  US.Append (Index_Data, Key);
-                  US.Append (Index_Data, [1 .. 14 - Key'Length => ' ']);
-                  US.Append (Index_Data, First);
-                  US.Append (Index_Data, Last);
-               end;
-            end;
-         end loop;
-      end Pack_Table;
-
-      --  A locale-keyed value as a table rather than a chain. The chain form
-      --  emitted two branches per locale -- exact, then fallback -- so a
-      --  lookup walked up to 1,532 Locale_In_List calls, each canonicalising
-      --  both strings before comparing. The table is bisected instead, and the
-      --  same 6 KB-per-766-locales trade as the date-pattern index applies.
-      --  Raw leaves the packed value alone instead of decoding it as hex: a
-      --  value that is already an encoded blob, as the date-name rows are,
-      --  would otherwise be hex-encoded a second time and stored at twice
-      --  the size for nothing.
-      --  Walk_Parents off stops at an exact match. A caller whose rows are
-      --  keyed on more than the locale needs the walk itself, so that it can
-      --  retest the row's contents at each parent rather than settle for the
-      --  nearest locale that has any row at all.
-      procedure Emit_Locale_Table
-        (Name         : String;
-         Default_Expr : String;
-         Raw          : Boolean := False;
-         Walk_Parents : Boolean := True)
-      is
-         Values : US.Unbounded_String;
-         Index_Data : US.Unbounded_String;
-
-         procedure Emit_String_Expression
-           (Indent : String;
-            Value  : String;
-            Suffix : String := "")
-         is
-            Chunk : constant := Data_Chunk;
-            Start : Positive := Value'First;
-            Stop  : Natural;
-            Term  : Positive := 1;
-         begin
-            if Value'Length = 0 then
-               L (Indent & """""" & Suffix);
-               return;
-            end if;
-            while Start <= Value'Last loop
-               Stop := Natural'Min (Start + Chunk - 1, Value'Last);
-               L (Indent & (if Term = 1 then "" else "& ")
-                  & """" & Value (Start .. Stop) & """"
-                  & (if Stop = Value'Last then Suffix else ""));
-               Start := Stop + 1;
-               Term := Term + 1;
-            end loop;
-         end Emit_String_Expression;
-      begin
-         Pack_Table (Values, Index_Data);
-
-         L;
-         L ("   function " & Name & " (Locale : String) return String is");
-         L ("      Values : constant String :=");
-         Emit_String_Expression ("        ", S (Values), ";");
-         L ("      Index_Data : constant String :=");
-         Emit_String_Expression ("        ", S (Index_Data), ";");
-         L ("      Width : constant := " & Trim (Integer'Image (Index_Record_Width)) & ";");
-         L ("      Count : constant Natural := Index_Data'Length / Width;");
-         L;
-         L ("      function Key (N : Positive) return String is");
-         L ("        (Index_Data (Index_Data'First + (N - 1) * Width ..");
-         L ("                     Index_Data'First + (N - 1) * Width + 13));");
-         L;
-         L ("      function Padded (Cand : String) return String is");
-         L ("        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)");
-         L ("         else Cand & [1 .. 14 - Cand'Length => ' ']);");
-         L;
-         L ("      function Value_At (N : Positive) return String is");
-         L ("         Base : constant Natural :=");
-         L ("           Index_Data'First + (N - 1) * Width + 14;");
-         L ("         F : constant Natural :=");
-         L ("           N62 (Index_Data (Base .. Base + 4));");
-         L ("         T : constant Natural :=");
-         L ("           N62 (Index_Data (Base + 5 .. Base + 9));");
-         L ("      begin");
-         if Raw then
-            L ("         return Values (F .. T);");
-         else
-            L ("         return VB (Values (F .. T));");
-         end if;
-         L ("      end Value_At;");
-         L;
-         L ("      --  Keys are stored canonical, so canonicalise once and");
-         L ("      --  bisect. Nothing walks: a locale the table does not hold");
-         L ("      --  costs the same handful of comparisons as one it does.");
-         L ("      function Lookup (Cand : String) return String is");
-         L ("         Low : Natural := 1;");
-         L ("         High : Natural := Count;");
-         L ("         Mid : Natural;");
-         L ("      begin");
-         --  No "Count = 0" disjunct: an empty table leaves High at 0, so the
-         --  loop below already answers "" without it -- and where the table is
-         --  non-empty (a static literal), GNAT flags the test as always False.
-         L ("         if Cand'Length = 0 then");
-         L ("            return """";");
-         L ("         end if;");
-         L;
-         L ("         declare");
-         L ("            Wanted : constant String :=");
-         L ("              Padded (Canonical_Locale (Cand));");
-         L ("         begin");
-         L ("            while Low <= High loop");
-         L ("               Mid := (Low + High) / 2;");
-         L ("               if Key (Mid) = Wanted then");
-         L ("                  return Value_At (Mid);");
-         L ("               elsif Key (Mid) < Wanted then");
-         L ("                  Low := Mid + 1;");
-         L ("               else");
-         L ("                  High := Mid - 1;");
-         L ("               end if;");
-         L ("            end loop;");
-         L ("         end;");
-         L ("         return """";");
-         L ("      end Lookup;");
-
-         L;
-         if not Walk_Parents then
-            L ("      Exact : constant String := Lookup (Locale);");
-            L ("   begin");
-            L ("      if Exact /= """" then");
-            L ("         return Exact;");
-            L ("      end if;");
-            L;
-            L ("      return " & Default_Expr & ";");
-            L ("   end " & Name & ";");
-            return;
-         end if;
-
-         L ("      --  Parents are cut from the canonical spelling: ""de_AT"" has");
-         L ("      --  no '-' to cut, and would otherwise lose its fallback.");
-         L ("      Canon : constant String := Canonical_Locale (Locale);");
-         L ("      Exact : constant String := Lookup (Locale);");
-         L ("      Cut : Natural := Canon'Last;");
-         L ("   begin");
-         L ("      if Exact /= """" then");
-         L ("         return Exact;");
-         L ("      end if;");
-         L;
-         L ("      --  Then each parent, which is what the fallback pass did.");
-         L ("      while Cut > Canon'First loop");
-         L ("         if Canon (Cut) = '-' then");
-         L ("            declare");
-         L ("               Hit : constant String :=");
-         L ("                 Lookup (Canon (Canon'First .. Cut - 1));");
-         L ("            begin");
-         L ("               if Hit /= """" then");
-         L ("                  return Hit;");
-         L ("               end if;");
-         L ("            end;");
-         L ("         end if;");
-         L ("         Cut := Cut - 1;");
-         L ("      end loop;");
-         L;
-         L ("      return " & Default_Expr & ";");
-         L ("   end " & Name & ";");
-      end Emit_Locale_Table;
-
-      procedure Emit_Grouping is
-         Has_Row : Boolean := False;
-      begin
-         for Index in 1 .. Rule_Count loop
-            Has_Row := Has_Row or else Is_Kind (Index, "indian_grouping");
-         end loop;
-         L;
-         L ("   function Uses_Indian_Grouping (Locale : String) return Boolean is");
-         --  Narrowing may drop every row, leaving Locale unused below.
-         if not Has_Row then
-            L ("      pragma Unreferenced (Locale);");
-         end if;
-         L ("   begin");
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "indian_grouping") then
-               L ("      if In_List (Language (Locale), """ & S (Rules (Index).A) & """)");
-               L ("        or else Contains (Locale, """ & S (Rules (Index).B) & """)");
-               L ("      then");
-               L ("         return True;");
-               L ("      end if;");
-            end if;
-         end loop;
-         L ("      return False;");
-         L ("   end Uses_Indian_Grouping;");
-      end Emit_Grouping;
-
-      procedure Emit_Day_Month_Year is
-         Has_Row : Boolean := False;
-      begin
-         for Index in 1 .. Rule_Count loop
-            Has_Row := Has_Row or else Is_Kind (Index, "day_month_year");
-         end loop;
-         L;
-         L ("   function Uses_Day_Month_Year (Locale : String) return Boolean is");
-         --  Narrowing may drop every row, leaving Locale unused below.
-         if not Has_Row then
-            L ("      pragma Unreferenced (Locale);");
-         end if;
-         L ("   begin");
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "day_month_year") then
-               L ("      if In_List (Language (Locale), """ & S (Rules (Index).A) & """) then");
-               L ("         return True;");
-               L ("      end if;");
-            end if;
-         end loop;
-         L ("      return False;");
-         L ("   end Uses_Day_Month_Year;");
-      end Emit_Day_Month_Year;
 
       procedure Emit_Week_Data is
       begin
@@ -3906,25 +3521,6 @@ procedure Generate_CLDR_Data is
          L ("   end Era_Year_Separator;");
       end Emit_Era_Name;
 
-      --  Every entry carries one form per plural category, and for most
-      --  currencies that is the same word repeated six times: 54% of the
-      --  entries are all-identical, and the forms across the whole table
-      --  fall from 13.5 million characters to 3.5 million once the repeats
-      --  go. Trailing repeats are dropped here; the reader takes the last
-      --  form for any category past the end.
-      procedure Emit_Symbol_First is
-      begin
-         L;
-         L ("   function Currency_Symbol_First (Locale : String) return Boolean is");
-         L ("   begin");
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "symbol_first") then
-               L ("      return In_List (Language (Locale), """ & S (Rules (Index).A) & """);");
-            end if;
-         end loop;
-         L ("   end Currency_Symbol_First;");
-      end Emit_Symbol_First;
-
       procedure Emit_Unit_Separators is
       begin
          L;
@@ -4085,64 +3681,10 @@ procedure Generate_CLDR_Data is
          L ("   end Spellout_Scale_Name;");
       end Emit_Number_Spellout_Words;
 
-      --  18,385 records, scanned whole on each of up to four passes. Same
-      --  remedy as the relative time patterns: one segment per locale, and
-      --  the locale field drops out of the record.
-      --  5,579 rows keyed on locale, base and category. One payload per
-      --  locale holds that locale's rows, which is about seven of them, so a
-      --  short scan inside the payload replaces a second index.
-      --
-      --  The order the chain resolved in has to survive: every wanted
-      --  category, over the locale and then its parents, before any "other"
-      --  row -- so a category found on a parent beats "other" on the locale
-      --  itself. That is why the walk is here rather than in the table: the
-      --  payload has to be retested at each parent, not just found.
-      --  63,970 records, scanned from the first character on every pass and
-      --  up to four passes to a lookup, which came to a quarter of a million
-      --  record parses to answer one call. The records arrive grouped by
-      --  locale, so each locale becomes one segment of the table and a
-      --  lookup scans its eighty-odd records instead of all of them. The
-      --  locale field goes with it: the segment already says which it is.
-      --  The same table, built the other way round: a family names the
-      --  locales that use it, so each list is exploded into one entry per
-      --  locale. The families themselves repeat across hundreds of locales
-      --  and are packed once.
-      procedure Emit_Rule_Family (Name : String; Kind : String) is
-      begin
-         Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, Kind) then
-               declare
-                  Locales : constant String := S (Rules (Index).B);
-                  Family : constant String :=
-                    Ada_Expression_UTF8_Hex
-                      ("""" & S (Rules (Index).A) & """");
-                  Start : Positive := Locales'First;
-               begin
-                  for Position in Locales'Range loop
-                     if Locales (Position) = ',' then
-                        Add_Table_Entry
-                          (Locales (Start .. Position - 1), Family);
-                        Start := Position + 1;
-                     end if;
-                  end loop;
-
-                  if Start <= Locales'Last then
-                     Add_Table_Entry (Locales (Start .. Locales'Last), Family);
-                  end if;
-               end;
-            end if;
-         end loop;
-
-         Emit_Locale_Table (Name, """other-only""");
-      end Emit_Rule_Family;
-
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
       Current_File := Output'Unchecked_Access;
       Emit_Static_Prelude;
-      Emit_Grouping;
-      Emit_Day_Month_Year;
       Emit_Week_Data;
       Emit_Time_Style_Pattern;
       Emit_Date_Time_Field_Separator;
@@ -4153,12 +3695,9 @@ procedure Generate_CLDR_Data is
       Emit_Currency_Field ("Currency_Cash_Increment", 3, "Natural", "1");
       Emit_Currency_Field ("Currency_Symbol", 4, "String", "Code");
       Emit_Currency_Field ("Currency_Narrow_Symbol", 5, "String", "Currency_Symbol (Code)");
-      Emit_Symbol_First;
       Emit_Unit_Separators;
       Emit_Byte_Size_Unit_Label;
       Emit_Number_Spellout_Words;
-      Emit_Rule_Family ("Cardinal_Rule_Family", "cardinal");
-      Emit_Rule_Family ("Ordinal_Rule_Family", "ordinal");
       L;
       L ("end I18N.CLDR_Data;");
       Ada.Text_IO.Close (Output);

@@ -91,21 +91,6 @@ package body I18N.CLDR_Data is
       return Result (1 .. Filled);
    end VB;
 
-   function Contains (Text : String; Fragment : String) return Boolean is
-   begin
-      if Fragment'Length = 0 or else Text'Length < Fragment'Length then
-         return False;
-      end if;
-
-      for Index in Text'First .. Text'Last - Fragment'Length + 1 loop
-         if Text (Index .. Index + Fragment'Length - 1) = Fragment then
-            return True;
-         end if;
-      end loop;
-
-      return False;
-   end Contains;
-
    function Lower (C : Character) return Character is
    begin
       if C in 'A' .. 'Z' then
@@ -114,21 +99,6 @@ package body I18N.CLDR_Data is
 
       return C;
    end Lower;
-
-   function In_List (Value : String; List : String) return Boolean is
-      Start : Positive := List'First;
-   begin
-      for Index in List'Range loop
-         if List (Index) = ',' then
-            if Value = List (Start .. Index - 1) then
-               return True;
-            end if;
-            Start := Index + 1;
-         end if;
-      end loop;
-
-      return Value = List (Start .. List'Last);
-   end In_List;
 
    function Language (Locale : String) return String is
       First : constant Positive := Locale'First;
@@ -239,24 +209,6 @@ package body I18N.CLDR_Data is
 
       return Matches (List (Start .. List'Last));
    end Locale_In_List;
-
-   function Uses_Indian_Grouping (Locale : String) return Boolean is
-   begin
-      if In_List (Language (Locale), "as,bn,bn-IN,brx,ccp,ccp-IN,dz,en-IN,gu,hi,hi-Latn,kok,kok-Deva,kok-Latn,kxv,kxv-Deva,kxv-Latn,kxv-Orya,kxv-Telu,ml,mr,ne,ne-IN,or,pa,pa-Guru,sa,ta,ta-LK,te,xnr")
-        or else Contains (Locale, "-IN")
-      then
-         return True;
-      end if;
-      return False;
-   end Uses_Indian_Grouping;
-
-   function Uses_Day_Month_Year (Locale : String) return Boolean is
-   begin
-      if In_List (Language (Locale), "es-VE,en-IT,en-LT,en-MW,de-LI,vec,bn,en-JE,mk,ff-Adlm-GM,en-NG,hy,en-IO,ckb,en-ZW,ms-SG,en-AE,be,tk,hsb,ar-KM,bal-Arab,sr-Cyrl-ME,en-SL,km,ru-BY,fr-VU,uz-Latn,my,kn,de-LU,kk-Cyrl,pt-MO,en-PN,en-BZ,en-SD,mai,de-BE,szl,mr,en-CK,en-LR,es-US,fr-BE,en-NZ,ms-Arab,su-Latn,ms-Arab-BN,ro,es-CL,ar-SS,en-KN,ar-MR,ar-TD,en-KI,en-SB,ca-IT,lo,ku-Latn,qu-BO,es-PE,oc,te,en-SS,bs,en-PW,es-GT,bez,ar-SD,scn,sc,en-PL,wo,zh-Hant-MO,uz-Cyrl,en-GI,fr-LU,smn,en-TZ,xnr,ar-BH,tpi,fr-TG,cy,hr-BA,ln-CF,zh-Hans-HK,kxv-Telu,ff-Adlm,it-CH,sw-UG,fr-MF,en-SK,en-AG,de-CH,hi-Latn,ar-ER,kok-Deva,ms,jv,en-AI,lb,en-001,nl-SR,el-CY,ff-Adlm-MR,en-CX,mni,en-PT,dsb,en-FI,fr-TN,en-GE,fr-NE,kek,bas,fr-CF,ff-Adlm-NE,doi,bg,fr-WF,fr-TD,fr-PF,uk,haw,kkj,ku-Latn-SY,fr-RE,ar-QA,az,en-ES,rm,yrl,agq,el,ro-MD,kk-KZ,de-AT,nn,sr-Latn-XK,es-PY,vmw,ta-LK,en-TO,en-ZM,fr-DZ,fr-MQ,kxv-Latn,ar-SA,en-TT,en-DK,fr-HT,en-VG,en-SZ,sq-XK,ta-MY,sr-Latn-BA,en-NU,kxv-Orya,es-EA,bem,fr-BF,en-GD,en-IM,ar-MA,en-CM,en-KE,fr-MU,es-BO,fr-GQ,ku-Latn-IQ,fr-CG,syr-SY,en-VU,en-DM,fr-MA,ie,en-TC,nnh,ff-Adlm-GW,ka,ast,dje,oc-ES,es-MX,nl-BE,sv-FI,th,fy,kxv-Deva,de,qu-EC,en-GY,fr-SN,en-MS,it,br,en-ER,ca,ccp-IN,nus,en-DG,es-419,pt-GQ,fi,fr-MR,en-MV,fo-DK,en-MU,nb-SJ,ar-IL,en-CH,yi,sr,dav,nl-SX,dua,en-SX,en-BM,be-tarask,en-IN,ln,sr-Latn-ME,lij,en-NF,ca-ES-valencia,uz,da-GL,pt-GW,en-GB,fr-ML,dyo,ar-LB,yo,sa,hi,pt-MZ,ba,fr-CH,fr-SC,ga-GB,to,bua,tt,en-AT,nso,lu,nmg,nl-AW,en-MG,en-RO,es-DO,en-AU,de-IT,fr-CM,en-TK,en-FJ,en-GH,en-MY,fr-GP,sl,ar-IQ,es-PH,fr-BI,ar-OM,mni-Beng,sw-CD,ff-Adlm-GH,yrl-CO,ebu,en-FM,en-LS,prg,sr-Latn,fr,bs-Cyrl,az-Latn,ff-Adlm-SL,ar-SY,fr-SY,brx,kgp,en-FR,se-FI,fr-GA,es-CR,sr-Cyrl,az-Cyrl,ar-EH,pt-AO,ta,sr-Cyrl-XK,asa,en-UA,ur,ta-SG,as,es-BR,ar-EG,en-SC,he,ku,ur-IN,ga,rn,en-NR,ln-CG,ar-YE,twq,cs,en-BE,en-EE,pt-ST,en-IE,ar-TN,yav,en-150,en-CC,en-CY,kxv,en-GG,en-BW,en-HU,fr-MG,en-LV,en-ID,gl,en-VC,ig,ru-KG,pt-CH,yrl-VE,bn-IN,fr-PM,ar-DJ,en-FK,ewo,mi,qu,ru,en-GM,ms-ID,es-IC,zh-Hant-HK,en-CZ,es-CU,pl,da,en-KY,en-MT,ru-UA,en-BS,sq,yo-BJ,ml,el-polyton,su,fr-CD,ff-Adlm-LR,es-BZ,en-SI,ln-AO,fr-GF,gu,fr-NC,bs-Latn,ksf,sq-MK,ff-Adlm-BF,en-BB,is,it-VA,kea,nb,pcm,en-MO,it-SM,ca-AD,ff-Adlm-CM,ms-BN,bm,ckb-IR,nds,en-TV,sw-KE,bal-Latn,en-GS,en-DE,bal,am,kok-Latn,syr,pa,es-SV,es-HN,vi,rw,es-AR,nl-CW,ia,tg,tr-CY,en-PG,es-GQ,gd,ru-KZ,es-UY,fr-KM,nl-BQ,fr-GN,nl,no,ff-Adlm-SN,pt,ca-FR,en-LC,pt-CV,kok,tr,es,en-WS,en-UG,pt-PT,ccp,ar-AE,pt-LU,lld,en-SH,fr-DJ,fr-MC,en-IL,en-HK,id,en-RW,es-CO,lv,ff-Adlm-NG,en-NL,sk,es-NI,fr-BL,fo,fr-RW,pt-TL,nds-NL,ar-KW,pa-Guru,en-JM,en-NA,es-EC,ar-PS,mua,fr-BJ,ar,cgg,sr-Cyrl-BA,et,ar-JO,ar-DZ,fr-CI,kk,ar-LY,ku-TR,en-NO,ru-MD,en-SG,pms,en-PK,mgh,ar-SO,ht,hr,sw,fr-YT") then
-         return True;
-      end if;
-      return False;
-   end Uses_Day_Month_Year;
 
    function First_Day_Of_Week (Locale : String) return String is
    begin
@@ -664,11 +616,6 @@ package body I18N.CLDR_Data is
       return Currency_Symbol (Code);
    end Currency_Narrow_Symbol;
 
-   function Currency_Symbol_First (Locale : String) return Boolean is
-   begin
-      return In_List (Language (Locale), "aa,aa-DJ,aa-ER,ab,af,af-NA,ak,am,an,ann,apc,arn,as,az-Arab,az-Arab-IQ,az-Arab-TR,bal,bal-Arab,bal-Latn,bem,bew,bgc,bgn,bgn-AE,bgn-AF,bgn-IR,bgn-OM,bho,blo,blt,bm,bm-Nkoo,bn-IN,bo,bo-IN,bqi,brx,bss,byn,cad,cch,ceb,cgg,cho,chr,cic,co,cop,csw,cu,cy,dav,de-AT,de-CH,de-LI,doi,dv,dz,ebu,ee,ee-TG,en,en-001,en-AE,en-AG,en-AI,en-AS,en-AT,en-AU,en-BB,en-BI,en-BM,en-BS,en-BW,en-BZ,en-CA,en-CC,en-CH,en-CK,en-CM,en-CX,en-CY,en-DG,en-DM,en-Dsrt,en-ER,en-FJ,en-FK,en-FM,en-GB,en-GD,en-GG,en-GH,en-GI,en-GM,en-GS,en-GU,en-GY,en-HK,en-ID,en-IE,en-IL,en-IM,en-IN,en-IO,en-JE,en-JM,en-JP,en-KE,en-KI,en-KN,en-KY,en-LC,en-LR,en-LS,en-MG,en-MH,en-MO,en-MP,en-MS,en-MT,en-MU,en-MV,en-MW,en-MY,en-NA,en-NF,en-NG,en-NL,en-NR,en-NU,en-NZ,en-PG,en-PH,en-PK,en-PN,en-PR,en-PW,en-RW,en-SB,en-SC,en-SD,en-SG,en-SH,en-SL,en-SS,en-SX,en-SZ,en-Shaw,en-TC,en-TK,en-TO,en-TT,en-TV,en-TZ,en-UG,en-UM,en-VC,en-VG,en-VI,en-VU,en-WS,en-ZA,en-ZM,en-ZW,es-419,es-AR,es-BO,es-BR,es-BZ,es-CL,es-CO,es-CR,es-CU,es-DO,es-EC,es-GQ,es-GT,es-HN,es-MX,es-NI,es-PA,es-PE,es-PR,es-PY,es-SV,es-US,es-UY,es-VE,fa,fa-AF,ff-Adlm,ff-Adlm-BF,ff-Adlm-CM,ff-Adlm-GH,ff-Adlm-GM,ff-Adlm-GW,ff-Adlm-LR,ff-Adlm-MR,ff-Adlm-NE,ff-Adlm-NG,ff-Adlm-SL,ff-Adlm-SN,fil,frr,fur,fy,ga,ga-GB,gaa,gd,gez,gez-ER,gn,gu,guz,gv,ha,ha-Arab,ha-Arab-SD,ha-GH,ha-NE,haw,hi,hi-Latn,hnj,hnj-Hmnp,ia,id,ie,ig,ii,io,it-CH,iu,iu-Latn,ja,jbo,jgo,jmc,jv,kaa,kaa-Cyrl,kaa-Latn,kaj,kam,kcg,kde,kek,ken,kgp,ki,kk-Arab,kkj,kl,kln,kn,ko,ko-CN,ko-KP,kok,kok-Deva,kok-Latn,kpe,kpe-GN,ks,ks-Arab,ks-Deva,ku-Arab,ku-Arab-IR,kw,kxv,kxv-Deva,kxv-Latn,kxv-Orya,kxv-Telu,la,lag,lkt,lmo,lo,lrc,lrc-IQ,ltg,luy,lzz,mai,mas,mas-TZ,mdf,mer,mfe,mg,mgh,mgo,mhn,mi,mic,ml,mn,mn-Mong,mn-Mong-MN,mni,mni-Beng,mni-Mtei,moh,mr,ms,ms-Arab,ms-Arab-BN,ms-BN,ms-ID,ms-SG,mt,mua,mus,mww,mww-Hmnp,myv,mzn,naq,nd,ne,ne-IN,nl,nl-AW,nl-BE,nl-BQ,nl-CW,nl-SR,nl-SX,nnh,nqo,nr,nso,nus,nv,ny,nyn,oka,oka-US,om,om-KE,or,os,os-RU,osa,pa,pa-Arab,pa-Guru,pap,pap-AW,pcm,pi,pi-Latn,pis,ps,ps-PK,pt,qu,qu-BO,qu-EC,quc,raj,rhg,rhg-Rohg,rhg-Rohg-BD,rif,rm,rof,rw,sa,saq,sat,sat-Deva,sat-Olck,scn,sd-Deva,sg,sgs,shn,shn-TH,si,sid,skr,sma,sma-NO,smj,smj-NO,sms,sn,so,so-DJ,so-ET,so-KE,ss,ss-SZ,ssy,st,st-LS,su,su-Latn,suz,suz-Deva,suz-Sunu,sw,sw-CD,sw-KE,sw-UG,syr,syr-SY,ta,ta-LK,ta-MY,ta-SG,te,teo,teo-KE,th,ti,ti-ER,tig,tn,tn-BW,to,tok,tr,tr-CY,trv,trw,ts,tyv,ug,und,ur,ur-IN,uz-Arab,vai,vai-Latn,vai-Vaii,ve,vo,vun,wa,wae,wal,wbp,wo,xh,xnr,yi,yo,yo-BJ,yrl,yrl-CO,yrl-VE,yue,yue-Hans,yue-Hant,yue-Hant-CN,yue-Hant-MO,za,zh,zh-Hans,zh-Hans-HK,zh-Hans-MO,zh-Hans-MY,zh-Hans-SG,zh-Hant,zh-Hant-HK,zh-Hant-MO,zh-Hant-MY,zh-Latn,zu");
-   end Currency_Symbol_First;
-
    function Duration_Field_Separator (Locale : String) return String is
       pragma Unreferenced (Locale);
    begin
@@ -816,176 +763,5 @@ package body I18N.CLDR_Data is
          return "";
       end if;
    end Spellout_Scale_Name;
-
-   function Cardinal_Rule_Family (Locale : String) return String is
-      Values : constant String :=
-        "bi1pcy0xb25lLWlzLTAtb3ItMQaS0wLW9yLW4tMQYXIb25lLWlzLTEYmUemVyby1vbmUYnIc3IaS0xLXYwLWNvbXBhY3QtbWFueQY2ViY3MY3kZGEZHNibi1pcy0xLWNvbXBhY3QtbWFueQZmYaS0wLTEtY29tcGFjdC1tYW55Z2EZ2QZ3YaGUaXMbi1vbmUtdHdva3cbGFnbHQbHYbWscm8bXQcGwaS0wLXRvLTEtY29tcGFjdC1tYW55cnUc2hpc2kc2wdHpt";
-      Index_Data : constant String :=
-        "af            aaaabaaaaiak            aaaajaaaaAam            aaaaBaaaaOan            aaaabaaaaiar            aaaaPaaaaRars           aaaaPaaaaRas            aaaaBaaaaOasa           aaaabaaaaiast           aaaaSaaaa2az            aaaabaaaaibal           aaaabaaaaibe            aaaa3aaaa5bem           aaaabaaaaibez           aaaabaaaaibg            aaaabaaaaibho           aaaajaaaaAblo           aaaa6aaabgbn            aaaaBaaaaObr            aaabhaaabjbrx           aaaabaaaaibs            aaabkaaabmca            aaabnaaabMce            aaaabaaaaiceb           aaabNaaabQcgg           aaaabaaaaichr           aaaabaaaaickb           aaaabaaaaics            aaabRaaabTcsw           aaaajaaaaAcv            aaaa6aaabgcy            aaabUaaabWda            aaabXaaabZde            aaaaSaaaa2doi           aaaaBaaaaOdsb           aaab0aaab3dv            aaaabaaaaiee            aaaabaaaaiel            aaaabaaaaien            aaaaSaaaa2eo            aaaabaaaaies            aaab4aaactet            aaaaSaaaa2eu            aaaabaaaaifa            aaaaBaaaaOff            aaacuaaacwfi            aaaaSaaaa2fil           aaabNaaabQfo            aaaabaaaaifr            aaacxaaacUfur           aaaabaaaaify            aaaaSaaaa2ga            aaacVaaacXgd            aaacYaaac0gl            aaaaSaaaa2gsw           aaaabaaaaigu            aaaaBaaaaOguw           aaaajaaaaAgv            aaac1aaac3ha            aaaabaaaaihaw           aaaabaaaaihe            aaac4aaac6hi            aaaaBaaaaOhr            aaabkaaabmhsb           aaab0aaab3hu            aaaabaaaaihy            aaacuaaacwia            aaaaSaaaa2ie            aaaaSaaaa2io            aaaaSaaaa2is            aaac7aaac9it            aaabnaaabMiu            aaadaaaadljgo           aaaabaaaaijmc           aaaabaaaaika            aaaabaaaaikab           aaacuaaacwkaj           aaaabaaaaikcg           aaaabaaaaikk            aaaabaaaaikkj           aaaabaaaaikl            aaaabaaaaikn            aaaaBaaaaOkok           aaaaBaaaaOkok-latn      aaaaBaaaaOks            aaaabaaaaiksb           aaaabaaaaiksh           aaaa6aaabgku            aaaabaaaaikw            aaadmaaadoky            aaaabaaaailag           aaadpaaadslb            aaaabaaaailg            aaaabaaaailij           aaaaSaaaa2lld           aaabnaaabMln            aaaajaaaaAlt            aaadtaaadvlv            aaadwaaadymas           aaaabaaaaimg            aaaajaaaaAmgo           aaaabaaaaimk            aaadzaaadBml            aaaabaaaaimn            aaaabaaaaimo            aaadCaaadEmr            aaaabaaaaimt            aaadFaaadHnah           aaaabaaaainaq           aaadaaaadlnb            aaaabaaaaind            aaaabaaaaine            aaaabaaaainl            aaaaSaaaa2nn            aaaabaaaainnh           aaaabaaaaino            aaaabaaaainr            aaaabaaaainso           aaaajaaaaAny            aaaabaaaainyn           aaaabaaaaiom            aaaabaaaaior            aaaabaaaaios            aaaabaaaaipa            aaaajaaaaApap           aaaabaaaaipcm           aaaaBaaaaOpl            aaadIaaadKprg           aaadwaaadyps            aaaabaaaaipt            aaadLaaaecpt-pt         aaabnaaabMrm            aaaabaaaairo            aaadCaaadErof           aaaabaaaairu            aaaedaaaefrwk           aaaabaaaaisaq           aaaabaaaaisat           aaadaaaadlsc            aaaaSaaaa2scn           aaabnaaabMsd            aaaabaaaaisdh           aaaabaaaaise            aaadaaaadlseh           aaaabaaaaish            aaabkaaabmshi           aaaegaaaejsi            aaaekaaaemsk            aaabRaaabTsl            aaaenaaaepsma           aaadaaaadlsmi           aaadaaaadlsmj           aaadaaaadlsmn           aaadaaaadlsms           aaadaaaadlsn            aaaabaaaaiso            aaaabaaaaisq            aaaabaaaaisr            aaabkaaabmss            aaaabaaaaissy           aaaabaaaaist            aaaabaaaaisv            aaaaSaaaa2sw            aaaaSaaaa2syr           aaaabaaaaita            aaaabaaaaite            aaaabaaaaiteo           aaaabaaaaiti            aaaajaaaaAtig           aaaabaaaaitk            aaaabaaaaitl            aa"
-        & "abNaaabQtn            aaaabaaaaitr            aaaabaaaaits            aaaabaaaaitzm           aaaeqaaaetug            aaaabaaaaiuk            aaaedaaaefur            aaaaSaaaa2uz            aaaabaaaaive            aaaabaaaaivec           aaabnaaabMvo            aaaabaaaaivun           aaaabaaaaiwa            aaaajaaaaAwae           aaaabaaaaixh            aaaabaaaaixog           aaaabaaaaiyi            aaaaSaaaa2zu            aaaaBaaaaO";
-      Width : constant := 24;
-      Count : constant Natural := Index_Data'Length / Width;
-
-      function Key (N : Positive) return String is
-        (Index_Data (Index_Data'First + (N - 1) * Width ..
-                     Index_Data'First + (N - 1) * Width + 13));
-
-      function Padded (Cand : String) return String is
-        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)
-         else Cand & [1 .. 14 - Cand'Length => ' ']);
-
-      function Value_At (N : Positive) return String is
-         Base : constant Natural :=
-           Index_Data'First + (N - 1) * Width + 14;
-         F : constant Natural :=
-           N62 (Index_Data (Base .. Base + 4));
-         T : constant Natural :=
-           N62 (Index_Data (Base + 5 .. Base + 9));
-      begin
-         return VB (Values (F .. T));
-      end Value_At;
-
-      --  Keys are stored canonical, so canonicalise once and
-      --  bisect. Nothing walks: a locale the table does not hold
-      --  costs the same handful of comparisons as one it does.
-      function Lookup (Cand : String) return String is
-         Low : Natural := 1;
-         High : Natural := Count;
-         Mid : Natural;
-      begin
-         if Cand'Length = 0 then
-            return "";
-         end if;
-
-         declare
-            Wanted : constant String :=
-              Padded (Canonical_Locale (Cand));
-         begin
-            while Low <= High loop
-               Mid := (Low + High) / 2;
-               if Key (Mid) = Wanted then
-                  return Value_At (Mid);
-               elsif Key (Mid) < Wanted then
-                  Low := Mid + 1;
-               else
-                  High := Mid - 1;
-               end if;
-            end loop;
-         end;
-         return "";
-      end Lookup;
-
-      --  Parents are cut from the canonical spelling: "de_AT" has
-      --  no '-' to cut, and would otherwise lose its fallback.
-      Canon : constant String := Canonical_Locale (Locale);
-      Exact : constant String := Lookup (Locale);
-      Cut : Natural := Canon'Last;
-   begin
-      if Exact /= "" then
-         return Exact;
-      end if;
-
-      --  Then each parent, which is what the fallback pass did.
-      while Cut > Canon'First loop
-         if Canon (Cut) = '-' then
-            declare
-               Hit : constant String :=
-                 Lookup (Canon (Canon'First .. Cut - 1));
-            begin
-               if Hit /= "" then
-                  return Hit;
-               end if;
-            end;
-         end if;
-         Cut := Cut - 1;
-      end loop;
-
-      return "other-only";
-   end Cardinal_Rule_Family;
-
-   function Ordinal_Rule_Family (Locale : String) return String is
-      Values : constant String :=
-        "aW5kaWMtb3JkaW5hbAYXotb3JkaW5hbAbi1vbmUtb3JkaW5hbAYmUtb3JkaW5hbAYmxvLW9yZGluYWwY2Etb3JkaW5hbAY3ktb3JkaW5hbAZW4tb3JkaW5hbAZ2Qtb3JkaW5hbAaGktb3JkaW5hbAaHUtb3JkaW5hbAaXQtb3JkaW5hbAa2Etb3JkaW5hbAa2stb3JkaW5hbAbXItb3JkaW5hbAa3ctb3JkaW5hbAbGlqLW9yZGluYWwbWstb3JkaW5hbAbmUtb3JkaW5hbAb3Itb3JkaW5hbAc3Etb3JkaW5hbAc3Ytb3JkaW5hbAdGstb3JkaW5hbAdWstb3JkaW5hbA";
-      Index_Data : constant String :=
-        "as            aaaabaaaasaz            aaaataaaaGbal           aaaaHaaaaYbe            aaaaZaaabcblo           aaabdaaabrbn            aaaabaaaasca            aaabsaaabFcy            aaabGaaabTen            aaabUaaab7fil           aaaaHaaaaYfr            aaaaHaaaaYga            aaaaHaaaaYgd            aaab8aaaclgu            aaacmaaaczhi            aaacmaaaczhu            aaacAaaacNhy            aaaaHaaaaYit            aaacOaaac1ka            aaac2aaadfkk            aaadgaaadtkok           aaaduaaadHkok-latn      aaaduaaadHkw            aaadIaaadVlij           aaadWaaaealld           aaacOaaac1lo            aaaaHaaaaYmk            aaaebaaaeomo            aaaaHaaaaYmr            aaaduaaadHms            aaaaHaaaaYne            aaaepaaaeCor            aaaeDaaaeQro            aaaaHaaaaYsc            aaacOaaac1scn           aaadWaaaeasq            aaaeRaaae4sv            aaae5aaafitk            aaafjaaafwtl            aaaaHaaaaYuk            aaafxaaafKvec           aaacOaaac1vi            aaaaHaaaaY";
-      Width : constant := 24;
-      Count : constant Natural := Index_Data'Length / Width;
-
-      function Key (N : Positive) return String is
-        (Index_Data (Index_Data'First + (N - 1) * Width ..
-                     Index_Data'First + (N - 1) * Width + 13));
-
-      function Padded (Cand : String) return String is
-        (if Cand'Length >= 14 then Cand (Cand'First .. Cand'First + 13)
-         else Cand & [1 .. 14 - Cand'Length => ' ']);
-
-      function Value_At (N : Positive) return String is
-         Base : constant Natural :=
-           Index_Data'First + (N - 1) * Width + 14;
-         F : constant Natural :=
-           N62 (Index_Data (Base .. Base + 4));
-         T : constant Natural :=
-           N62 (Index_Data (Base + 5 .. Base + 9));
-      begin
-         return VB (Values (F .. T));
-      end Value_At;
-
-      --  Keys are stored canonical, so canonicalise once and
-      --  bisect. Nothing walks: a locale the table does not hold
-      --  costs the same handful of comparisons as one it does.
-      function Lookup (Cand : String) return String is
-         Low : Natural := 1;
-         High : Natural := Count;
-         Mid : Natural;
-      begin
-         if Cand'Length = 0 then
-            return "";
-         end if;
-
-         declare
-            Wanted : constant String :=
-              Padded (Canonical_Locale (Cand));
-         begin
-            while Low <= High loop
-               Mid := (Low + High) / 2;
-               if Key (Mid) = Wanted then
-                  return Value_At (Mid);
-               elsif Key (Mid) < Wanted then
-                  Low := Mid + 1;
-               else
-                  High := Mid - 1;
-               end if;
-            end loop;
-         end;
-         return "";
-      end Lookup;
-
-      --  Parents are cut from the canonical spelling: "de_AT" has
-      --  no '-' to cut, and would otherwise lose its fallback.
-      Canon : constant String := Canonical_Locale (Locale);
-      Exact : constant String := Lookup (Locale);
-      Cut : Natural := Canon'Last;
-   begin
-      if Exact /= "" then
-         return Exact;
-      end if;
-
-      --  Then each parent, which is what the fallback pass did.
-      while Cut > Canon'First loop
-         if Canon (Cut) = '-' then
-            declare
-               Hit : constant String :=
-                 Lookup (Canon (Canon'First .. Cut - 1));
-            begin
-               if Hit /= "" then
-                  return Hit;
-               end if;
-            end;
-         end if;
-         Cut := Cut - 1;
-      end loop;
-
-      return "other-only";
-   end Ordinal_Rule_Family;
 
 end I18N.CLDR_Data;

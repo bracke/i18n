@@ -10,16 +10,6 @@ package I18N.CLDR_Data is
    --  @return The first two locale characters, or an empty string.
    function Language (Locale : String) return String;
 
-   --  Report whether the locale uses Indian primary/secondary grouping.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return True when Indian grouping should be used.
-   function Uses_Indian_Grouping (Locale : String) return Boolean;
-
-   --  Report whether date styles use day-month-year ordering.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return True when built-in date styles use day-month-year ordering.
-   function Uses_Day_Month_Year (Locale : String) return Boolean;
-
    --  Return the generated first day of week for a locale.
    --  @param Locale Locale identifier or catalog locale key.
    --  @return Weekday key: sun, mon, fri, or sat.
@@ -114,11 +104,6 @@ package I18N.CLDR_Data is
    --  @return UTF-8 narrow symbol text, or the standard symbol fallback.
    function Currency_Narrow_Symbol (Code : String) return String;
 
-   --  Report whether currency symbols are formatted before the amount.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return True when symbol-first formatting is built in for Locale.
-   function Currency_Symbol_First (Locale : String) return Boolean;
-
    --  Return a deterministic byte-size unit label.
    --  @param Scale Binary byte scale from B through PiB.
    --  @return Display label for the byte-size formatter.
@@ -175,15 +160,5 @@ package I18N.CLDR_Data is
       Scale   : Natural;
       Ordinal : Boolean := False)
       return String;
-
-   --  Return the CLDR cardinal plural rule family for a locale.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return Stable internal family name consumed by I18N.Plurals.
-   function Cardinal_Rule_Family (Locale : String) return String;
-
-   --  Return the CLDR ordinal plural rule family for a locale.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return Stable internal family name consumed by I18N.Plurals.
-   function Ordinal_Rule_Family (Locale : String) return String;
 
 end I18N.CLDR_Data;

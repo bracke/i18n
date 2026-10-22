@@ -47,6 +47,11 @@ private package I18N.Locale_Data is
    function Lookup_Exact
      (Section : String; Locale : String; Found : out Boolean) return String;
 
+   --  A plural rule family (Section "cardinal_family" or "ordinal_family"):
+   --  the exact locale's, else its language's, else "other-only". Plural
+   --  rules are keyed by language and do not inherit along parentLocales.
+   function Plural_Family (Section : String; Locale : String) return String;
+
    --  Membership test matching the compiled In_List (Language (Locale), list)
    --  toggles (currency symbol placement, Indian grouping): looks the locale's
    --  two-letter language up EXACTLY -- no parent or root fallback, since the

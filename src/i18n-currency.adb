@@ -188,7 +188,7 @@ package body I18N.Currency is
          end if;
       end loop;
 
-      return I18N.CLDR_Data.Uses_Indian_Grouping (Locale);
+      return False;
    end Uses_Indian_Grouping;
 
    function Currency_Symbol (Code : String) return String is
@@ -333,7 +333,7 @@ package body I18N.Currency is
       elsif Store_Found then
          return Store_Value = "1";
       end if;
-      return I18N.CLDR_Data.Currency_Symbol_First (Locale);
+      return False;
    end Symbol_First;
 
    function Amount_Separator (Locale : String) return String is

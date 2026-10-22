@@ -198,6 +198,27 @@ package body I18N.Locale_Data is
       end;
    end Locale_Digit;
 
+   function Plural_Family (Section : String; Locale : String) return String is
+      Found : Boolean;
+      Exact : constant String := Lookup_Exact (Section, Locale, Found);
+      Last  : Natural := Locale'Last;
+   begin
+      if Found then
+         return Exact;
+      end if;
+      for Index in Locale'Range loop
+         if Locale (Index) in '-' | '_' then
+            Last := Index - 1;
+            exit;
+         end if;
+      end loop;
+      declare
+         Of_Language : constant String := Lookup_Exact (Section, Locale (Locale'First .. Last), Found);
+      begin
+         return (if Found then Of_Language else "other-only");
+      end;
+   end Plural_Family;
+
    function Language_Member
      (Section : String; Locale : String; Found : out Boolean) return String
    is

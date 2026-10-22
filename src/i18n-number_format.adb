@@ -133,7 +133,7 @@ package body I18N.Number_Format is
          end if;
       end loop;
 
-      return I18N.CLDR_Data.Uses_Indian_Grouping (Locale);
+      return False;
    end Uses_Indian_Grouping;
 
    function Number_Percent_Suffix (Locale : String) return String is

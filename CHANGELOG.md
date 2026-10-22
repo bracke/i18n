@@ -17,6 +17,15 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Plural rule families, Indian grouping, symbol-first currency and
+  day-month-year order come from `formats.i18ndata` only.** A plural family
+  is the exact locale's, else its language's, else other-only, which
+  reproduces the compiled table for all 766 locales; the two membership
+  tests answer False where the data lists no locale, as the compiled table
+  did. `I18N.CLDR_Data` loses `Cardinal_Rule_Family`, `Ordinal_Rule_Family`,
+  `Uses_Indian_Grouping`, `Currency_Symbol_First` and `Uses_Day_Month_Year`,
+  and the generator its bisected-table machinery: `i18n-cldr_data.adb` is
+  33 KB.
 - **Zone aliases come from `tzdb.i18ndata`.** Its new `@link` section maps
   each tz database alias to its zone, and `I18N.Time_Zone_Data.Canonical_Zone`
   replaces `I18N.CLDR_Data.Canonical_Time_Zone` (`i18n-cldr_data.adb` is
