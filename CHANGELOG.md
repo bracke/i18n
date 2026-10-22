@@ -10,6 +10,17 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- **Long specific zone names ("zzzz") are the standard and daylight names.**
+  They were the generic name in every locale and season ("Eastern Time" for
+  New York in July, where CLDR has "Eastern Daylight Time"): the import never
+  brought CLDR's long standard/daylight names in. The exporter now emits each
+  zone's current metazone (from `metaZones.json`) and every locale's long
+  standard and daylight metazone names, plus a zone's own ("British Summer
+  Time"); they go into the per-locale zone shards, so only locales in use are
+  loaded. A zone CLDR names by an older id (Asia/Calcutta) is filed under its
+  tz database name too. Generic names ("vvvv") are unchanged in every locale.
+- The normalize and subset stages read an empty last field as "" where their
+  `Field` helper returns the separator.
 - **Daylight saving time no longer stops after 2050.** The compiled zone
   table ran to 2050 and the last offset in it then held for ever, so summer
   dates from 2051 on were an hour off in every zone with daylight time (and

@@ -131,6 +131,19 @@ procedure Extract_CLDR_Normalized is
       return "";
    end Field;
 
+   --  The text after the last separator, which may be empty. Field returns
+   --  the separator itself for an empty last field, so a row whose last
+   --  value can legitimately be empty reads it with this instead.
+   function Last_Field (Line : String; Separator : Character := '|') return String is
+   begin
+      for Index in reverse Line'Range loop
+         if Line (Index) = Separator then
+            return Line (Index + 1 .. Line'Last);
+         end if;
+      end loop;
+      return Line;
+   end Last_Field;
+
    function Field_Count (Line : String; Separator : Character := '|') return Natural is
       Count : Natural := 1;
    begin
@@ -1283,6 +1296,27 @@ procedure Extract_CLDR_Normalized is
                   & "|" & Value);
                Seen_Output := True;
             end;
+         elsif Kind = "zone_metazone" then
+            if Field_Count (Line) /= 3 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+               Add_Line_Error (Line_Number, "invalid zone_metazone record");
+               return;
+            end if;
+            Add_Key ("zone_metazone|" & Field (Line, 2), Line_Number);
+            L ("zone_metazone|" & Field (Line, 2) & "|" & Field (Line, 3));
+            Seen_Output := True;
+         elsif Kind = "zone_specific_name" then
+            if Field_Count (Line) /= 5
+              or else Field (Line, 2) = ""
+              or else Field (Line, 3) = ""
+              or else (Field (Line, 4) = "" and then Last_Field (Line) = "")
+            then
+               Add_Line_Error (Line_Number, "invalid zone_specific_name record");
+               return;
+            end if;
+            Add_Key ("zone_specific_name|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
+            L ("zone_specific_name_text|" & Field (Line, 2) & "|" & Field (Line, 3)
+               & "|" & Field (Line, 4) & "|" & Last_Field (Line));
+            Seen_Output := True;
          elsif Kind = "zone_short_family" then
             declare
                Locale   : constant String := Field (Line, 2);

@@ -700,6 +700,40 @@ procedure Import_CLDR_Raw is
                Emit_Record
                  ("zone_family_display|" & Locale & "|" & Family & "|" & Value);
             end;
+         elsif Kind = "zone_metazone" then
+            declare
+               Zone     : constant String := JSON_Value (Line, "zone");
+               Metazone : constant String := JSON_Value (Line, "metazone");
+            begin
+               if not Valid_Value (Zone) or else not Valid_Value (Metazone) then
+                  Add_Line_Error (Line_Number, "invalid staged zone_metazone record");
+                  return;
+               end if;
+               Add_Key ("zone_metazone|" & Zone, Line_Number);
+               Emit_Record ("zone_metazone|" & Zone & "|" & Metazone);
+            end;
+         elsif Kind = "zone_specific_name" then
+            declare
+               Locale   : constant String := JSON_Value (Line, "locale");
+               Key      : constant String := JSON_Value (Line, "key");
+               Standard : constant String := JSON_Value (Line, "standard");
+               Daylight : constant String := JSON_Value (Line, "daylight");
+            begin
+               --  Either name may be missing (GMT has no daylight time, a zone
+               --  may override only one), but not both.
+               if not Valid_Value (Locale)
+                 or else not Valid_Value (Key)
+                 or else Has_Raw_Separator (Standard)
+                 or else Has_Raw_Separator (Daylight)
+                 or else (Standard = "" and then Daylight = "")
+               then
+                  Add_Line_Error (Line_Number, "invalid staged zone_specific_name record");
+                  return;
+               end if;
+               Add_Key ("zone_specific_name|" & Locale & "|" & Key, Line_Number);
+               Emit_Record
+                 ("zone_specific_name|" & Locale & "|" & Key & "|" & Standard & "|" & Daylight);
+            end;
          elsif Kind = "zone_short_family" then
             declare
                Locale   : constant String := JSON_Value (Line, "locale");

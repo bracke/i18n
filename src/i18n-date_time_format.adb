@@ -2148,10 +2148,51 @@ package body I18N.Date_Time_Format is
            (if Daylight then "timezone_display_daylight."
             else "timezone_display_standard.") & Zone,
            Found);
+      --  CLDR's long specific names (TR35 "zzzz"): one the zone has itself
+      --  ("British Summer Time"), else its metazone's standard or daylight
+      --  name ("Eastern Daylight Time"). Both sit in the locale's zone shard.
+      function Specific_Name return String is
+         Kind       : constant String := (if Daylight then "dst:" else "std:");
+         Zone_Found : Boolean;
+         Zone_Name  : constant String :=
+           I18N.Locale_Data.Shard_Lookup ("zones", "exemplar", Locale, Kind & "zone:" & Zone, Zone_Found);
+      begin
+         if Zone_Found then
+            return Zone_Name;
+         end if;
+
+         declare
+            Direct_Found : Boolean;
+            Direct       : constant String :=
+              I18N.Locale_Data.Lookup ("zone_metazone", "und", Zone, Direct_Found);
+            Canonical_Found : Boolean := False;
+            Canonical    : constant String :=
+              (if Direct_Found then ""
+               else I18N.Locale_Data.Lookup
+                      ("zone_metazone", "und", I18N.CLDR_Data.Canonical_Time_Zone (Zone), Canonical_Found));
+            Metazone     : constant String := (if Direct_Found then Direct else Canonical);
+            Name_Found   : Boolean;
+            Name         : constant String :=
+              (if Metazone = "" then ""
+               else I18N.Locale_Data.Shard_Lookup ("zones", "exemplar", Locale, Kind & "mz:" & Metazone, Name_Found));
+         begin
+            return (if Metazone /= "" and then Name_Found then Name else "");
+         end;
+      end Specific_Name;
    begin
       if Found then
          return Value;
-      else
+      end if;
+
+      declare
+         Name : constant String := Specific_Name;
+      begin
+         if Name /= "" then
+            return Name;
+         end if;
+      end;
+
+      begin
          declare
             Pattern_Found : Boolean;
             Pattern       : constant String :=
@@ -2180,7 +2221,7 @@ package body I18N.Date_Time_Format is
                end;
             end if;
          end;
-      end if;
+      end;
 
       return Time_Zone_Display_Name (Locale, Zone);
    end Time_Zone_Specific_Display_Name;

@@ -1300,6 +1300,27 @@ procedure Generate_CLDR_Data is
       elsif Kind = "zone_exemplar_hex" and then Capture_Locale (A) then
          --  A=locale, B=zone id, C=exemplar city (raw hex bytes).
          Zone_Add (A, B, Hex_Bytes_To_String (C));
+      elsif Kind = "zone_metazone" then
+         --  A=zone, B=CLDR metazone id; one map for every locale, kept under
+         --  und where every walk ends.
+         Add_Format ("zone_metazone", "und", B, Sub => A);
+      elsif Kind = "zone_specific_name" and then Capture_Locale (A) then
+         --  A=locale, B="mz:<metazone>" or "zone:<zone>", C=long standard,
+         --  D=long daylight (either may be empty).
+         declare
+            Standard : constant String := Ada_Expression_UTF8_Bytes (C);
+            Daylight : constant String := Ada_Expression_UTF8_Bytes (D);
+         begin
+            --  Into the locale's zone shard, beside its exemplar cities,
+            --  under keys no zone id can have: loaded only for the locales a
+            --  program formats in, where the formats file is loaded whole.
+            if Standard /= "" then
+               Zone_Add (A, "std:" & B, Standard);
+            end if;
+            if Daylight /= "" then
+               Zone_Add (A, "dst:" & B, Daylight);
+            end if;
+         end;
       elsif Kind = "zone_short_family" and then Capture_Locale (A) then
          --  A=locale, B=metazone family, C=standard, D=daylight, E=generic.
          Add_Format
@@ -1778,6 +1799,16 @@ procedure Generate_CLDR_Data is
             Field (Line, 2),
             Field (Line, 3),
             Field (Line, 4));
+      elsif Kind = "zone_metazone" then
+         if Field_Count (Line) /= 3 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid zone_metazone row shape");
+         end if;
+         Add_Rule (Kind, Field (Line, 2), Field (Line, 3));
+      elsif Kind = "zone_specific_name" then
+         if Field_Count (Line) /= 5 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid zone_specific_name row shape");
+         end if;
+         Add_Rule (Kind, Field (Line, 2), Field (Line, 3), Field (Line, 4), Field (Line, 5));
       elsif Kind = "zone_short_family" then
          if Field_Count (Line) /= 6
            or else Field (Line, 2) = ""
@@ -1946,6 +1977,64 @@ procedure Generate_CLDR_Data is
    --  final rule can be checked against them before it replaces them.
    TZDB_Last_Year : constant := 2100;
    TZDB_Range     : constant String := "1900,2101";
+
+   --  CLDR names some zones by ids the tz database keeps only as links
+   --  (Asia/Calcutta for Asia/Kolkata, America/Godthab for America/Nuuk). A
+   --  metazone row or a zone's own name under such an id is filed under the
+   --  zone it links to as well, so a lookup by the tz database's name finds it.
+   procedure File_CLDR_Zone_Aliases is
+      function Link_Target (Name : String) return String is
+      begin
+         for Index in 1 .. TZDB_Link_Count loop
+            if S (TZDB_Link_Names (Index)) = Name then
+               return S (TZDB_Link_Targets (Index));
+            end if;
+         end loop;
+         return "";
+      end Link_Target;
+
+      Format_Before : constant Natural := Format_Count;
+      Zone_Before   : constant Natural := Zone_Count;
+   begin
+      for Index in 1 .. Format_Before loop
+         if S (Format_Entries (Index).Section) = "zone_metazone" then
+            declare
+               Key    : constant String := S (Format_Entries (Index).Key);
+               Prefix : constant String := "und" & Store_Sep;
+               Zone   : constant String :=
+                 (if Key'Length > Prefix'Length then Key (Key'First + Prefix'Length .. Key'Last) else "");
+               Target : constant String := Link_Target (Zone);
+            begin
+               if Target /= "" then
+                  Add_Format ("zone_metazone", "und", S (Format_Entries (Index).Value), Sub => Target);
+               end if;
+            end;
+         end if;
+      end loop;
+
+      for Index in 1 .. Zone_Before loop
+         declare
+            Key : constant String := S (Zone_Entries (Index).Key);
+         begin
+            if Key'Length > 9
+              and then (Key (Key'First .. Key'First + 8) = "std:zone:"
+                        or else Key (Key'First .. Key'First + 8) = "dst:zone:")
+            then
+               declare
+                  Target : constant String := Link_Target (Key (Key'First + 9 .. Key'Last));
+               begin
+                  if Target /= "" then
+                     Zone_Count := Zone_Count + 1;
+                     Zone_Entries (Zone_Count) :=
+                       (Section => Zone_Entries (Index).Section,
+                        Key     => US.To_Unbounded_String (Key (Key'First .. Key'First + 8) & Target),
+                        Value   => Zone_Entries (Index).Value);
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+   end File_CLDR_Zone_Aliases;
 
    procedure Load_TZDB_Transitions is
 
@@ -2456,6 +2545,10 @@ procedure Generate_CLDR_Data is
       elsif Kind = "zone_family_display" then
          return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
       elsif Kind = "zone_short_family" then
+         return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
+      elsif Kind = "zone_metazone" then
+         return S (Left.A) = S (Right.A);
+      elsif Kind = "zone_specific_name" then
          return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
       elsif Kind = "available_format" then
          return S (Left.A) = S (Right.A) and then S (Left.B) = S (Right.B);
@@ -5608,6 +5701,7 @@ begin
    Parse_Source;
    Load_TZDB_Links;
    if Errors = 0 then
+      File_CLDR_Zone_Aliases;
       Load_TZDB_Transitions;
    end if;
    if Errors = 0 then

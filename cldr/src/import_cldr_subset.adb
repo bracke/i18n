@@ -90,6 +90,19 @@ procedure Import_CLDR_Subset is
       return "";
    end Field;
 
+   --  The text after the last separator, which may be empty. Field returns
+   --  the separator itself for an empty last field, so a row whose last
+   --  value can legitimately be empty reads it with this instead.
+   function Last_Field (Line : String; Separator : Character := '|') return String is
+   begin
+      for Index in reverse Line'Range loop
+         if Line (Index) = Separator then
+            return Line (Index + 1 .. Line'Last);
+         end if;
+      end loop;
+      return Line;
+   end Last_Field;
+
    function Field_Count (Line : String; Separator : Character := '|') return Natural is
       Count : Natural := 1;
    begin
@@ -700,6 +713,13 @@ procedure Import_CLDR_Subset is
       then
          return "zone_short_family|" & Field (Payload, 2)
            & "|" & Field (Payload, 3);
+      elsif Kind = "zone_metazone" then
+         return "zone_metazone|" & Field (Payload, 2);
+      elsif Kind = "zone_specific_name"
+        or else Kind = "zone_specific_name_text"
+      then
+         return "zone_specific_name|" & Field (Payload, 2)
+           & "|" & Field (Payload, 3);
       elsif Kind = "zone_gmt_prefix"
         or else Kind = "zone_gmt_prefix_text"
       then
@@ -1251,6 +1271,27 @@ procedure Import_CLDR_Subset is
                   & Text_Expr (Value));
                Seen_Output := True;
             end;
+         elsif Kind = "zone_metazone" then
+            if Field_Count (Line) /= 3 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+               Add_Line_Error (Line_Number, "invalid zone_metazone row shape");
+               return;
+            end if;
+            Add_Key ("zone_metazone|" & Field (Line, 2), Line_Number);
+            L ("zone_metazone|" & Field (Line, 2) & "|" & Field (Line, 3));
+            Seen_Output := True;
+         elsif Kind = "zone_specific_name_text" then
+            if Field_Count (Line) /= 5
+              or else Field (Line, 2) = ""
+              or else Field (Line, 3) = ""
+              or else (Field (Line, 4) = "" and then Last_Field (Line) = "")
+            then
+               Add_Line_Error (Line_Number, "invalid zone_specific_name_text row shape");
+               return;
+            end if;
+            Add_Key ("zone_specific_name|" & Field (Line, 2) & "|" & Field (Line, 3), Line_Number);
+            L ("zone_specific_name|" & Field (Line, 2) & "|" & Field (Line, 3)
+               & "|" & Text_Expr (Field (Line, 4)) & "|" & Text_Expr (Last_Field (Line)));
+            Seen_Output := True;
          elsif Kind = "zone_short_family_text" then
             declare
                Locale   : constant String := Field (Line, 2);

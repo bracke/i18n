@@ -226,6 +226,118 @@ procedure Generate_CLDR_Export is
       return "";
    end Object_Field_Object;
 
+   --  A small, depth-aware walk over JSON text, for the few places that need
+   --  each member of an object (metazone names, the zone-to-metazone map)
+   --  rather than one named field.
+
+   --  The index of the last character of the JSON value starting at First.
+   function JSON_Value_End (Text : String; First : Positive) return Natural is
+      Index : Natural := First;
+      Depth : Natural := 0;
+   begin
+      if First > Text'Last then
+         return Text'Last;
+      elsif Text (First) = '"' then
+         Index := First + 1;
+         while Index <= Text'Last loop
+            if Text (Index) = '\' then
+               Index := Index + 2;
+            elsif Text (Index) = '"' then
+               return Index;
+            else
+               Index := Index + 1;
+            end if;
+         end loop;
+         return Text'Last;
+      elsif Text (First) in '{' | '[' then
+         while Index <= Text'Last loop
+            case Text (Index) is
+               when '"' =>
+                  Index := JSON_Value_End (Text, Index);
+               when '{' | '[' =>
+                  Depth := Depth + 1;
+               when '}' | ']' =>
+                  Depth := Depth - 1;
+                  if Depth = 0 then
+                     return Index;
+                  end if;
+               when others =>
+                  null;
+            end case;
+            Index := Index + 1;
+         end loop;
+         return Text'Last;
+      else
+         while Index < Text'Last and then Text (Index + 1) not in ',' | '}' | ']' loop
+            Index := Index + 1;
+         end loop;
+         return Index;
+      end if;
+   end JSON_Value_End;
+
+   function Skip_Blank (Text : String; From : Positive) return Positive is
+      Index : Positive := From;
+   begin
+      while Index < Text'Last and then Text (Index) in ' ' | ASCII.HT | ASCII.CR | ASCII.LF loop
+         Index := Index + 1;
+      end loop;
+      return Index;
+   end Skip_Blank;
+
+   --  Each "key": value member of the object Object (braces included).
+   procedure For_Each_Member
+     (Object  : String;
+      Process : not null access procedure (Key : String; Value : String))
+   is
+      Index : Natural;
+   begin
+      if Object'Length < 2 or else Object (Object'First) /= '{' then
+         return;
+      end if;
+      Index := Skip_Blank (Object, Object'First + 1);
+      while Index <= Object'Last and then Object (Index) = '"' loop
+         declare
+            Key_End     : constant Natural := JSON_Value_End (Object, Index);
+            Key         : constant String := Object (Index + 1 .. Key_End - 1);
+            Value_First : Positive := Skip_Blank (Object, Key_End + 1);
+         begin
+            exit when Object (Value_First) /= ':';
+            Value_First := Skip_Blank (Object, Value_First + 1);
+            declare
+               Value_Last : constant Natural := JSON_Value_End (Object, Value_First);
+            begin
+               Process (Key, Object (Value_First .. Value_Last));
+               Index := Skip_Blank (Object, Value_Last + 1);
+               exit when Object (Index) /= ',';
+               Index := Skip_Blank (Object, Index + 1);
+            end;
+         end;
+      end loop;
+   end For_Each_Member;
+
+   --  Each element of the array Items (brackets included).
+   procedure For_Each_Element
+     (Items   : String;
+      Process : not null access procedure (Value : String))
+   is
+      Index : Natural;
+   begin
+      if Items'Length < 2 or else Items (Items'First) /= '[' then
+         return;
+      end if;
+      Index := Skip_Blank (Items, Items'First + 1);
+      while Index <= Items'Last and then Items (Index) /= ']' loop
+         declare
+            Last : constant Natural := JSON_Value_End (Items, Index);
+         begin
+            Process (Items (Index .. Last));
+            Index := Skip_Blank (Items, Last + 1);
+            exit when Items (Index) /= ',';
+            Index := Skip_Blank (Items, Index + 1);
+         end;
+      end loop;
+   end For_Each_Element;
+
    procedure For_Each_Object_Field
      (Text    : String;
       Process : not null access procedure (Name : String; Value : String))
@@ -624,6 +736,49 @@ procedure Generate_CLDR_Export is
       end L;
 
       procedure Emit_JSON (Text : String) renames L;
+
+      --  Which metazone each zone is in now: of a zone's periods in
+      --  metaZones.json, the one with no end ("_to"). Locale-independent.
+      procedure Emit_Zone_Metazone_Rows is
+         Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/metaZones.json");
+         Info   : constant String :=
+           Object_Field_Object (Object_Field_Object (Source, "metazoneInfo"), "timezone");
+
+         procedure Scan (Prefix : String; Object : String);
+
+         procedure Scan (Prefix : String; Object : String) is
+            procedure Member (Key : String; Value : String) is
+               Zone    : constant String := (if Prefix = "" then Key else Prefix & "/" & Key);
+               Current : US.Unbounded_String;
+
+               procedure Period (Item : String) is
+                  Uses : constant String := Object_Field_Object (Item, "usesMetazone");
+               begin
+                  if Uses /= "" and then Project_Tools.JSON.Object_Field_Value (Uses, "_to") = "" then
+                     Current := US.To_Unbounded_String
+                       (Project_Tools.JSON.Object_Field_Value (Uses, "_mzone"));
+                  end if;
+               end Period;
+            begin
+               if Value'Length > 0 and then Value (Value'First) = '{' then
+                  Scan (Zone, Value);
+               elsif Value'Length > 0 and then Value (Value'First) = '[' then
+                  For_Each_Element (Value, Period'Access);
+                  if US.Length (Current) > 0 and then Valid_Zone_Name (Zone) then
+                     Emit_JSON
+                       ("{""type"":""zone_metazone"",""zone"":""" & Zone
+                        & """,""metazone"":""" & S (Current) & """}");
+                  end if;
+               end if;
+            end Member;
+         begin
+            For_Each_Member (Object, Member'Access);
+         end Scan;
+      begin
+         Scan ("", Info);
+      end Emit_Zone_Metazone_Rows;
 
       procedure Emit_Header is
       begin
@@ -3008,6 +3163,27 @@ procedure Generate_CLDR_Export is
                                           & """}");
                                     end if;
 
+                                    --  A zone's own long standard and daylight
+                                    --  names ("British Summer Time"), which win
+                                    --  over its metazone's.
+                                    declare
+                                       Daylight_Name : constant String :=
+                                         Project_Tools.JSON.Object_Field_Value
+                                           (Long, "daylight");
+                                    begin
+                                       if (Standard_Name /= "" or else Daylight_Name /= "")
+                                         and then Valid_Zone_Name (Canonical)
+                                         and then Contains (Canonical, "/")
+                                       then
+                                          Emit_JSON
+                                            ("{""type"":""zone_specific_name"",""locale"":"""
+                                             & Locale & """,""key"":""zone:" & Canonical
+                                             & """,""standard"":""" & JSON_Escape (Standard_Name)
+                                             & """,""daylight"":""" & JSON_Escape (Daylight_Name)
+                                             & """}");
+                                       end if;
+                                    end;
+
                                     if Key /= "long" and then Key /= "short" then
                                        Scan_Zone_Object (Child, Zone);
                                     end if;
@@ -3075,10 +3251,27 @@ procedure Generate_CLDR_Export is
                      & """}");
                end if;
             end Emit_Family;
+            --  Every metazone's long standard and daylight names, by CLDR's
+            --  own metazone id; zone_metazone says which a zone is in.
+            procedure Emit_Specific (Id : String; Object : String) is
+               Long     : constant String := Object_Field_Object (Object, "long");
+               Standard : constant String := Project_Tools.JSON.Object_Field_Value (Long, "standard");
+               Daylight : constant String := Project_Tools.JSON.Object_Field_Value (Long, "daylight");
+            begin
+               if Standard /= "" or else Daylight /= "" then
+                  Emit_JSON
+                    ("{""type"":""zone_specific_name"",""locale"":"""
+                     & Locale & """,""key"":""mz:" & Id
+                     & """,""standard"":""" & JSON_Escape (Standard)
+                     & """,""daylight"":""" & JSON_Escape (Daylight) & """}");
+               end if;
+            end Emit_Specific;
          begin
             if Metazones = "" then
                return;
             end if;
+
+            For_Each_Member (Metazones, Emit_Specific'Access);
 
             Emit_Family ("europe-central", "Europe_Central");
             Emit_Family ("europe-london", "Europe_Western");
@@ -3179,6 +3372,7 @@ procedure Generate_CLDR_Export is
             end;
          end loop;
          Emit_List_Separator_Rows;
+         Emit_Zone_Metazone_Rows;
       end Emit_Migrated_Date_Name_Rows;
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);

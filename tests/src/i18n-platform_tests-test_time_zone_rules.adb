@@ -1,4 +1,7 @@
+with Ada.Directories;
 with I18N.CLDR_Data;
+with I18N.Data_Store;
+with I18N.Date_Time_Format;
 with I18N.TZ_Rules;
 
 --  A zone's offset after its recorded transitions end comes from its final
@@ -28,7 +31,37 @@ is
       Assert (Valid, Rule & " is readable");
       return Result;
    end Rule_Offset;
+   --  A long specific zone name ("zzzz") as a locale writes it.
+   function Specific (Locale, Zone, Instant : String) return String is
+      Target : String (1 .. I18N.Date_Time_Format.Max_Formatted_Length);
+      Last   : Natural;
+      Ok, Overflow : Boolean;
+   begin
+      I18N.Date_Time_Format.Format_Date_Time_Into
+        (Instant, Locale, "::zzzz, " & Zone, Target, Last, Ok, Overflow);
+      return (if Ok then Target (1 .. Last) else "(failed)");
+   end Specific;
 begin
+   --  The names come from the data files, wherever the suite runs from.
+   if Ada.Directories.Exists ("../share/i18n") then
+      I18N.Data_Store.Configure_Data_Dir ("../share/i18n");
+   else
+      I18N.Data_Store.Configure_Data_Dir ("share/i18n");
+   end if;
+
+   --  The long specific names are CLDR's standard and daylight names, a
+   --  zone's own before its metazone's -- not the generic name for both.
+   Assert (Specific ("en", "America/New_York", "2024-01-15T12:00:00Z") = "Eastern Standard Time",
+           "New York in winter: " & Specific ("en", "America/New_York", "2024-01-15T12:00:00Z"));
+   Assert (Specific ("en", "America/New_York", "2024-07-15T12:00:00Z") = "Eastern Daylight Time",
+           "New York in summer: " & Specific ("en", "America/New_York", "2024-07-15T12:00:00Z"));
+   Assert (Specific ("en", "Europe/London", "2024-07-15T12:00:00Z") = "British Summer Time"
+           and then Specific ("en-GB", "Europe/London", "2024-01-15T12:00:00Z") = "Greenwich Mean Time",
+           "London has its own summer name, and en-GB inherits the names");
+   Assert (Specific ("en", "Asia/Kolkata", "2024-07-15T12:00:00Z") = "India Standard Time",
+           "a zone CLDR knows by an older name (Asia/Calcutta): "
+           & Specific ("en", "Asia/Kolkata", "2024-07-15T12:00:00Z"));
+
    --  Before and after the old end of the table.
    Assert (Offset ("America/New_York", 2049, 7, 1, 12) = -4 * 3_600, "New York summer 2049 is EDT");
    Assert (Offset ("America/New_York", 2051, 7, 1, 12) = -4 * 3_600, "New York summer 2051 is still EDT");
