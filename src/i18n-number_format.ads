@@ -24,4 +24,8 @@ package I18N.Number_Format is
    --  The locale's decimal separator.
    function Decimal_Separator (Locale : String) return String;
 
+   --  The locale's plus and minus signs.
+   function Plus_Sign (Locale : String) return String;
+   function Minus_Sign (Locale : String) return String;
+
 end I18N.Number_Format;

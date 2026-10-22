@@ -8,6 +8,13 @@ commit is what a consumer's release records.
 
 ## [Unreleased]
 
+### Added
+
+- `I18N.Number_Format.Plus_Sign` and `Minus_Sign`, beside `Decimal_Separator`
+  and `Digit_Text`, and `I18N.Date_Time_Format.Short_Zone_Name`: a zone's
+  CLDR short specific name at a UTC instant, or "" where it has none. They
+  replace what callers outside the crate took from `I18N.CLDR_Data`.
+
 ### Changed
 
 - **Number, currency, unit and zone symbols come only from the data files.**

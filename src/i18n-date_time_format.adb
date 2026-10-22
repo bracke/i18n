@@ -4584,4 +4584,20 @@ package body I18N.Date_Time_Format is
          Overflow := False;
    end Format_Date_Time_Into;
 
+   function Short_Zone_Name
+     (Locale : String;
+      Zone   : String;
+      Year, Month, Day, Hour, Minute, Second : Natural)
+      return String
+   is
+      Named    : constant String := Canonical_Zone_Name (Zone);
+      Valid    : Boolean;
+      Daylight : constant Boolean :=
+        I18N.Time_Zone_Data.Daylight_At_UTC (Named, Year, Month, Day, Hour, Minute, Second, Valid);
+   begin
+      return Specific_Zone_Name
+        (Locale, Named, False, Valid and then Daylight,
+         I18N.TZ_Rules.Epoch_Seconds (Year, Month, Day, Hour, Minute, Second));
+   end Short_Zone_Name;
+
 end I18N.Date_Time_Format;

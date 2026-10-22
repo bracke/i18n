@@ -192,6 +192,9 @@ package body I18N.Number_Format is
       Put (Target, Last, Overflow, [1 => C]);
    end Put_Char;
 
+   function Plus_Sign (Locale : String) return String is (Number_Plus_Sign (Locale));
+   function Minus_Sign (Locale : String) return String is (Number_Minus_Sign (Locale));
+
    function Digit_Text (Locale : String; Digit : Character) return String is
       --  A -u-nu-/@numbers= numbering-system override selects a fixed digit set
       --  keyed by the numbering system, not the locale -- so it must NOT walk
