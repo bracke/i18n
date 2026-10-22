@@ -26,6 +26,20 @@ private package I18N.Locale_Data is
       Locale  : String)
       return String;
 
+   --  The digit a numbering system (CLDR's id: "arab", "deva", ...) writes for
+   --  the Latin digit Digit. Found is False for a system the data does not
+   --  know; "latn" and a Digit outside '0' .. '9' answer the Digit itself.
+   function Numbering_Digit
+     (System : String;
+      Digit  : Character;
+      Found  : out Boolean)
+      return String;
+
+   --  The digit Locale writes for the Latin digit Digit: the numbering system
+   --  it names (-u-nu-arab, @numbers=arab) if any, else its own default
+   --  digits, else Digit itself.
+   function Locale_Digit (Locale : String; Digit : Character) return String;
+
    --  Exact per-locale lookup with NO fallback walk -- for fields CLDR keys by
    --  the exact locale and resolves by exact bisect (plural rule families),
    --  where walking the parentLocale chain would wrongly inherit (ht -> fr).

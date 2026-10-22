@@ -17,6 +17,14 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Digits come from the data files.** The numbering systems a locale can
+  name (`-u-nu-arab`, `@numbers=deva`; 77 of them) are a `numbering_digits`
+  section of `formats.i18ndata`, beside each locale's own `digit_text`, and
+  `I18N.CLDR_Data.Digit_Text` (43% of the compiled file) is gone:
+  `i18n-cldr_data.adb` is 62 KB. A system is now read from its subtag
+  rather than matched as a substring. ks-Deva and sd-Deva write Latin
+  digits, as CLDR has them (the compiled table gave them their base
+  language's Arabic-script digits).
 - **Number signs come from CLDR.** The plus and minus signs, the percent and
   per-mille signs and the exponent were the same constants for every locale
   ("-" where Swedish and Finnish write U+2212, "%" with nothing before it

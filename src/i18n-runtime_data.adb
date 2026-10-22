@@ -4,7 +4,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Hash;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
-with I18N.CLDR_Data;
+with I18N.Locale_Data;
 
 package body I18N.Runtime_Data is
 
@@ -929,9 +929,11 @@ package body I18N.Runtime_Data is
    end Has_Explicit_Numbering_System;
 
    function Is_Supported_Numbering_System (Name : String) return Boolean is
+      Found : Boolean;
+      Zero  : constant String := I18N.Locale_Data.Numbering_Digit (Name, '0', Found);
+      pragma Unreferenced (Zero);
    begin
-      return Name = "latn"
-        or else I18N.CLDR_Data.Digit_Text ("x-u-nu-" & Name, '0') /= "0";
+      return Found;
    end Is_Supported_Numbering_System;
 
    function Numbering_System_Digit
@@ -944,7 +946,11 @@ package body I18N.Runtime_Data is
       elsif Name = "latn" then
          return [1 => Digit];
       elsif Is_Supported_Numbering_System (Name) then
-         return I18N.CLDR_Data.Digit_Text ("x-u-nu-" & Name, Digit);
+         declare
+            Found : Boolean;
+         begin
+            return I18N.Locale_Data.Numbering_Digit (Name, Digit, Found);
+         end;
       else
          return [1 => Digit];
       end if;

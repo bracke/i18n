@@ -61,12 +61,6 @@ package I18N.CLDR_Data is
    --  @return UTF-8 separator text.
    function Date_Time_Style_Separator (Locale : String) return String;
 
-   --  Return a locale-specific digit.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @param Digit ASCII digit to localize.
-   --  @return UTF-8 digit text, or Digit unchanged for unsupported inputs.
-   function Digit_Text (Locale : String; Digit : Character) return String;
-
    --  Return the localized compact-number suffix.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Scale Compact scale value, including 10000 and 100000000 for

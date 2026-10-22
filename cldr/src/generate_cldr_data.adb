@@ -1224,6 +1224,15 @@ procedure Generate_CLDR_Data is
          Add_Format
            ("date_style_pattern", A, Ada_Expression_UTF8_Bytes (D),
             Sub => B & ":" & C);
+      elsif Kind = "digits" and then Starts_With (A, "nu-") then
+         --  A numbering system's digits (A="nu-<system>"), keyed by the
+         --  system and the Latin digit, for a locale that asks for them by
+         --  name (-u-nu-arab, @numbers=arab).
+         for P in 1 .. 10 loop
+            Add_Format
+              ("numbering_digits", "und", Digit_Item_UTF8 (B, P),
+               Sub => A (A'First + 3 .. A'Last) & ":" & Character'Val (Character'Pos ('0') + P - 1));
+         end loop;
       elsif Kind = "digits" and then Capture_Locale (A) then
          --  A=locale, B=ten comma-separated "16#NNN#" native digit points,
          --  keyed by the Latin digit they replace (0 .. 9).
@@ -3568,157 +3577,6 @@ procedure Generate_CLDR_Data is
          L ("   end Date_Time_Style_Separator;");
       end Emit_Date_Time_Style_Separator;
 
-      procedure Emit_Digits is
-         First : Boolean := True;
-
-         procedure Emit_Digit_Case (Index : Positive) is
-         begin
-            L ("         case Digit is");
-            for Digit in 0 .. 9 loop
-               L ("            when '"
-                  & Character'Val (Character'Pos ('0') + Digit)
-                  & "' => return U ("
-                  & Field (S (Rules (Index).B), Digit + 1, ',') & ");");
-            end loop;
-            L ("            when others => return [1 => Digit];");
-            L ("         end case;");
-            First := False;
-         end Emit_Digit_Case;
-         --  One row per locale, ten digits of four bytes each. The digits of
-         --  a numbering system are not always contiguous, so all ten are
-         --  stored; padding them to a fixed width keeps the row sliceable,
-         --  and UTF-8 never contains a NUL, so the pad strips unambiguously.
-         function Digit_Row_Hex (Index : Positive) return String is
-            Row : US.Unbounded_String;
-         begin
-            --  Ten digits of four NUL-padded bytes each. The row is one
-            --  value, so Value_At decodes it once and the reader below
-            --  slices bytes, as it always did.
-            declare
-               Bytes : US.Unbounded_String;
-            begin
-               for Digit in 0 .. 9 loop
-                  declare
-                     Text : constant String :=
-                       Ada_Expression_UTF8_Bytes
-                         ("U (" & Field (S (Rules (Index).B), Digit + 1, ',')
-                          & ")");
-                     Padded : String (1 .. 4) := [others => Character'Val (0)];
-                  begin
-                     if Text'Length > 4 then
-                        Add_Error ("digit does not fit four bytes");
-                     else
-                        Padded (1 .. Text'Length) := Text;
-                     end if;
-                     US.Append (Bytes, Padded);
-                  end;
-               end loop;
-
-               US.Append (Row, To_Base64 (S (Bytes)));
-            end;
-
-            return S (Row);
-         end Digit_Row_Hex;
-      begin
-         Reset_Table;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "digits")
-              and then not Starts_With (S (Rules (Index).A), "nu-")
-            then
-               declare
-                  Locales : constant String := S (Rules (Index).A);
-                  Row : constant String := Digit_Row_Hex (Index);
-                  Start : Positive := Locales'First;
-               begin
-                  for Position in Locales'Range loop
-                     if Locales (Position) = ',' then
-                        Add_Table_Entry (Locales (Start .. Position - 1), Row);
-                        Start := Position + 1;
-                     end if;
-                  end loop;
-
-                  if Start <= Locales'Last then
-                     Add_Table_Entry (Locales (Start .. Locales'Last), Row);
-                  end if;
-               end;
-            end if;
-         end loop;
-         Emit_Locale_Table ("Digit_Row", """""");
-
-         L;
-         L ("   function Digit_Text (Locale : String; Digit : Character) return String is");
-         L ("      Lang : constant String := Language (Locale);");
-         L ("   begin");
-         L ("      --  A locale either carries a numbering-system override or it");
-         L ("      --  does not. Testing that once skips the whole chain for the");
-         L ("      --  locales that do not, which is nearly all of them, and");
-         L ("      --  Digit_Text is asked once per digit of every number.");
-         L ("      if Contains (Locale, ""-u-nu-"")");
-         L ("        or else Contains (Locale, ""@numbers="")");
-         L ("      then");
-         L ("         if Contains (Locale, ""-u-nu-latn"")");
-         L ("           or else Contains (Locale, ""@numbers=latn"")");
-         L ("         then");
-         L ("            return [1 => Digit];");
-         First := False;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "digits")
-              and then Starts_With (S (Rules (Index).A), "nu-")
-            then
-               declare
-                  Key : constant String := S (Rules (Index).A);
-                  Number_System : constant String :=
-                    Key (Key'First + 3 .. Key'Last);
-               begin
-                  L ("         " & (if First then "if" else "elsif")
-                     & " Contains (Locale, ""-u-" & Key & """)");
-                  L ("           or else Contains (Locale, ""@numbers="
-                     & Number_System & """)");
-                  L ("         then");
-               end;
-               Emit_Digit_Case (Index);
-            end if;
-         end loop;
-         L ("         end if;");
-         L ("      end if;");
-         L;
-         for Index in 1 .. Rule_Count loop
-            if Is_Kind (Index, "digits")
-              and then S (Rules (Index).A) = "nu-beng"
-            then
-               L ("      if Lang = ""bn"" then");
-               Emit_Digit_Case (Index);
-               L ("      end if;");
-               L;
-            end if;
-         end loop;
-         L ("      declare");
-         L ("         Row : constant String := Digit_Row (Locale);");
-         L ("      begin");
-         L ("         --  Digit_Row is decoded by its own Value_At, so Row is");
-         L ("         --  already the forty bytes: ten digits of four.");
-         L ("         if Row'Length = 40 and then Digit in '0' .. '9' then");
-         L ("            declare");
-         L ("               Base : constant Natural :=");
-         L ("                 Row'First");
-         L ("                   + (Character'Pos (Digit)");
-         L ("                      - Character'Pos ('0')) * 4;");
-         L ("               Stop : Natural := Base + 3;");
-         L ("            begin");
-         L ("               while Stop >= Base");
-         L ("                 and then Row (Stop) = Character'Val (0)");
-         L ("               loop");
-         L ("                  Stop := Stop - 1;");
-         L ("               end loop;");
-         L ("               return Row (Base .. Stop);");
-         L ("            end;");
-         L ("         end if;");
-         L;
-         L ("         return [1 => Digit];");
-         L ("      end;");
-         L ("   end Digit_Text;");
-      end Emit_Digits;
-
       procedure Emit_Number_Display_Affixes is
       begin
          L;
@@ -4489,7 +4347,6 @@ procedure Generate_CLDR_Data is
       Emit_Time_Style_Pattern;
       Emit_Date_Time_Field_Separator;
       Emit_Date_Time_Style_Separator;
-      Emit_Digits;
       Emit_Number_Display_Affixes;
       Emit_Era_Name;
       Emit_Time_Zone_Data;

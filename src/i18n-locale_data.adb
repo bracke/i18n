@@ -137,6 +137,67 @@ package body I18N.Locale_Data is
       end;
    end Field;
 
+   function Numbering_Digit
+     (System : String;
+      Digit  : Character;
+      Found  : out Boolean)
+      return String
+   is
+   begin
+      if System = "latn" or else Digit not in '0' .. '9' then
+         Found := True;
+         return [1 => Digit];
+      end if;
+      return Lookup ("numbering_digits", "und", System & ":" & Digit, Found);
+   end Numbering_Digit;
+
+   function Locale_Digit (Locale : String; Digit : Character) return String is
+      --  The system a -u-nu- or @numbers= override names: up to the next
+      --  subtag, or keyword.
+      function Named_System return String is
+         function After (Marker : String; Stop : Character) return String is
+         begin
+            for Index in Locale'First .. Locale'Last - Marker'Length + 1 loop
+               if Locale (Index .. Index + Marker'Length - 1) = Marker then
+                  declare
+                     First : constant Positive := Index + Marker'Length;
+                     Last  : Natural := First - 1;
+                  begin
+                     while Last < Locale'Last and then Locale (Last + 1) /= Stop loop
+                        Last := Last + 1;
+                     end loop;
+                     return Locale (First .. Last);
+                  end;
+               end if;
+            end loop;
+            return "";
+         end After;
+
+         From_Extension : constant String := After ("-u-nu-", '-');
+      begin
+         return (if From_Extension /= "" then From_Extension else After ("@numbers=", ';'));
+      end Named_System;
+
+      System : constant String := Named_System;
+      Found  : Boolean;
+   begin
+      if Digit not in '0' .. '9' then
+         return [1 => Digit];
+      elsif System /= "" then
+         --  A system is chosen by name, not inherited: ar-u-nu-latn is Latin.
+         declare
+            Value : constant String := Numbering_Digit (System, Digit, Found);
+         begin
+            return (if Found then Value else [1 => Digit]);
+         end;
+      end if;
+      declare
+         Value : constant String := Lookup ("digit_text", Locale, [1 => Digit], Found);
+      begin
+         return (if Found then Value else [1 => Digit]);
+      end;
+   end Locale_Digit;
+
    function Language_Member
      (Section : String; Locale : String; Found : out Boolean) return String
    is

@@ -1,5 +1,4 @@
 with Ada.Characters.Handling;
-with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with I18N.CLDR_Data;
 with I18N.Display_Names;
@@ -1174,25 +1173,12 @@ package body I18N.Date_Time_Format is
       Found : Boolean;
       Value : constant String :=
         I18N.Runtime_Data.Locale_Digit_Text (Locale, Digit, Found);
-      --  A -u-nu-/@numbers= override selects digits by numbering system, not
-      --  locale, so it must not walk the parentLocale chain -- resolve it
-      --  structurally via CLDR_Data (see I18N.Number_Format.Digit_Text).
-      Numbering_Override : constant Boolean :=
-        Ada.Strings.Fixed.Index (Locale, "-u-nu-") > 0
-        or else Ada.Strings.Fixed.Index (Locale, "@numbers=") > 0;
-      Store_Found : Boolean := False;
-      Store_Value : constant String :=
-        (if Found or else Numbering_Override then ""
-         else I18N.Locale_Data.Lookup
-                ("digit_text", Locale, [1 => Digit], Store_Found));
    begin
       Put
         (Target,
          Last,
          Overflow,
-         (if Found then Value
-          elsif Store_Found then Store_Value
-          else I18N.CLDR_Data.Digit_Text (Locale, Digit)));
+         (if Found then Value else I18N.Locale_Data.Locale_Digit (Locale, Digit)));
    end Put_Digit;
 
    procedure Put_Number

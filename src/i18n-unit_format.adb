@@ -1,4 +1,3 @@
-with I18N.CLDR_Data;
 with I18N.Locale_Data;
 
 package body I18N.Unit_Format is
