@@ -3,6 +3,7 @@ with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
+with Ada.Strings;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
@@ -2719,6 +2720,20 @@ procedure Generate_CLDR_Export is
             end if;
          end Relative_Field_Key;
 
+         Relative_Widths : constant array (1 .. 3) of US.Unbounded_String :=
+           [US.To_Unbounded_String ("unit-width-full-name"),
+            US.To_Unbounded_String ("unit-width-short"),
+            US.To_Unbounded_String ("unit-width-narrow")];
+         Relative_Named_Bases : constant array (1 .. 15) of US.Unbounded_String :=
+           [US.To_Unbounded_String ("day"), US.To_Unbounded_String ("week"),
+            US.To_Unbounded_String ("month"), US.To_Unbounded_String ("quarter"),
+            US.To_Unbounded_String ("year"), US.To_Unbounded_String ("hour"),
+            US.To_Unbounded_String ("minute"), US.To_Unbounded_String ("second"),
+            US.To_Unbounded_String ("mon"), US.To_Unbounded_String ("tue"),
+            US.To_Unbounded_String ("wed"), US.To_Unbounded_String ("thu"),
+            US.To_Unbounded_String ("fri"), US.To_Unbounded_String ("sat"),
+            US.To_Unbounded_String ("sun")];
+
          procedure Emit_Relative_Current_Rows (Locale : String) is
             Fields : constant String := Date_Fields_Object (Locale);
 
@@ -2757,6 +2772,43 @@ procedure Generate_CLDR_Export is
             Emit_Base_Widths ("hour");
             Emit_Base_Widths ("minute");
             Emit_Base_Widths ("second");
+
+            --  CLDR's named offsets: "yesterday", "the day before yesterday",
+            --  "last week", and per weekday "last Monday", "this Monday",
+            --  "next Monday". Keyed base:width:offset.
+            declare
+               procedure Emit_Named (Base : String) is
+               begin
+                  for Width of Relative_Widths loop
+                     declare
+                        W      : constant String := S (Width);
+                        Object : constant String :=
+                          Object_Field_Object (Fields, Relative_Field_Key (Base, W));
+                     begin
+                        for Offset in -2 .. 2 loop
+                           declare
+                              Image : constant String :=
+                                (if Offset < 0 then "-" else "")
+                                & Ada.Strings.Fixed.Trim (Natural'Image (abs Offset), Ada.Strings.Both);
+                              Value : constant String :=
+                                Project_Tools.JSON.Object_Field_Value (Object, "relative-type-" & Image);
+                           begin
+                              if Value /= "" then
+                                 Emit_JSON
+                                   ("{""type"":""relative_text"",""locale"":""" & Locale
+                                    & """,""key"":""" & Base & ":" & W & ":" & Image
+                                    & """,""value"":""" & JSON_Escape (Value) & """}");
+                              end if;
+                           end;
+                        end loop;
+                     end;
+                  end loop;
+               end Emit_Named;
+            begin
+               for Base of Relative_Named_Bases loop
+                  Emit_Named (S (Base));
+               end loop;
+            end;
          end Emit_Relative_Current_Rows;
 
          procedure Emit_Relative_Time_Pattern_Rows (Locale : String) is

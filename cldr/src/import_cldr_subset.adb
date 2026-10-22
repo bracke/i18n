@@ -692,6 +692,8 @@ procedure Import_CLDR_Subset is
          return "zone_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "number_text" or else Kind = "number_text_text" then
          return "number_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
+      elsif Kind = "relative_text" or else Kind = "relative_text_text" then
+         return "relative_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "zone_specific_name"
         or else Kind = "zone_specific_name_text"
       then
@@ -1225,7 +1227,9 @@ procedure Import_CLDR_Subset is
             Add_Key ("zone_meta|" & Field (Line, 2), Line_Number);
             L ("zone_meta|" & Field (Line, 2) & "|" & Field (Line, 3));
             Seen_Output := True;
-         elsif Kind = "zone_text_text" or else Kind = "number_text_text" then
+         elsif Kind = "zone_text_text" or else Kind = "number_text_text"
+           or else Kind = "relative_text_text"
+         then
             declare
                Base : constant String := Kind (Kind'First .. Kind'Last - 5);
             begin

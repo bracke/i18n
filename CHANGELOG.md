@@ -10,6 +10,10 @@ commit is what a consumer's release records.
 
 ### Added
 
+- CLDR's named relative offsets -- "yesterday", "the day before yesterday",
+  "last week", and per weekday "last Monday" / "this Monday" / "next
+  Monday" -- in a `relative_exact` section of `formats.i18ndata` (91,404 rows
+  for every locale), read by `I18N.Relative_Format.Exact_Name`.
 - `I18N.Number_Format.Plus_Sign` and `Minus_Sign`, beside `Decimal_Separator`
   and `Digit_Text`, and `I18N.Date_Time_Format.Short_Zone_Name`: a zone's
   CLDR short specific name at a UTC instant, or "" where it has none. They

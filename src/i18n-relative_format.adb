@@ -92,4 +92,20 @@ package body I18N.Relative_Format is
       return (if Found then Value else "");
    end Unit_Display_Name;
 
+   function Exact_Name
+     (Locale : String;
+      Base   : String;
+      Width  : String;
+      Offset : Integer;
+      Found  : out Boolean)
+      return String
+   is
+      Image : constant String := Integer'Image (Offset);
+      Sub   : constant String :=
+        Base & ":" & Width & ":"
+        & (if Offset < 0 then Image else Image (Image'First + 1 .. Image'Last));
+   begin
+      return I18N.Locale_Data.Lookup ("relative_exact", Locale, Sub, Found);
+   end Exact_Name;
+
 end I18N.Relative_Format;

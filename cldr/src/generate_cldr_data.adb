@@ -1673,6 +1673,16 @@ procedure Generate_CLDR_Data is
               ("zone_text", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                Sub => Field (Line, 3));
          end if;
+      elsif Kind = "relative_text" then
+         --  A locale's named relative offset ("yesterday", "last Monday"),
+         --  keyed base:width:offset.
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = "" then
+            Add_Line_Error (Line_Number, "invalid relative_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            Add_Format
+              ("relative_exact", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
+               Sub => Field (Line, 3));
+         end if;
       elsif Kind = "number_text" then
          --  A locale's number symbol by name (plus, minus, percent, permille,
          --  exponent), into the section the number formatter reads.

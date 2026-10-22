@@ -31,6 +31,19 @@ package I18N.Relative_Format is
       Future   : Boolean)
       return String;
 
+   --  CLDR's own name for Offset Base units from now ("yesterday" for -1
+   --  day, "the day before yesterday" for -2, "last Monday" for -1 mon), in
+   --  Width ("unit-width-full-name", "-short", "-narrow"). Base is a time
+   --  unit (second .. year) or a weekday (mon .. sun). Found is False where
+   --  CLDR names no such offset -- "in 3 days" is a pattern, not a name.
+   function Exact_Name
+     (Locale : String;
+      Base   : String;
+      Width  : String;
+      Offset : Integer;
+      Found  : out Boolean)
+      return String;
+
    --  The relative-time-specific unit display name (singular/plural).
    function Unit_Display_Name
      (Locale : String; Base : String; Singular : Boolean) return String;
