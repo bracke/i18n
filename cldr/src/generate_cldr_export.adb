@@ -781,6 +781,35 @@ procedure Generate_CLDR_Export is
       --    golden:<mz>:<region>    the zone a metazone stands for in a region
       --                            ("001" for the world)
       --    primary:<country>       a country's primary zone, where it has many
+      --  Each region's preferred hour symbol (CLDR timeData): "h" in the
+      --  United States, "H" in Germany, and 001's for the rest. A skeleton's
+      --  "j" asks for it.
+      procedure Emit_Hour_Cycle_Rows is
+         Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/timeData.json");
+         Data   : constant String :=
+           Object_Field_Object (Object_Field_Object (Source, "supplemental"), "timeData");
+
+         procedure Region (Key : String; Value : String) is
+            Preferred : constant String := Project_Tools.JSON.Object_Field_Value (Value, "_preferred");
+            Store_Key : String := Key;
+         begin
+            for C of Store_Key loop
+               if C = '_' then
+                  C := '-';
+               end if;
+            end loop;
+            if Preferred /= "" then
+               Emit_JSON
+                 ("{""type"":""hour_text"",""locale"":""und"",""key"":""" & Store_Key
+                  & """,""value"":""" & JSON_Escape (Preferred) & """}");
+            end if;
+         end Region;
+      begin
+         For_Each_Member (Data, Region'Access);
+      end Emit_Hour_Cycle_Rows;
+
       procedure Emit_Zone_Metazone_Rows is
          Source : constant String :=
            Project_Tools.Files.Read_Raw_File
@@ -3467,6 +3496,7 @@ procedure Generate_CLDR_Export is
          end loop;
          Emit_List_Separator_Rows;
          Emit_Zone_Metazone_Rows;
+         Emit_Hour_Cycle_Rows;
       end Emit_Migrated_Date_Name_Rows;
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);

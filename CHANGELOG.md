@@ -88,6 +88,13 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- **A skeleton's `j` and the default hour cycle follow CLDR's timeData.** The
+  hour cycle came from a hand-kept rule (12-hour for English, Arabic and
+  Korean, 24-hour for every other language). It is now the region's
+  preferred hour (a new `hour_cycle` section, 276 regions), still under any
+  `-u-hc-` or runtime override, and a `j` skeleton CLDR has a format for
+  takes that format: `jm` is "h:mm a" in the US, "HH:mm" in Germany, "H:mm"
+  in Japan.
 - **Unit values follow CLDR's own patterns.** A unit was the value, a space
   (none for Japanese, Chinese and Korean) and the name with its `{0}` cut
   out, which lost French's and German's no-break space, Japanese's space in

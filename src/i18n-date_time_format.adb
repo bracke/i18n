@@ -153,8 +153,9 @@ package body I18N.Date_Time_Format is
       end if;
    end Hour_Cycle_From_Name;
 
+   function Preferred_Hour (Locale : String) return Character;
+
    function Hour_Cycle_For (Locale : String) return Hour_Cycle is
-      Lang : constant String := I18N.CLDR_Data.Language (Locale);
    begin
       if Contains (Locale, "-u-hc-h11")
         or else Contains (Locale, "@hours=h11")
@@ -181,11 +182,14 @@ package body I18N.Date_Time_Format is
          begin
             if Found then
                return Hour_Cycle_From_Name (Name);
-            elsif Lang = "en" or else Lang = "ar" or else Lang = "ko" then
-               return H12;
-            else
-               return H23;
             end if;
+            --  The region's preferred hour from CLDR's timeData.
+            case Preferred_Hour (Locale) is
+               when 'h' => return H12;
+               when 'K' => return H11;
+               when 'k' => return H24;
+               when others => return H23;
+            end case;
          end;
       end if;
    end Hour_Cycle_For;
@@ -1593,7 +1597,99 @@ package body I18N.Date_Time_Format is
       end if;
    end Skeleton_Text;
 
+   function Resolve_Plain_Skeleton_Pattern
+     (Locale   : String;
+      Skeleton : String)
+      return String;
+
+   --  The hour symbol a skeleton's "j" stands for in Locale: its region's
+   --  preferred one from CLDR's timeData ("h" in the United States, "H" in
+   --  Germany), else the world's.
+   function Preferred_Hour (Locale : String) return Character is
+      Full   : constant String := I18N.Locales.Maximize (Locale);
+      Region : Ada.Strings.Unbounded.Unbounded_String;
+      Start  : Positive := Full'First;
+   begin
+      for Index in Full'Range loop
+         if Index = Full'Last or else Full (Index + 1) in '-' | '_' then
+            declare
+               Subtag : constant String := Full (Start .. Index);
+            begin
+               if Start > Full'First
+                 and then ((Subtag'Length = 2 and then Subtag (Subtag'First) in 'A' .. 'Z' | 'a' .. 'z')
+                           or else (Subtag'Length = 3 and then Subtag (Subtag'First) in '0' .. '9'))
+               then
+                  Region := Ada.Strings.Unbounded.To_Unbounded_String
+                    (Ada.Characters.Handling.To_Upper (Subtag));
+                  exit;
+               end if;
+            end;
+            Start := Index + 2;
+         end if;
+      end loop;
+      declare
+         Found : Boolean;
+         Of_Region : constant String :=
+           (if Ada.Strings.Unbounded.Length (Region) = 0 then ""
+            else I18N.Locale_Data.Lookup
+                   ("hour_cycle", "und", Ada.Strings.Unbounded.To_String (Region), Found));
+         World : constant String := I18N.Locale_Data.Lookup ("hour_cycle", "und", "001", Found);
+      begin
+         if Of_Region'Length > 0 then
+            return Of_Region (Of_Region'First);
+         elsif World'Length > 0 then
+            return World (World'First);
+         end if;
+      end;
+      return 'H';
+   end Preferred_Hour;
+
    function Resolve_Skeleton_Pattern
+     (Locale   : String;
+      Skeleton : String)
+      return String
+   is
+      --  CLDR's available formats are keyed by concrete hour symbols; a "j"
+      --  asks for the locale's own.
+      function With_Hour (Text : String) return String is
+         Result : String := Text;
+         Hour   : Character := ' ';
+      begin
+         for C of Result loop
+            if C = 'j' then
+               if Hour = ' ' then
+                  --  The locale's hour cycle, with its -u-hc- and runtime
+                  --  overrides, as a concrete symbol.
+                  Hour :=
+                    (case Hour_Cycle_For (Locale) is
+                        when H11 => 'K', when H12 => 'h', when H23 => 'H', when H24 => 'k');
+               end if;
+               C := Hour;
+            end if;
+         end loop;
+         return Result;
+      end With_Hour;
+   begin
+      for C of Skeleton loop
+         if C = 'j' then
+            declare
+               Concrete : constant String := With_Hour (Skeleton);
+               Pattern  : constant String := Resolve_Plain_Skeleton_Pattern (Locale, Concrete);
+            begin
+               --  CLDR's format for the concrete skeleton ("hm" -> "h:mm a");
+               --  where it has none, the j skeleton itself, whose hour and day
+               --  period the formatter fills in.
+               if Pattern /= Concrete then
+                  return Pattern;
+               end if;
+               exit;
+            end;
+         end if;
+      end loop;
+      return Resolve_Plain_Skeleton_Pattern (Locale, Skeleton);
+   end Resolve_Skeleton_Pattern;
+
+   function Resolve_Plain_Skeleton_Pattern
      (Locale   : String;
       Skeleton : String)
       return String
@@ -1615,7 +1711,7 @@ package body I18N.Date_Time_Format is
       else
          return (if Pattern = "" then Skeleton else Pattern);
       end if;
-   end Resolve_Skeleton_Pattern;
+   end Resolve_Plain_Skeleton_Pattern;
 
    function Style_Tail (Style : String) return String is
       Comma : constant Natural := First_Unquoted_Comma (Style);

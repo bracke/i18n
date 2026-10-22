@@ -1672,6 +1672,13 @@ procedure Generate_CLDR_Data is
               ("zone_text", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                Sub => Field (Line, 3));
          end if;
+      elsif Kind = "hour_text" then
+         --  A region's preferred hour symbol, under und keyed by the region.
+         if Field_Count (Line) /= 4 or else Field (Line, 3) = "" or else Field (Line, 4) = "" then
+            Add_Line_Error (Line_Number, "invalid hour_text row shape");
+         else
+            Add_Format ("hour_cycle", "und", Ada_Expression_UTF8_Bytes (Field (Line, 4)), Sub => Field (Line, 3));
+         end if;
       elsif Kind = "unit_text" then
          --  A unit pattern that is not the value, a space and the name, into
          --  the locale's unit shard beside the name, keyed p:base:width:category.
