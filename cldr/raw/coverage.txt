@@ -14,7 +14,7 @@ require_raw_count|plural_family|62
 require_raw_count|policy|3
 require_raw_count|relative_current|18384
 require_raw_count|relative_offset|1532
-require_raw_count|relative_time_pattern|63969
+require_raw_count|relative_time_pattern|66901
 require_raw_count|relative_unit_category|5579
 require_raw_count|symbol|1532
 require_raw_count|unit_name|847585

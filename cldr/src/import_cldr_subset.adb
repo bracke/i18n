@@ -1181,7 +1181,6 @@ procedure Import_CLDR_Subset is
                  or else not Is_Relative_Offset (Direction)
                  or else not Is_Plural_Category (Category)
                  or else Pattern = ""
-                 or else Placeholder_Index (Pattern) = 0
                then
                   Add_Line_Error
                     (Line_Number, "invalid relative_time_pattern_text row shape");

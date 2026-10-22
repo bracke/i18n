@@ -2857,7 +2857,9 @@ procedure Generate_CLDR_Export is
                  Project_Tools.JSON.Object_Field_Value
                    (Group, "relativeTimePattern-count-" & Category);
             begin
-               if Value /= "" and then Contains (Value, "{0}") then
+               --  Kept with or without its {0}: Arabic's one and two forms
+               --  ("an hour ago", "two hours ago") name the count in words.
+               if Value /= "" then
                   Emit_JSON
                     ("{""type"":""relative_time_pattern"",""locale"":"""
                      & Locale & """,""base"":""" & Base

@@ -951,7 +951,6 @@ procedure Import_CLDR_Raw is
                  or else not Is_Relative_Offset (Direction)
                  or else not Is_Plural_Category (Category)
                  or else not Valid_Value (Pattern)
-                 or else not Contains (Pattern, "{0}")
                then
                   Add_Line_Error
                     (Line_Number, "invalid staged relative_time_pattern record");

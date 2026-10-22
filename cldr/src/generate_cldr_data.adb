@@ -1617,7 +1617,6 @@ procedure Generate_CLDR_Data is
            or else (Field (Line, 5) /= "future" and then Field (Line, 5) /= "past")
            or else not Is_Plural_Category (Field (Line, 6))
            or else Field (Line, 7) = ""
-           or else not Contains (Field (Line, 7), "{0}")
          then
             Add_Line_Error
               (Line_Number, "invalid relative_time_pattern row shape");

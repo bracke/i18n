@@ -88,6 +88,10 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- **Relative-time patterns that name their count in words are kept.** The
+  exporter dropped every CLDR pattern without a `{0}`, so Arabic's one and
+  two forms ("قبل ساعة واحدة", "قبل ساعتين") and other duals fell back to
+  the "other" pattern with a digit ("قبل ٢ ساعة"). 2,932 patterns are back.
 - **Generic and short zone names ("v", "vvvv", "z", "VVVV") follow TR35 as
   ICU does, from CLDR data; the hand-kept zone-family list no longer names
   anything.** London read "Western European Time", en-GB wrote "WET"/"WEST",
