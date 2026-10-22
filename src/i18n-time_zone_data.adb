@@ -1,3 +1,4 @@
+with Ada.Calendar;
 with Ada.Strings.Unbounded;
 
 with I18N.CLDR_Data;
@@ -274,6 +275,35 @@ package body I18N.Time_Zone_Data is
       pragma Unreferenced (Offset);
       return Daylight;
    end Daylight_At_UTC;
+
+   function Standard_Offset_Seconds
+     (Zone  : String;
+      Valid : out Boolean)
+      return Integer
+   is
+      Year     : constant Natural := Natural (Ada.Calendar.Year (Ada.Calendar.Clock));
+      Offset   : Integer;
+      Daylight : Boolean;
+   begin
+      if Is_UTC (Zone) then
+         Valid := True;
+         return 0;
+      end if;
+      Read_State (Zone, Year, 1, 1, 0, 0, 0, 0, Offset, Daylight, Valid);
+      if Valid and then Daylight then
+         declare
+            July_Offset   : Integer;
+            July_Daylight : Boolean;
+            July_Valid    : Boolean;
+         begin
+            Read_State (Zone, Year, 7, 1, 0, 0, 0, 0, July_Offset, July_Daylight, July_Valid);
+            if July_Valid and then not July_Daylight then
+               return July_Offset;
+            end if;
+         end;
+      end if;
+      return Offset;
+   end Standard_Offset_Seconds;
 
    function Daylight_Near_UTC
      (Zone   : String;

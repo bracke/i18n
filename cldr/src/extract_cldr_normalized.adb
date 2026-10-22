@@ -349,21 +349,6 @@ procedure Extract_CLDR_Normalized is
       return True;
    end Is_Zone_Id;
 
-   function Is_Zone_Family (Value : String) return Boolean is
-   begin
-      if Value = "" then
-         return False;
-      end if;
-
-      for C of Value loop
-         if C not in 'a' .. 'z' and then C not in '0' .. '9' and then C /= '-' then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   end Is_Zone_Family;
-
    function Is_Hex_List (Value : String) return Boolean is
    begin
       if Value'Length = 0 then
@@ -957,44 +942,6 @@ procedure Extract_CLDR_Normalized is
          else
             Add_Coverage_Key (Line, Line_Number);
          end if;
-      elsif Kind = "require_zone_display_locales" then
-         if Field_Count (Line) /= 3 or else not Is_Zone_Id (Field (Line, 2)) then
-            Add_Line_Error (Line_Number, "invalid require_zone_display_locales row");
-         else
-            Add_Coverage_Key (Line, Line_Number);
-            for Index in 1 .. Field_Count (Field (Line, 3), ',') loop
-               Require_Key
-                 ("zone_display|" & Field (Field (Line, 3), Index, ',')
-                  & "|" & Field (Line, 2),
-                 Line_Number);
-            end loop;
-         end if;
-      elsif Kind = "require_zone_family_display_locales" then
-         if Field_Count (Line) /= 3 or else not Is_Zone_Family (Field (Line, 2)) then
-            Add_Line_Error
-              (Line_Number, "invalid require_zone_family_display_locales row");
-         else
-            Add_Coverage_Key (Line, Line_Number);
-            for Index in 1 .. Field_Count (Field (Line, 3), ',') loop
-               Require_Key
-                 ("zone_family_display|" & Field (Field (Line, 3), Index, ',')
-                  & "|" & Field (Line, 2),
-                  Line_Number);
-            end loop;
-         end if;
-      elsif Kind = "require_zone_short_family_locales" then
-         if Field_Count (Line) /= 3 or else not Is_Zone_Family (Field (Line, 2)) then
-            Add_Line_Error
-              (Line_Number, "invalid require_zone_short_family_locales row");
-         else
-            Add_Coverage_Key (Line, Line_Number);
-            for Index in 1 .. Field_Count (Field (Line, 3), ',') loop
-               Require_Key
-                 ("zone_short_family|" & Field (Field (Line, 3), Index, ',')
-                  & "|" & Field (Line, 2),
-                  Line_Number);
-            end loop;
-         end if;
       elsif Kind = "require_currency_count" then
          if Field_Count (Line) /= 2 or else not Is_Decimal_Text (Field (Line, 2)) then
             Add_Line_Error (Line_Number, "invalid require_currency_count row");
@@ -1258,7 +1205,7 @@ procedure Extract_CLDR_Normalized is
                L ("day_period_text|" & Locale & "|" & Period & "|" & Width & "|" & Value);
                Seen_Output := True;
             end;
-         elsif Kind = "zone_display" or else Kind = "zone_exemplar" then
+         elsif Kind = "zone_exemplar" then
             declare
                Locale : constant String := Field (Line, 2);
                Zone   : constant String := Field (Line, 3);
@@ -1274,26 +1221,6 @@ procedure Extract_CLDR_Normalized is
                end if;
                Add_Key (Kind & "|" & Locale & "|" & Zone, Line_Number);
                L (Kind & "_text|" & Locale & "|" & Zone & "|" & Value);
-               Seen_Output := True;
-            end;
-         elsif Kind = "zone_family_display" then
-            declare
-               Locale : constant String := Field (Line, 2);
-               Family : constant String := Field (Line, 3);
-               Value  : constant String := Field (Line, 4);
-            begin
-               if Field_Count (Line) /= 4
-                 or else Locale = ""
-                 or else not Is_Zone_Family (Family)
-                 or else Value = ""
-               then
-                  Add_Line_Error (Line_Number, "invalid zone_family_display record");
-                  return;
-               end if;
-               Add_Key ("zone_family_display|" & Locale & "|" & Family, Line_Number);
-               L
-                 ("zone_family_display_text|" & Locale & "|" & Family
-                  & "|" & Value);
                Seen_Output := True;
             end;
          elsif Kind = "zone_meta" then
@@ -1324,30 +1251,6 @@ procedure Extract_CLDR_Normalized is
                & "|" & Field (Line, 4) & "|" & Field (Line, 5) & "|" & Field (Line, 6)
                & "|" & Field (Line, 7) & "|" & Field (Line, 8) & "|" & Last_Field (Line));
             Seen_Output := True;
-         elsif Kind = "zone_short_family" then
-            declare
-               Locale   : constant String := Field (Line, 2);
-               Family   : constant String := Field (Line, 3);
-               Standard : constant String := Field (Line, 4);
-               Daylight : constant String := Field (Line, 5);
-               Generic_Label : constant String := Field (Line, 6);
-            begin
-               if Field_Count (Line) /= 6
-                 or else Locale = ""
-                 or else not Is_Zone_Family (Family)
-                 or else Standard = ""
-                 or else Daylight = ""
-                 or else Generic_Label = ""
-               then
-                  Add_Line_Error (Line_Number, "invalid zone_short_family record");
-                  return;
-               end if;
-               Add_Key ("zone_short_family|" & Locale & "|" & Family, Line_Number);
-               L
-                 ("zone_short_family_text|" & Locale & "|" & Family & "|"
-                  & Standard & "|" & Daylight & "|" & Generic_Label);
-               Seen_Output := True;
-            end;
          elsif Kind = "zone_gmt_prefix"
            or else Kind = "zone_offset_separator"
            or else Kind = "zone_location_pattern"

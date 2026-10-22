@@ -3648,19 +3648,10 @@ package body I18N.Date_Time_Format is
          end if;
       end;
 
-      declare
-         Offset : constant Integer :=
-           I18N.CLDR_Data.Time_Zone_Base_Offset_Minutes (Zone, Valid);
-      begin
-         if Valid then
-            return Offset * 60;
-         end if;
-      end;
-
+      --  A time of day with no date: the zone's standard time.
       declare
          Offset_Seconds : constant Integer :=
-           I18N.Time_Zone_Data.Offset_Seconds_At_UTC
-             (Zone, 2000, 1, 1, 0, 0, 0, Valid);
+           I18N.Time_Zone_Data.Standard_Offset_Seconds (Zone, Valid);
       begin
          if Valid then
             return Offset_Seconds;
@@ -3698,19 +3689,10 @@ package body I18N.Date_Time_Format is
          end if;
       end;
 
-      declare
-         Offset : constant Integer :=
-           I18N.CLDR_Data.Time_Zone_Base_Offset_Minutes (Zone, Valid);
-      begin
-         if Valid then
-            return Offset;
-         end if;
-      end;
-
+      --  A time of day with no date: the zone's standard time.
       declare
          Offset_Seconds : constant Integer :=
-           I18N.Time_Zone_Data.Offset_Seconds_At_UTC
-             (Zone, 2000, 1, 1, 0, 0, 0, Valid);
+           I18N.Time_Zone_Data.Standard_Offset_Seconds (Zone, Valid);
       begin
          if Valid then
             return Offset_Seconds / 60;

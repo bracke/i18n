@@ -348,21 +348,6 @@ procedure Import_CLDR_Raw is
       return True;
    end Is_Zone_Id;
 
-   function Is_Zone_Family (Value : String) return Boolean is
-   begin
-      if Value = "" then
-         return False;
-      end if;
-
-      for C of Value loop
-         if C not in 'a' .. 'z' and then C not in '0' .. '9' and then C /= '-' then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   end Is_Zone_Family;
-
    function Is_Hex_List (Value : String) return Boolean is
    begin
       if Value'Length = 0 then
@@ -666,7 +651,7 @@ procedure Import_CLDR_Raw is
                  ("day_period|" & Locale & "|" & Period & "|" & Width
                  & "|" & Value);
             end;
-         elsif Kind = "zone_display" or else Kind = "zone_exemplar" then
+         elsif Kind = "zone_exemplar" then
             declare
                Locale : constant String := JSON_Value (Line, "locale");
                Zone   : constant String := JSON_Value (Line, "zone");
@@ -681,24 +666,6 @@ procedure Import_CLDR_Raw is
                end if;
                Add_Key (Kind & "|" & Locale & "|" & Zone, Line_Number);
                Emit_Record (Kind & "|" & Locale & "|" & Zone & "|" & Value);
-            end;
-         elsif Kind = "zone_family_display" then
-            declare
-               Locale : constant String := JSON_Value (Line, "locale");
-               Family : constant String := JSON_Value (Line, "family");
-               Value  : constant String := JSON_Value (Line, "value");
-            begin
-               if not Valid_Value (Locale)
-                 or else not Is_Zone_Family (Family)
-                 or else not Valid_Value (Value)
-               then
-                  Add_Line_Error
-                    (Line_Number, "invalid staged zone_family_display record");
-                  return;
-               end if;
-               Add_Key ("zone_family_display|" & Locale & "|" & Family, Line_Number);
-               Emit_Record
-                 ("zone_family_display|" & Locale & "|" & Family & "|" & Value);
             end;
          elsif Kind = "zone_meta" then
             declare
@@ -753,29 +720,6 @@ procedure Import_CLDR_Raw is
                end if;
                Add_Key ("zone_specific_name|" & Locale & "|" & Key, Line_Number);
                Emit_Record ("zone_specific_name|" & Locale & "|" & Key & US.To_String (Joined));
-            end;
-         elsif Kind = "zone_short_family" then
-            declare
-               Locale   : constant String := JSON_Value (Line, "locale");
-               Family   : constant String := JSON_Value (Line, "family");
-               Standard : constant String := JSON_Value (Line, "standard");
-               Daylight : constant String := JSON_Value (Line, "daylight");
-               Generic_Label : constant String := JSON_Value (Line, "generic");
-            begin
-               if not Valid_Value (Locale)
-                 or else not Is_Zone_Family (Family)
-                 or else not Valid_Value (Standard)
-                 or else not Valid_Value (Daylight)
-                 or else not Valid_Value (Generic_Label)
-               then
-                  Add_Line_Error
-                    (Line_Number, "invalid staged zone_short_family record");
-                  return;
-               end if;
-               Add_Key ("zone_short_family|" & Locale & "|" & Family, Line_Number);
-               Emit_Record
-                 ("zone_short_family|" & Locale & "|" & Family & "|"
-                  & Standard & "|" & Daylight & "|" & Generic_Label);
             end;
          elsif Kind = "zone_gmt_prefix"
            or else Kind = "zone_offset_separator"

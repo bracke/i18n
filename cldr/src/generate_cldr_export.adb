@@ -3277,18 +3277,6 @@ procedure Generate_CLDR_Export is
                                     City : constant String :=
                                       Project_Tools.JSON.Object_Field_Value
                                         (Child, "exemplarCity");
-                                    Long : constant String :=
-                                      Object_Field_Object (Child, "long");
-                                    Generic_Name : constant String :=
-                                      Project_Tools.JSON.Object_Field_Value
-                                        (Long, "generic");
-                                    Standard_Name : constant String :=
-                                      Project_Tools.JSON.Object_Field_Value
-                                        (Long, "standard");
-                                    Display_Name : constant String :=
-                                      (if Generic_Name /= ""
-                                       then Generic_Name
-                                       else Standard_Name);
                                  begin
                                     if City /= ""
                                       and then Valid_Zone_Name (Canonical)
@@ -3298,18 +3286,6 @@ procedure Generate_CLDR_Export is
                                          ("{""type"":""zone_exemplar"",""locale"":"""
                                           & Locale & """,""zone"":""" & Canonical
                                           & """,""value"":""" & JSON_Escape (City)
-                                          & """}");
-                                    end if;
-
-                                    if Display_Name /= ""
-                                      and then Valid_Zone_Name (Canonical)
-                                      and then Contains (Canonical, "/")
-                                    then
-                                       Emit_JSON
-                                         ("{""type"":""zone_display"",""locale"":"""
-                                          & Locale & """,""zone"":""" & Canonical
-                                          & """,""value"":""" & JSON_Escape
-                                            (Display_Name)
                                           & """}");
                                     end if;
 
@@ -3348,46 +3324,6 @@ procedure Generate_CLDR_Export is
             Names     : constant String := Time_Zone_Names_Object (Locale);
             Metazones : constant String := Object_Field_Object (Names, "metazone");
 
-            procedure Emit_Family
-              (Family  : String;
-               CLDR_ID : String)
-            is
-               Object  : constant String := Object_Field_Object (Metazones, CLDR_ID);
-               Long    : constant String := Object_Field_Object (Object, "long");
-               Short   : constant String := Object_Field_Object (Object, "short");
-               Generic_Label : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Long, "generic");
-               Standard : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Long, "standard");
-               Short_Generic : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Short, "generic");
-               Short_Standard : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Short, "standard");
-               Short_Daylight : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Short, "daylight");
-               Display : constant String :=
-                 (if Generic_Label /= "" then Generic_Label else Standard);
-            begin
-               if Display /= "" then
-                  Emit_JSON
-                    ("{""type"":""zone_family_display"",""locale"":"""
-                     & Locale & """,""family"":""" & Family
-                     & """,""value"":""" & JSON_Escape (Display) & """}");
-               end if;
-
-               if Short_Generic /= ""
-                 and then Short_Standard /= ""
-                 and then Short_Daylight /= ""
-               then
-                  Emit_JSON
-                    ("{""type"":""zone_short_family"",""locale"":"""
-                     & Locale & """,""family"":""" & Family
-                     & """,""standard"":""" & JSON_Escape (Short_Standard)
-                     & """,""daylight"":""" & JSON_Escape (Short_Daylight)
-                     & """,""generic"":""" & JSON_Escape (Short_Generic)
-                     & """}");
-               end if;
-            end Emit_Family;
             --  Every metazone's long standard and daylight names, by CLDR's
             --  own metazone id; zone_metazone says which a zone is in.
             procedure Emit_Specific (Id : String; Object : String) is
@@ -3400,86 +3336,6 @@ procedure Generate_CLDR_Export is
             end if;
 
             For_Each_Member (Metazones, Emit_Specific'Access);
-
-            Emit_Family ("europe-central", "Europe_Central");
-            Emit_Family ("europe-london", "Europe_Western");
-            Emit_Family ("europe-eastern", "Europe_Eastern");
-            Emit_Family ("america-eastern", "America_Eastern");
-            Emit_Family ("america-central", "America_Central");
-            Emit_Family ("america-mexico-city", "America_Central");
-            Emit_Family ("america-mountain", "America_Mountain");
-            Emit_Family ("america-pacific", "America_Pacific");
-            Emit_Family ("america-sao-paulo", "Brasilia");
-            Emit_Family ("pacific-new-zealand", "New_Zealand");
-            Emit_Family ("australia-eastern", "Australia_Eastern");
-            Emit_Family ("australia-central", "Australia_Central");
-            Emit_Family ("australia-central-western", "Australia_CentralWestern");
-            Emit_Family ("australia-western", "Australia_Western");
-            Emit_Family ("australia-lord-howe", "Lord_Howe");
-            Emit_Family ("asia-jerusalem", "Israel");
-            Emit_Family ("asia-tehran", "Iran");
-
-            declare
-               procedure Emit_Fixed_Zone
-                 (Zone    : String;
-                  CLDR_ID : String)
-               is
-                  Object  : constant String := Object_Field_Object
-                    (Metazones, CLDR_ID);
-                  Long    : constant String := Object_Field_Object
-                    (Object, "long");
-                  Generic_Label : constant String :=
-                    Project_Tools.JSON.Object_Field_Value (Long, "generic");
-                  Standard : constant String :=
-                    Project_Tools.JSON.Object_Field_Value (Long, "standard");
-                  Display : constant String :=
-                    (if Generic_Label /= "" then Generic_Label else Standard);
-               begin
-                  if Display /= "" then
-                     Emit_JSON
-                       ("{""type"":""zone_display"",""locale"":"""
-                        & Locale & """,""zone"":""" & Zone
-                        & """,""value"":""" & JSON_Escape (Display) & """}");
-                  end if;
-               end Emit_Fixed_Zone;
-            begin
-               Emit_Fixed_Zone ("Asia/Tokyo", "Japan");
-               Emit_Fixed_Zone ("Europe/Moscow", "Moscow");
-               Emit_Fixed_Zone ("America/Bogota", "Colombia");
-               Emit_Fixed_Zone ("America/Lima", "Peru");
-               Emit_Fixed_Zone ("America/Argentina/Buenos_Aires", "Argentina");
-               Emit_Fixed_Zone ("Africa/Johannesburg", "Africa_Southern");
-               Emit_Fixed_Zone ("Africa/Accra", "Ghana");
-               Emit_Fixed_Zone ("Africa/Abidjan", "GMT");
-               Emit_Fixed_Zone ("Africa/Algiers", "Europe_Central");
-               Emit_Fixed_Zone ("Africa/Tunis", "Europe_Central");
-               Emit_Fixed_Zone ("Africa/Nairobi", "Africa_Eastern");
-               Emit_Fixed_Zone ("Africa/Lagos", "Africa_Western");
-               Emit_Fixed_Zone ("Asia/Dubai", "Gulf");
-               Emit_Fixed_Zone ("Asia/Yerevan", "Armenia");
-               Emit_Fixed_Zone ("Asia/Tbilisi", "Georgia");
-               Emit_Fixed_Zone ("Asia/Baku", "Azerbaijan");
-               Emit_Fixed_Zone ("Asia/Tashkent", "Uzbekistan");
-               Emit_Fixed_Zone ("Asia/Riyadh", "Arabian");
-               Emit_Fixed_Zone ("Asia/Shanghai", "China");
-               Emit_Fixed_Zone ("Asia/Singapore", "Singapore");
-               Emit_Fixed_Zone ("Asia/Hong_Kong", "Hong_Kong");
-               Emit_Fixed_Zone ("Asia/Taipei", "Taipei");
-               Emit_Fixed_Zone ("Asia/Kuala_Lumpur", "Malaysia");
-               Emit_Fixed_Zone ("Asia/Manila", "Philippines");
-               Emit_Fixed_Zone ("Asia/Bangkok", "Indochina");
-               Emit_Fixed_Zone ("Asia/Jakarta", "Indonesia_Western");
-               Emit_Fixed_Zone ("Asia/Ho_Chi_Minh", "Indochina");
-               Emit_Fixed_Zone ("Asia/Karachi", "Pakistan");
-               Emit_Fixed_Zone ("Asia/Colombo", "Lanka");
-               Emit_Fixed_Zone ("Asia/Dhaka", "Bangladesh");
-               Emit_Fixed_Zone ("Asia/Yangon", "Myanmar");
-               Emit_Fixed_Zone ("Asia/Seoul", "Korea");
-               Emit_Fixed_Zone ("Asia/Kolkata", "India");
-               Emit_Fixed_Zone ("Asia/Kathmandu", "Nepal");
-               Emit_Fixed_Zone ("Asia/Ulaanbaatar", "Mongolia");
-               Emit_Fixed_Zone ("Pacific/Honolulu", "Hawaii_Aleutian");
-            end;
          end Emit_Time_Zone_Metazone_Rows;
       begin
          Load_Date_Locales;

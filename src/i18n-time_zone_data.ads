@@ -34,6 +34,14 @@ package I18N.Time_Zone_Data is
       Valid  : out Boolean)
       return Boolean;
 
+   --  Zone's standard offset in seconds this year, east positive: its offset
+   --  at whichever of 1 January and 1 July it keeps standard time (the base
+   --  a time of day with no date is converted by). Valid as above.
+   function Standard_Offset_Seconds
+     (Zone  : String;
+      Valid : out Boolean)
+      return Integer;
+
    --  Whether Zone observes daylight saving time at any moment within Days
    --  days either side of the given UTC date and time -- the test TR35's
    --  generic names make before naming a zone by its standard time.

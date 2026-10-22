@@ -10,6 +10,15 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **The hand-kept zone-family list is gone.** `I18N.CLDR_Data` loses
+  `Time_Zone_DST_Family`, `Time_Zone_Display_Name`, `Time_Zone_Short_Name`,
+  `Time_Zone_Generic_Short_Name` and `Time_Zone_Base_Offset_Minutes`, and the
+  CLDR pipeline loses the `zone_display`, `zone_family_display` and
+  `zone_short_family` rows (26,917 of them) that fed only those. Zone names
+  come from `I18N.Date_Time_Format` ("z", "zzzz", "v", ...); a time of day
+  with no date converts by the new `I18N.Time_Zone_Data.Standard_Offset_Seconds`,
+  the zone's standard offset this year from the tz database, where the list
+  knew some fifty zones.
 - **Time-zone offsets load from `share/i18n/tzdb.i18ndata`**, the last large
   table compiled into `i18n-cldr_data.adb` (which goes from 1.4 MB to 264 KB).
   `I18N.Time_Zone_Data.Offset_Seconds_At_UTC` replaces
@@ -42,9 +51,7 @@ commit is what a consumer's release records.
   Time", not "Switzerland Time").
 
   Against ICU 74 (CLDR 44), 12,000 cases across 12 locales and 40 zones
-  differ in 420 places, all of them CLDR 44 to 48 data changes. The
-  `I18N.CLDR_Data` family functions (`Time_Zone_DST_Family`,
-  `Time_Zone_Short_Name`, ...) stay for existing callers.
+  differ in 420 places, all of them CLDR 44 to 48 data changes.
 - **Historical dates use the metazone in force at the date.** London before
   1971 was "British"; the zone's whole metazone history now comes from
   `metaZones.json`, and daylight time comes from the tz database (zdump's

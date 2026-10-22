@@ -528,21 +528,6 @@ procedure Import_CLDR_Subset is
       return True;
    end Is_Zone_Id;
 
-   function Is_Zone_Family (Value : String) return Boolean is
-   begin
-      if Value = "" then
-         return False;
-      end if;
-
-      for C of Value loop
-         if C not in 'a' .. 'z' and then C not in '0' .. '9' and then C /= '-' then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   end Is_Zone_Family;
-
    function Valid_Hex_List (Text : String) return Boolean is
    begin
       for Index in 1 .. Field_Count (Text, '~') loop
@@ -696,23 +681,11 @@ procedure Import_CLDR_Subset is
            & (if Field_Count (Payload) = 6
               then Field (Payload, 5)
               else Field (Payload, 6));
-      elsif Kind = "zone_display" or else Kind = "zone_display_text" then
-         return "zone_display|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "zone_exemplar"
         or else Kind = "zone_exemplar_text"
         or else Kind = "zone_exemplar_hex"
       then
          return "zone_exemplar|" & Field (Payload, 2) & "|" & Field (Payload, 3);
-      elsif Kind = "zone_family_display"
-        or else Kind = "zone_family_display_text"
-      then
-         return "zone_family_display|" & Field (Payload, 2)
-           & "|" & Field (Payload, 3);
-      elsif Kind = "zone_short_family"
-        or else Kind = "zone_short_family_text"
-      then
-         return "zone_short_family|" & Field (Payload, 2)
-           & "|" & Field (Payload, 3);
       elsif Kind = "zone_meta" then
          return "zone_meta|" & Field (Payload, 2);
       elsif Kind = "zone_text" or else Kind = "zone_text_text" then
@@ -1221,7 +1194,7 @@ procedure Import_CLDR_Subset is
                   & Text_Expr (Pattern));
                Seen_Output := True;
             end;
-         elsif Kind = "zone_display_text" or else Kind = "zone_exemplar_text" then
+         elsif Kind = "zone_exemplar_text" then
             declare
                Locale : constant String := Field (Line, 2);
                Zone   : constant String := Field (Line, 3);
@@ -1236,41 +1209,10 @@ procedure Import_CLDR_Subset is
                   return;
                end if;
 
-               if Kind = "zone_display_text" then
-                  Add_Key ("zone_display|" & Locale & "|" & Zone, Line_Number);
-                  L
-                    ("zone_display|" & Locale & "|" & Zone & "|"
-                     & Text_Expr (Value));
-               else
-                  Add_Key ("zone_exemplar|" & Locale & "|" & Zone, Line_Number);
-                  L
-                    ("zone_exemplar_hex|" & Locale & "|" & Zone & "|"
-                     & Hex_Bytes (Value));
-               end if;
-               Seen_Output := True;
-            end;
-         elsif Kind = "zone_family_display_text" then
-            declare
-               Locale : constant String := Field (Line, 2);
-               Family : constant String := Field (Line, 3);
-               Value  : constant String := Field (Line, 4);
-            begin
-               if Field_Count (Line) /= 4
-                 or else Locale = ""
-                 or else not Is_Zone_Family (Family)
-                 or else Value = ""
-               then
-                  Add_Line_Error
-                    (Line_Number, "invalid zone_family_display_text row shape");
-                  return;
-               end if;
-
-               Add_Key
-                 ("zone_family_display|" & Locale & "|" & Family,
-                  Line_Number);
+               Add_Key ("zone_exemplar|" & Locale & "|" & Zone, Line_Number);
                L
-                 ("zone_family_display|" & Locale & "|" & Family & "|"
-                  & Text_Expr (Value));
+                 ("zone_exemplar_hex|" & Locale & "|" & Zone & "|"
+                  & Hex_Bytes (Value));
                Seen_Output := True;
             end;
          elsif Kind = "zone_meta" then
@@ -1302,35 +1244,6 @@ procedure Import_CLDR_Subset is
                & "|" & Text_Expr (Field (Line, 6)) & "|" & Text_Expr (Field (Line, 7))
                & "|" & Text_Expr (Field (Line, 8)) & "|" & Text_Expr (Last_Field (Line)));
             Seen_Output := True;
-         elsif Kind = "zone_short_family_text" then
-            declare
-               Locale   : constant String := Field (Line, 2);
-               Family   : constant String := Field (Line, 3);
-               Standard : constant String := Field (Line, 4);
-               Daylight : constant String := Field (Line, 5);
-               Generic_Label : constant String := Field (Line, 6);
-            begin
-               if Field_Count (Line) /= 6
-                 or else Locale = ""
-                 or else not Is_Zone_Family (Family)
-                 or else Standard = ""
-                 or else Daylight = ""
-                 or else Generic_Label = ""
-               then
-                  Add_Line_Error
-                    (Line_Number, "invalid zone_short_family_text row shape");
-                  return;
-               end if;
-
-               Add_Key
-                 ("zone_short_family|" & Locale & "|" & Family,
-                  Line_Number);
-               L
-                 ("zone_short_family|" & Locale & "|" & Family & "|"
-                  & Text_Expr (Standard) & "|" & Text_Expr (Daylight)
-                  & "|" & Text_Expr (Generic_Label));
-               Seen_Output := True;
-            end;
          elsif Kind = "zone_gmt_prefix_text"
            or else Kind = "zone_offset_separator_text"
            or else Kind = "zone_location_pattern_text"
