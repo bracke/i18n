@@ -55,6 +55,8 @@ begin
    Assert (Interval ("2026-10-09/2026-10-15", "pl", "::yMMMd")
            = "9" & En_Dash & "15 pa" & Character'Val (16#C5#) & Character'Val (16#BA#) & " 2026",
            "Polish days of one month");
+   Assert (Interval ("2026-10-09/2026-11-15", "sw", "::yMMMd") = "9 Okt 2026" & Range_Dash & "15 Nov 2026",
+           "a pattern that drops the first month (CLDR 48's Swahili) gives way to the fallback");
    Assert (Interval ("2026-10-09/2026-10-09", "de", "::yMMMd") = "9. Okt. 2026",
            "one day is that date");
    Assert (Interval ("2026-10-09/2026-10-15", "de", "medium") = "09.10.2026" & Range_Dash & "15.10.2026",

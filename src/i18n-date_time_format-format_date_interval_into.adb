@@ -134,8 +134,26 @@ begin
          Pattern : constant String :=
            I18N.Locale_Data.Lookup ("date_interval", Locale, Skeleton_Text (Style_Only) & ":" & Field, Found);
          Split   : constant Natural := (if Found then Second_Half (Pattern) else 0);
+
+         --  Whether the first date's half writes the field that differs: a
+         --  pattern that does not ("d – d MMM y" for months apart, CLDR 48's
+         --  Swahili) cannot tell the dates apart, and the fallback can.
+         function Writes_Field (Half : String) return Boolean is
+            Quoted : Boolean := False;
+         begin
+            for C of Half loop
+               if C = ''' then
+                  Quoted := not Quoted;
+               elsif not Quoted
+                 and then (C = Field (Field'First) or else (Field = "M" and then C = 'L'))
+               then
+                  return True;
+               end if;
+            end loop;
+            return False;
+         end Writes_Field;
       begin
-         if Split > Pattern'First then
+         if Split > Pattern'First and then Writes_Field (Pattern (Pattern'First .. Split - 1)) then
             Write (Pattern (Pattern'First .. Split - 1), From, Done);
             if Done and then not Overflow then
                Write (Pattern (Split .. Pattern'Last), To, Done);
