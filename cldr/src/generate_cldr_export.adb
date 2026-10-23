@@ -2592,7 +2592,13 @@ procedure Generate_CLDR_Export is
                Part   : String;
                Pattern : String)
             is
-               Value : constant String := Separator_From_Pattern (Pattern);
+               --  "{0}{1}" -- Japanese narrow units -- joins with nothing, which
+               --  the store, having no empty values, keeps as CLDR's "no value"
+               --  marker; I18N.List_Format reads it back as "".
+               Adjacent : constant Boolean :=
+                 First_Index (Pattern, "{0}{1}") /= 0;
+               Value : constant String :=
+                 (if Adjacent then "∅∅∅" else Separator_From_Pattern (Pattern));
             begin
                if Value /= "" then
                   Emit_JSON
@@ -2743,6 +2749,8 @@ procedure Generate_CLDR_Export is
                           (Locale, Patterns, "or", "listPattern-type-or");
                         Emit_List_Family
                           (Locale, Patterns, "unit", "listPattern-type-unit");
+                        Emit_List_Family
+                          (Locale, Patterns, "unit-narrow", "listPattern-type-unit-narrow");
                      end;
                   end if;
 

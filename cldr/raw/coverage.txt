@@ -6,7 +6,7 @@ require_raw_count|available_format|10930
 require_raw_count|currency|307
 require_raw_count|currency_name_payload|405
 require_raw_count|day_period|7530
-require_raw_count|list_separator|11460
+require_raw_count|list_separator|15320
 require_raw_count|name_hex|4494
 require_raw_count|name_set|102
 require_raw_count|numbering_system|163

@@ -10,6 +10,11 @@ commit is what a consumer's release records.
 
 ### Added
 
+- CLDR's narrow unit lists (`unit-narrow`, "1 h, 30 min und 5 s") beside
+  the standard, or and unit families. A separator CLDR leaves empty --
+  Japanese and Chinese "{0}{1}" -- is kept as the "no value" marker and
+  read back as "", where it used to fall back to root's ", ".
+
 - CLDR's `perUnitPattern` -- a unit as a rate's denominator, "{0}/s",
   German "{0} pro Stunde" -- as `p:<unit>:<width>:per` rows of the unit
   shards (64,344 rows), read by `I18N.Unit_Format.Per_Pattern`.

@@ -264,7 +264,8 @@ procedure Import_CLDR_Raw is
    begin
       return Value = "standard"
         or else Value = "or"
-        or else Value = "unit";
+        or else Value = "unit"
+        or else Value = "unit-narrow";
    end Is_List_Separator_Family;
 
    function Is_Unit_Separator_Part (Value : String) return Boolean is
