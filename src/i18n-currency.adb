@@ -161,13 +161,21 @@ package body I18N.Currency is
         (if Found then Value else Natural'Value (Currency_Data ("currency_cash_increment", Code, "1")));
    end Cash_Increment;
 
+   --  A locale's currency separator where CLDR gives money its own (de-AT
+   --  groups amounts with "." and other numbers with a space), else the
+   --  number separator.
+   function Currency_Separator (Section, Field_Name, Locale : String) return String is
+      Found : Boolean;
+      Value : constant String := I18N.Locale_Data.Lookup (Section, Locale, "", Found);
+   begin
+      return (if Found and then Value /= "" then Value else I18N.Locale_Data.Field (Field_Name, Locale));
+   end Currency_Separator;
+
    function Decimal_Separator (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("decimal_separator", Locale));
+     (Currency_Separator ("number_currency_decimal", "decimal_separator", Locale));
 
    function Group_Separator (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("group_separator", Locale));
+     (Currency_Separator ("number_currency_group", "group_separator", Locale));
 
    function Number_Minus_Sign (Locale : String) return String is
      (I18N.Locale_Data.Field

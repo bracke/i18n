@@ -1722,6 +1722,10 @@ procedure Generate_CLDR_Data is
                   elsif Name = "permille" then "number_permille_suffix"
                   elsif Name = "exponent" then "number_exponent_separator"
                   elsif Name = "min_grouping" then "number_min_grouping"
+                  elsif Name = "decimal_latn" then "number_decimal_latn"
+                  elsif Name = "group_latn" then "number_group_latn"
+                  elsif Name = "currency_group" then "number_currency_group"
+                  elsif Name = "currency_decimal" then "number_currency_decimal"
                   elsif Name = "currency_pattern" then "currency_pattern"
                   else "");
                --  A currency symbol the locale writes otherwise than it

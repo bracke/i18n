@@ -1458,6 +1458,20 @@ procedure Generate_CLDR_Export is
                                Project_Tools.JSON.Object_Field_Value
                                  (Object_Field_Object (Text, "currencyFormats-numberSystem-" & System),
                                   "standard"));
+                     --  The Latin system's separators beside a native default
+                     --  (Arabic "1,234.5" for ar-u-nu-latn, not "1٬234٫5").
+                     if System /= "latn" then
+                        declare
+                           Latin : constant String := Object_Field_Object (Text, "symbols-numberSystem-latn");
+                        begin
+                           if Latin /= "" then
+                              Put_Text ("decimal_latn", Project_Tools.JSON.Object_Field_Value (Latin, "decimal"));
+                              Put_Text ("group_latn", Project_Tools.JSON.Object_Field_Value (Latin, "group"));
+                           end if;
+                        end;
+                     end if;
+                     Put_Text ("currency_group", Project_Tools.JSON.Object_Field_Value (Symbols, "currencyGroup"));
+                     Put_Text ("currency_decimal", Project_Tools.JSON.Object_Field_Value (Symbols, "currencyDecimal"));
                      Put_Text ("plus", Project_Tools.JSON.Object_Field_Value (Symbols, "plusSign"));
                      Put_Text ("minus", Project_Tools.JSON.Object_Field_Value (Symbols, "minusSign"));
                      Put_Text ("permille", Project_Tools.JSON.Object_Field_Value (Symbols, "perMille"));
@@ -1478,6 +1492,29 @@ procedure Generate_CLDR_Export is
                      end;
                   end;
 
+                  --  A region writing Latin digits where its language writes
+                  --  others (ar-MA, ar-DZ) says so, or it would inherit them.
+                  if System = "latn" and then Ada.Strings.Fixed.Index (Locale, "-") > 0 then
+                     declare
+                        Language : constant String :=
+                          Locale (Locale'First .. Ada.Strings.Fixed.Index (Locale, "-") - 1);
+                        Language_Text : constant String :=
+                          Project_Tools.Files.Read_Raw_File
+                            ("upstream/cldr-json/cldr-numbers-full/main/" & Language & "/numbers.json");
+                        Language_System : constant String :=
+                          (if Language = "ar" then "arab"
+                           else Project_Tools.JSON.Field_Value (Language_Text, "defaultNumberingSystem"));
+                     begin
+                        if Language_System /= "" and then Language_System /= "latn" then
+                           Emit_JSON
+                             ("{""type"":""numbering_system"",""locale"":"""
+                              & Locale & """,""digits"":""" & Numbering_Digits ("latn") & """}");
+                        end if;
+                     exception
+                        when others =>
+                           null;
+                     end;
+                  end if;
                   if System /= "latn" then
                      if Digit_Codes = "" then
                         Add_Error

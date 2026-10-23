@@ -1,3 +1,4 @@
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 with I18N.CLDR_Data;
@@ -100,13 +101,32 @@ package body I18N.Number_Format is
       end if;
    end UTF8;
 
+   --  The numbering system a locale names ("-u-nu-latn"), or "".
+   function Named_System (Locale : String) return String is
+      At_Key : constant Natural := Ada.Strings.Fixed.Index (Locale, "-u-nu-");
+   begin
+      if At_Key = 0 or else At_Key + 9 > Locale'Last then
+         return "";
+      end if;
+      return Locale (At_Key + 6 .. At_Key + 9);
+   end Named_System;
+
+   --  A separator: the named Latin system's where the locale has one of its
+   --  own beside a native default, else the locale's.
+   function Separator (Field_Name, Latin_Section, Locale : String) return String is
+      Found : Boolean := False;
+      Latin : constant String :=
+        (if Named_System (Locale) = "latn"
+         then I18N.Locale_Data.Lookup (Latin_Section, Locale, "", Found) else "");
+   begin
+      return (if Found and then Latin /= "" then Latin else I18N.Locale_Data.Field (Field_Name, Locale));
+   end Separator;
+
    function Decimal_Separator (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("decimal_separator", Locale));
+     (Separator ("decimal_separator", "number_decimal_latn", Locale));
 
    function Group_Separator (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("group_separator", Locale));
+     (Separator ("group_separator", "number_group_latn", Locale));
 
    function Uses_Indian_Grouping (Locale : String) return Boolean is
       Found : Boolean;

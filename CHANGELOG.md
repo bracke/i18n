@@ -168,6 +168,13 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- Arabic and Persian with Latin digits (ar-u-nu-latn) take the Latin
+  system's separators ("1,234,567.5", as ICU), not the Arabic ones; regions
+  whose default is Latin where their language's is not (ar-MA, ar-DZ, ...)
+  write Latin digits instead of inheriting Arabic-Indic ones.
+- Money takes CLDR's currency separators where a locale has its own (de-AT
+  "€ 1.234.567,80" while numbers group with a space; fr-CH).
+
 - `I18N.Casing` bisected its general-category ranges, which the data lists
   category by category, so every lookup missed. They are now sorted after
   loading. The new `I18N.Casing.General_Category` exposes the lookup.
