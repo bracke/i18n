@@ -1,10 +1,12 @@
 with Ada.Command_Line;
+with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
 with Ada.Strings;
 with Ada.Strings.Fixed;
+with Ada.Strings.Hash;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
@@ -1273,6 +1275,116 @@ procedure Generate_CLDR_Export is
                end if;
                raise;
          end Day_Month_Year_Locales;
+         --  A locale's currency symbols where they differ from what it would
+         --  inherit -- its CLDR parent's (parentLocales, then the truncated
+         --  tag), and English's at the top, which the und rows hold -- so the
+         --  reader's fallback walk finds "US$" in en-GB, "$US" in French,
+         --  "EUR" in Swiss German and Ukrainian. cldr-json files are resolved,
+         --  so one parent's file is the whole inheritance.
+         procedure Emit_Locale_Currency_Symbols is
+            package Symbol_Maps is new Ada.Containers.Indefinite_Hashed_Maps
+              (Key_Type => String, Element_Type => String,
+               Hash => Ada.Strings.Hash, Equivalent_Keys => "=");
+            Main_Root : constant String := "upstream/cldr-json/cldr-numbers-full/main/";
+            Parents   : constant String :=
+              Object_Field_Object
+                (Object_Field_Object
+                   (Project_Tools.Files.Read_Raw_File
+                      ("upstream/cldr-json/cldr-core/supplemental/parentLocales.json"),
+                    "parentLocales"),
+                 "parentLocale");
+
+            function Currencies_Of (Loc : String) return String is
+            begin
+               if not Ada.Directories.Exists (Main_Root & Loc & "/currencies.json") then
+                  return "";
+               end if;
+               return Object_Field_Object
+                 (Project_Tools.Files.Read_Raw_File (Main_Root & Loc & "/currencies.json"), "currencies");
+            end Currencies_Of;
+
+            function Parent_Of (Loc : String) return String is
+               Override : constant String := Project_Tools.JSON.Object_Field_Value (Parents, Loc);
+            begin
+               if Override /= "" then
+                  return (if Override = "root" then "und" else Override);
+               end if;
+               for Index in reverse Loc'Range loop
+                  if Loc (Index) = '-' then
+                     return Loc (Loc'First .. Index - 1);
+                  end if;
+               end loop;
+               return "und";
+            end Parent_Of;
+
+            procedure Load (Map : in out Symbol_Maps.Map; Currencies : String) is
+               procedure Add (Code : String; Value : String) is
+                  Symbol : constant String := Project_Tools.JSON.Object_Field_Value (Value, "symbol");
+                  Narrow : constant String := Project_Tools.JSON.Object_Field_Value (Value, "symbol-alt-narrow");
+                  Shown  : constant String := (if Symbol = "" then Code else Symbol);
+               begin
+                  Map.Include ("symbol:" & Code, Shown);
+                  Map.Include ("narrow:" & Code, (if Narrow = "" then Shown else Narrow));
+               end Add;
+            begin
+               For_Each_Object_Field (Currencies, Add'Access);
+            end Load;
+
+            Root : Symbol_Maps.Map;
+         begin
+            Load (Root, Currencies_Of ("und"));
+            for Index in 1 .. Locale_Count loop
+               declare
+                  Locale : constant String := S (Locales (Index));
+                  Own    : constant String := (if Locale = "und" then "" else Currencies_Of (Locale));
+                  Parent : constant String := Parent_Of (Locale);
+                  Parent_Text : constant String := (if Parent = "und" then "" else Currencies_Of (Parent));
+                  Inherited   : Symbol_Maps.Map;
+                  Mine        : Symbol_Maps.Map;
+
+                  --  What the reader finds without this locale's row: the
+                  --  parent's, root's, or the code itself, which root's base
+                  --  rows default to.
+                  function Inherited_Value (Key : String) return String is
+                     Code : constant String := Key (Key'First + 7 .. Key'Last);
+                  begin
+                     if Inherited.Contains (Key) then
+                        return Inherited.Element (Key);
+                     elsif Key (Key'First .. Key'First + 6) = "narrow:"
+                       and then Inherited.Contains ("symbol:" & Code)
+                     then
+                        return Inherited.Element ("symbol:" & Code);
+                     end if;
+                     return Code;
+                  end Inherited_Value;
+               begin
+                  if Own /= "" then
+                     if Parent_Text = "" then
+                        Inherited := Root;
+                     else
+                        Load (Inherited, Parent_Text);
+                     end if;
+                     Load (Mine, Own);
+                     for Cursor in Mine.Iterate loop
+                        declare
+                           Key   : constant String := Symbol_Maps.Key (Cursor);
+                           Value : constant String := Symbol_Maps.Element (Cursor);
+                        begin
+                           if Value /= Inherited_Value (Key) then
+                              Emit_JSON
+                                ("{""type"":""number_text"",""locale"":""" & Locale
+                                 & """,""key"":""" & Key & """,""value"":""" & JSON_Escape (Value) & """}");
+                           end if;
+                        end;
+                     end loop;
+                  end if;
+               exception
+                  when others =>
+                     Add_Error ("failed to import CLDR currency symbols for " & Locale);
+               end;
+            end loop;
+         end Emit_Locale_Currency_Symbols;
+
       begin
          Load_Locales;
 
@@ -1331,6 +1443,21 @@ procedure Generate_CLDR_Export is
                            Last_Digit := Index;
                         end if;
                      end loop;
+                     --  Grouping waits for this many digits beyond the group
+                     --  (Spanish and Polish write "1234"), and the currency
+                     --  pattern places the symbol, its spacing and bidi marks.
+                     declare
+                        Min_Grouping : constant String :=
+                          Project_Tools.JSON.Field_Value (Text, "minimumGroupingDigits");
+                     begin
+                        if Min_Grouping /= "" then
+                           Put_Text ("min_grouping", Min_Grouping);
+                        end if;
+                     end;
+                     Put_Text ("currency_pattern",
+                               Project_Tools.JSON.Object_Field_Value
+                                 (Object_Field_Object (Text, "currencyFormats-numberSystem-" & System),
+                                  "standard"));
                      Put_Text ("plus", Project_Tools.JSON.Object_Field_Value (Symbols, "plusSign"));
                      Put_Text ("minus", Project_Tools.JSON.Object_Field_Value (Symbols, "minusSign"));
                      Put_Text ("permille", Project_Tools.JSON.Object_Field_Value (Symbols, "perMille"));
@@ -1370,9 +1497,7 @@ procedure Generate_CLDR_Export is
          end loop;
 
          Emit_Numeric_Numbering_System_Rows;
-         Emit_JSON
-           ("{""type"":""numbering_system"",""locale"":""th"",""digits"":"""
-            & Numbering_Digits ("thai") & """}");
+         Emit_Locale_Currency_Symbols;
          Emit_JSON
            ("{""type"":""policy"",""name"":""indian_grouping"",""locales"":"""
             & Indian_Grouping_Locales
@@ -1805,6 +1930,11 @@ procedure Generate_CLDR_Export is
                 ("upstream/cldr-json/cldr-numbers-full/main/en/currencies.json"),
               "currencies");
          Default_Fraction : constant String := Object_Field_Object (Fractions, "DEFAULT");
+         Root_Currencies : constant String :=
+           Object_Field_Object
+             (Project_Tools.Files.Read_Raw_File
+                ("upstream/cldr-json/cldr-numbers-full/main/und/currencies.json"),
+              "currencies");
 
          function Display_Name (Code : String; Fallback : String) return String is
          begin
@@ -1866,10 +1996,13 @@ procedure Generate_CLDR_Export is
               (if Cash_Rounding /= "" and then Cash_Rounding /= "0" then Cash_Rounding
                elsif Cash_Digits /= "" and then Cash_Digits /= Units then Cash_Digits
                else "1");
+            --  The base rows carry root's symbols ("US$", the code where root
+            --  names none); English's own "$" is one of the locale rows.
+            Root_Value : constant String := Object_Field_Object (Root_Currencies, Code);
             Symbol : constant String :=
-              Project_Tools.JSON.Object_Field_Value (Value, "symbol");
+              Project_Tools.JSON.Object_Field_Value (Root_Value, "symbol");
             Narrow : constant String :=
-              Project_Tools.JSON.Object_Field_Value (Value, "symbol-alt-narrow");
+              Project_Tools.JSON.Object_Field_Value (Root_Value, "symbol-alt-narrow");
             Name : constant String :=
               Project_Tools.JSON.Object_Field_Value (Value, "displayName");
          begin

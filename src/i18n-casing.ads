@@ -10,4 +10,9 @@ package I18N.Casing is
 
    function Available return Boolean;
 
+   --  The Unicode General_Category of a code point ("Sc", "Lu", "Zs"), from
+   --  the same UCD data; "Cn" where the data is missing or the code point is
+   --  unassigned.
+   function General_Category (Code_Point : Natural) return String;
+
 end I18N.Casing;

@@ -9,7 +9,7 @@ require_raw_count|day_period|7530
 require_raw_count|list_separator|15320
 require_raw_count|name_hex|4494
 require_raw_count|name_set|102
-require_raw_count|numbering_system|163
+require_raw_count|numbering_system|162
 require_raw_count|plural_family|62
 require_raw_count|policy|3
 require_raw_count|relative_current|18384
@@ -60,7 +60,6 @@ require_policy|symbol_first
 
 require_numbering_system|ar
 require_numbering_system|fa
-require_numbering_system|th
 require_numbering_system|nu-arab
 require_numbering_system|nu-arabext
 require_numbering_system|nu-thai

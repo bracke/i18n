@@ -1,3 +1,4 @@
+with Ada.Containers.Generic_Array_Sort;
 with Ada.Containers.Hashed_Maps;
 with Ada.Containers.Vectors;
 with I18N.Data_Store;
@@ -31,6 +32,10 @@ package body I18N.Casing is
    type Range_Array is array (Positive range <>) of Range_Rec;
    type Range_Access is access Range_Array;
    GC_Tab : Range_Access;
+
+   function Before (Left, Right : Range_Rec) return Boolean is (Left.Lo < Right.Lo);
+   procedure Sort_Ranges is new Ada.Containers.Generic_Array_Sort
+     (Index_Type => Positive, Element_Type => Range_Rec, Array_Type => Range_Array, "<" => Before);
 
    Loaded    : Boolean := False;
    Have_Data : Boolean := False;
@@ -211,6 +216,9 @@ package body I18N.Casing is
                end;
             end loop;
          end;
+         --  The data lists the ranges category by category; GC_Of bisects
+         --  by code point.
+         Sort_Ranges (GC_Tab.all);
       end;
    end Ensure_Loaded;
 
@@ -458,5 +466,14 @@ package body I18N.Casing is
       Ensure_Loaded;
       return Have_Data;
    end Available;
+
+   function General_Category (Code_Point : Natural) return String is
+   begin
+      Ensure_Loaded;
+      if GC_Tab = null or else GC_Tab'Length = 0 or else Code_Point > 16#10FFFF# then
+         return "Cn";
+      end if;
+      return GC_Of (CP (Code_Point));
+   end General_Category;
 
 end I18N.Casing;

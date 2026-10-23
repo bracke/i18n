@@ -1,3 +1,6 @@
+with Ada.Wide_Wide_Characters.Unicode;
+
+with I18N.Casing;
 with I18N.Number_Format;
 with I18N.Locale_Data;
 with I18N.Plurals;
@@ -199,22 +202,35 @@ package body I18N.Currency is
       return False;
    end Uses_Indian_Grouping;
 
-   function Currency_Symbol (Code : String) return String is
+   --  The locale's own symbol for the currency ("US$" in en-GB, "$US" in
+   --  French, "EUR" in Swiss German), inheriting up CLDR's parent chain to
+   --  the und rows.
+   function Locale_Currency_Data
+     (Section : String; Locale : String; Code : String; Default : String) return String
+   is
+      Found : Boolean;
+      Value : constant String := I18N.Locale_Data.Lookup (Section, Locale, Code, Found);
+   begin
+      return (if Found then Value else Default);
+   end Locale_Currency_Data;
+
+   function Currency_Symbol (Locale : String; Code : String) return String is
       Found : Boolean;
       Value : constant String :=
         I18N.Runtime_Data.Currency_Text (Code, "symbol", Found);
    begin
-      return (if Found then Value else Currency_Data ("currency_symbol", Code, Code));
+      return (if Found then Value else Locale_Currency_Data ("currency_symbol", Locale, Code, Code));
    end Currency_Symbol;
 
-   function Currency_Narrow_Symbol (Code : String) return String is
+   function Currency_Narrow_Symbol (Locale : String; Code : String) return String is
       Found : Boolean;
       Value : constant String :=
         I18N.Runtime_Data.Currency_Text (Code, "narrow_symbol", Found);
    begin
       return
         (if Found then Value
-         else Currency_Data ("currency_narrow_symbol", Code, Currency_Symbol (Code)));
+         else Locale_Currency_Data
+                ("currency_narrow_symbol", Locale, Code, Currency_Symbol (Locale, Code)));
    end Currency_Narrow_Symbol;
 
    function Currency_Display_Name
@@ -316,9 +332,9 @@ package body I18N.Currency is
    begin
       case Style.Display is
          when Symbol =>
-            return Currency_Symbol (Style.Code);
+            return Currency_Symbol (Locale, Style.Code);
          when Narrow_Symbol =>
-            return Currency_Narrow_Symbol (Style.Code);
+            return Currency_Narrow_Symbol (Locale, Style.Code);
          when Name_Display =>
             return Currency_Display_Name (Locale, Style.Code, Category);
          when ISO_Code_Display =>
@@ -416,7 +432,9 @@ package body I18N.Currency is
       Remaining        : Natural := Digit_Count;
       Group_Sep        : constant String := Group_Separator (Locale);
    begin
-      if Digit_Count <= Primary_Group then
+      if Digit_Count < Primary_Group + I18N.Number_Format.Min_Grouping_Digits (Locale) then
+         First_Group := Digit_Count;
+      elsif Digit_Count <= Primary_Group then
          First_Group := Digit_Count;
       else
          First_Group := (Digit_Count - Primary_Group) mod Secondary_Group;
@@ -634,6 +652,144 @@ package body I18N.Currency is
               Digits_Buf (Count - Offset + 1);
          end loop;
       end Set_Rounded;
+
+      --  The amount laid out by the locale's CLDR currency pattern (the
+      --  symbol before or after, Arabic's right-to-left mark, an explicit
+      --  negative subpattern) with CLDR's currency spacing: a no-break space
+      --  between the symbol and a digit unless the symbol's neighbouring
+      --  character is itself a symbol ("€1,234.50" but "EUR 1,234.50"). CLDR
+      --  gives every locale the same spacing rule.
+      procedure Put_Patterned (Pattern : String) is
+         Sign_Mark : constant String := Character'Val (16#C2#) & Character'Val (16#A4#);
+         NBSP      : constant String := Character'Val (16#C2#) & Character'Val (16#A0#);
+         Number          : String (1 .. 192);
+         Number_Last     : Natural := 0;
+         Number_Overflow : Boolean := False;
+         Semi            : Natural := 0;
+         Shown           : constant String := Display (1 .. Display_Last);
+         In_Quote        : Boolean := False;
+
+         --  The code point of Text that starts at From.
+         function Code_At (Text : String; From : Positive) return Natural is
+            B : constant Natural := Character'Pos (Text (From));
+         begin
+            if B < 16#80# then
+               return B;
+            elsif B >= 16#F0# and then From + 3 <= Text'Last then
+               return (B - 16#F0#) * 262_144 + (Character'Pos (Text (From + 1)) - 16#80#) * 4_096
+                 + (Character'Pos (Text (From + 2)) - 16#80#) * 64 + Character'Pos (Text (From + 3)) - 16#80#;
+            elsif B >= 16#E0# and then From + 2 <= Text'Last then
+               return (B - 16#E0#) * 4_096 + (Character'Pos (Text (From + 1)) - 16#80#) * 64
+                 + Character'Pos (Text (From + 2)) - 16#80#;
+            elsif B >= 16#C0# and then From + 1 <= Text'Last then
+               return (B - 16#C0#) * 64 + Character'Pos (Text (From + 1)) - 16#80#;
+            end if;
+            return B;
+         end Code_At;
+
+         function Last_Code (Text : String) return Natural is
+            Start : Natural := Text'Last;
+         begin
+            while Start > Text'First and then Character'Pos (Text (Start)) in 16#80# .. 16#BF# loop
+               Start := Start - 1;
+            end loop;
+            return Code_At (Text, Start);
+         end Last_Code;
+
+         --  CLDR's currencyMatch [[:^S:]&[:^Z:]]: a symbol edge that is
+         --  neither a symbol nor a separator takes the space.
+         function Takes_Space (Code : Natural) return Boolean is
+            use Ada.Wide_Wide_Characters.Unicode;
+            UCD : constant String := I18N.Casing.General_Category (Code);
+         begin
+            --  i18n's UCD first: the run-time's tables predate the rupee
+            --  sign and its successors, which they call unassigned.
+            if UCD /= "Cn" then
+               return UCD (UCD'First) not in 'S' | 'Z';
+            end if;
+            return Get_Category (Wide_Wide_Character'Val (Code))
+              not in Sc | Sk | Sm | So | Zs | Zl | Zp;
+         end Takes_Space;
+      begin
+         Put_Integer_With_Grouping
+           (Target       => Number,
+            Last         => Number_Last,
+            Overflow     => Number_Overflow,
+            Locale       => Locale,
+            Amount_Text  => Integer_Text,
+            Integer_From => 1,
+            Integer_To   => Integer_Last);
+         if Scale > 0 then
+            Put (Number, Number_Last, Number_Overflow, Decimal_Sep);
+            Put_Fraction (Number, Number_Last, Number_Overflow, Locale, Frac_Value, Scale);
+         end if;
+         if Number_Overflow then
+            Overflow := True;
+            return;
+         end if;
+
+         for Index in Pattern'Range loop
+            if Pattern (Index) = ''' then
+               In_Quote := not In_Quote;
+            elsif Pattern (Index) = ';' and then not In_Quote then
+               Semi := Index;
+               exit;
+            end if;
+         end loop;
+         In_Quote := False;
+
+         declare
+            Sub : constant String :=
+              (if Negative and then Semi /= 0 then Pattern (Semi + 1 .. Pattern'Last)
+               elsif Semi /= 0 then Pattern (Pattern'First .. Semi - 1)
+               else Pattern);
+            I : Natural := Sub'First;
+         begin
+            --  Without a negative subpattern the minus sign leads.
+            if Negative and then Semi = 0 then
+               Put (Target, Last, Overflow, Number_Minus_Sign (Locale));
+            end if;
+            while I <= Sub'Last loop
+               if Sub (I) = ''' then
+                  if I < Sub'Last and then Sub (I + 1) = ''' then
+                     Put (Target, Last, Overflow, "'");
+                     I := I + 2;
+                  else
+                     In_Quote := not In_Quote;
+                     I := I + 1;
+                  end if;
+               elsif In_Quote then
+                  Put (Target, Last, Overflow, Sub (I .. I));
+                  I := I + 1;
+               elsif I < Sub'Last and then Sub (I .. I + 1) = Sign_Mark then
+                  Put (Target, Last, Overflow, Shown);
+                  I := I + 2;
+                  if I <= Sub'Last and then Sub (I) in '#' | '0'
+                    and then Shown'Length > 0 and then Takes_Space (Last_Code (Shown))
+                  then
+                     Put (Target, Last, Overflow, NBSP);
+                  end if;
+               elsif Sub (I) in '#' | '0' | ',' | '.' then
+                  while I <= Sub'Last and then Sub (I) in '#' | '0' | ',' | '.' loop
+                     I := I + 1;
+                  end loop;
+                  Put (Target, Last, Overflow, Number (1 .. Number_Last));
+                  if I < Sub'Last and then Sub (I .. I + 1) = Sign_Mark
+                    and then Shown'Length > 0 and then Takes_Space (Code_At (Shown, Shown'First))
+                  then
+                     Put (Target, Last, Overflow, NBSP);
+                  end if;
+               elsif Sub (I) = '-' then
+                  Put (Target, Last, Overflow, Number_Minus_Sign (Locale));
+                  I := I + 1;
+               else
+                  Put (Target, Last, Overflow, Sub (I .. I));
+                  I := I + 1;
+               end if;
+            end loop;
+         end;
+      end Put_Patterned;
+
    begin
       Last := 0;
       Ok := False;
@@ -681,14 +837,12 @@ package body I18N.Currency is
       if Dot_Pos /= 0 then
          if Frac_To < Frac_From then
             return;
-         elsif not (Style.Cash and then Scale = 0)
-           and then Natural (Frac_To - Frac_From + 1) >
-             Scale + (if Style.Cash then 1 else 0)
+         elsif Style.Cash and then Scale > 0
+           and then Natural (Frac_To - Frac_From + 1) > Scale + 1
          then
-            --  A zero-decimal cash currency (for example HUF with a cash
-            --  increment of 5) accepts a fractional amount and rounds it into
-            --  the integer part below; every other style keeps the strict
-            --  precision limit.
+            --  A cash style keeps its precision limit; a zero-decimal cash
+            --  currency (HUF with a cash increment of 5) rounds below, and
+            --  every other style rounds digits beyond the currency's own.
             return;
          end if;
       end if;
@@ -714,6 +868,24 @@ package body I18N.Currency is
          Extra_Digit :=
            Character'Pos (Amount_Text (Dot_Pos + 1 + Scale))
            - Character'Pos ('0');
+      end if;
+
+      --  Digits beyond the currency's own round half-even, as ICU does:
+      --  1234.5 yen is 1,234 yen, 0.125 euro 0.12 euro.
+      if not Style.Cash and then Dot_Pos /= 0 and then Frac_To >= Dot_Pos + 1 + Scale then
+         declare
+            Next : constant Natural :=
+              Character'Pos (Amount_Text (Dot_Pos + 1 + Scale)) - Character'Pos ('0');
+            Rest_Nonzero : constant Boolean :=
+              (for some Index in Dot_Pos + 2 + Scale .. Frac_To => Amount_Text (Index) /= '0');
+            Kept_Odd : constant Boolean :=
+              (if Scale > 0 then Frac_Value mod 2 = 1
+               else (Character'Pos (Amount_Text (Integer_To)) - Character'Pos ('0')) mod 2 = 1);
+         begin
+            if Next > 5 or else (Next = 5 and then (Rest_Nonzero or else Kept_Odd)) then
+               Frac_Value := Frac_Value + 1;
+            end if;
+         end;
       end if;
 
       Unit := Power_10 (Scale);
@@ -804,6 +976,34 @@ package body I18N.Currency is
       end if;
       if Display_Last = 0 then
          return;
+      end if;
+
+      --  Symbol, narrow-symbol and ISO-code displays follow the locale's
+      --  CLDR currency pattern; names and the accounting style keep their
+      --  composition below.
+      --  Placement given as runtime data is an explicit instruction and
+      --  keeps the composition.
+      if not Style.Accounting and then Style.Display /= Name_Display then
+         declare
+            Found   : Boolean;
+            Pattern : constant String :=
+              I18N.Locale_Data.Lookup ("currency_pattern", Locale, "", Found);
+            Runtime_First : Boolean;
+            First_Value   : constant Boolean :=
+              I18N.Runtime_Data.Locale_Boolean (Locale, "currency_symbol_first", Runtime_First);
+            Runtime_Separator : Boolean;
+            Separator_Value   : constant String :=
+              I18N.Runtime_Data.Locale_Text (Locale, "currency_amount_separator", Runtime_Separator);
+            pragma Unreferenced (First_Value, Separator_Value);
+         begin
+            if Found and then Pattern'Length > 0
+              and then not Runtime_First and then not Runtime_Separator
+            then
+               Put_Patterned (Pattern);
+               Ok := not Overflow;
+               return;
+            end if;
+         end;
       end if;
 
       if Negative and then Style.Accounting then

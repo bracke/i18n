@@ -1354,6 +1354,18 @@ package body I18N.Number_Format is
       return Count;
    end Fraction_Leading_Zeroes;
 
+   --  CLDR's minimumGroupingDigits: grouping begins only when the integer has
+   --  this many digits beyond the first group (2 in Spanish and Polish, which
+   --  write "1234" but "12 345").
+   function Min_Grouping_Digits (Locale : String) return Positive is
+      Found : Boolean;
+      Value : constant String :=
+        I18N.Locale_Data.Lookup ("number_min_grouping", Locale, "", Found);
+   begin
+      return (if Found and then Value'Length = 1 and then Value (Value'First) in '1' .. '9'
+              then Character'Pos (Value (Value'First)) - Character'Pos ('0') else 1);
+   end Min_Grouping_Digits;
+
    procedure Put_Grouped_Integer
      (Target   : in out String;
       Last     : in out Natural;
@@ -1376,6 +1388,8 @@ package body I18N.Number_Format is
       if Grouping = No_Grouping
         or else (Grouping = Min_2_Grouping
                  and then Digit_Count <= Primary_Group + 1)
+        or else (Grouping = Auto_Grouping
+                 and then Digit_Count < Primary_Group + Min_Grouping_Digits (Locale))
       then
          for Index in 1 .. Digit_Count loop
             if Index <= Pad_Count then

@@ -30,6 +30,23 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- **Currencies are formatted by CLDR's own patterns and symbols.** The
+  formatter composed a symbol, a symbol-first flag and a separator. It now
+  reads each locale's currency pattern (symbol side, no-break spaces,
+  Arabic/Hebrew/Persian bidi marks, explicit negative subpatterns) and
+  applies CLDR's currency spacing. The spacing uses the UCD general
+  category, as the run-time's tables predate the rupee sign. It takes the
+  locale's symbol ("US$" in en-GB, zh and ko; "$US" in French; "EUR" in
+  Swiss German and Romanian), exported as overrides of root along CLDR's
+  parent chain. Digits beyond the currency's own round half-even (¥1,234
+  for 1234.5 yen) instead of being rejected. Runtime-supplied placement
+  still wins. 540 locale x currency x amount cases match ICU, apart from
+  CLDR 48 data changes.
+- Numbers honour CLDR's minimumGroupingDigits: Spanish, Polish, Italian
+  and Slovenian write "1234" but "12 345".
+- Thai uses Latin digits, its CLDR default. A hand-written row had made
+  Thai digits the default; they remain available as `-u-nu-thai`.
+
 - Ordinals spelled out (`ordinal_words`) use CLDR's RBNF rules too, through
   `I18N.Spellout.Ordinal` and the new `Ordinal_Ruleset` (`%spellout-ordinal`,
   or the masculine set where a language has only gendered ones). The
@@ -120,6 +137,10 @@ commit is what a consumer's release records.
   file installed, every zone but UTC is unknown.
 
 ### Fixed
+
+- `I18N.Casing` bisected its general-category ranges, which the data lists
+  category by category, so every lookup missed. They are now sorted after
+  loading. The new `I18N.Casing.General_Category` exposes the lookup.
 
 - A fresh clone generates the rbnf, calendars, person-names and annotations
   shards. Each directory is tracked with a `.keep` placeholder, which the

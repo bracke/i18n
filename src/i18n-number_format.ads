@@ -28,4 +28,8 @@ package I18N.Number_Format is
    function Plus_Sign (Locale : String) return String;
    function Minus_Sign (Locale : String) return String;
 
+   --  CLDR's minimumGroupingDigits for the locale: grouping starts only
+   --  when the integer has this many digits beyond the first group.
+   function Min_Grouping_Digits (Locale : String) return Positive;
+
 end I18N.Number_Format;

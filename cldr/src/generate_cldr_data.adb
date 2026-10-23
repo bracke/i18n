@@ -1721,9 +1721,22 @@ procedure Generate_CLDR_Data is
                   elsif Name = "percent" then "number_percent_suffix"
                   elsif Name = "permille" then "number_permille_suffix"
                   elsif Name = "exponent" then "number_exponent_separator"
+                  elsif Name = "min_grouping" then "number_min_grouping"
+                  elsif Name = "currency_pattern" then "currency_pattern"
                   else "");
+               --  A currency symbol the locale writes otherwise than it
+               --  inherits, keyed by the code beside the und rows.
+               Is_Symbol : constant Boolean :=
+                 Name'Length = 10 and then Name (Name'First .. Name'First + 6) = "symbol:";
+               Is_Narrow : constant Boolean :=
+                 Name'Length = 10 and then Name (Name'First .. Name'First + 6) = "narrow:";
             begin
-               if Section = "" then
+               if Is_Symbol or else Is_Narrow then
+                  Add_Format
+                    ((if Is_Symbol then "currency_symbol" else "currency_narrow_symbol"),
+                     Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
+                     Sub => Name (Name'First + 7 .. Name'Last));
+               elsif Section = "" then
                   Add_Line_Error (Line_Number, "unknown number_text name " & Name);
                else
                   Add_Format (Section, Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)));
