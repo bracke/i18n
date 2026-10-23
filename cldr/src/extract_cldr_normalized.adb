@@ -1,7 +1,6 @@
 with Ada.Command_Line;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Indefinite_Hashed_Maps;
-with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
@@ -10,7 +9,7 @@ with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
 with Project_Tools.Files;
-with Hostkit.Fs;
+with Cldr_Output;
 
 procedure Extract_CLDR_Normalized is
    package US renames Ada.Strings.Unbounded;
@@ -28,7 +27,7 @@ procedure Extract_CLDR_Normalized is
    Coverage_Path : constant String := "raw/coverage.txt";
    Target_Path   : constant String := "import/normalized_cldr.txt";
    Coverage      : constant String := Project_Tools.Files.Read_Raw_File (Coverage_Path);
-   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_normalized_cldr.generated.txt";
+   Generated_Path : constant String := Cldr_Output.Temp_Path ("i18n_normalized_cldr.generated.txt");
 
    Max_Keys : constant := 2_000_000;
    Max_Coverage_Keys : constant := 400_000;
@@ -1645,9 +1644,9 @@ begin
                "cldr/import/normalized_cldr.txt is not current; run cldr/bin/extract_cldr_normalized");
             Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          end if;
+         Cldr_Output.Discard (Generated_Path);
       else
-         Ada.Directories.Create_Path (Ada.Directories.Containing_Directory (Target_Path));
-         Ada.Directories.Copy_File (Generated_Path, Target_Path);
+         Cldr_Output.Publish (Generated_Path, Target_Path);
          Ada.Text_IO.Put_Line ("extracted cldr/import/normalized_cldr.txt");
       end if;
    end;

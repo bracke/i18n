@@ -16,7 +16,7 @@ with Tarlib.Inputs;
 with Tarlib.Entries;
 with Tarlib.Errors;
 with Awklib.Interpreter;
-with Hostkit.Fs;
+with Cldr_Output;
 
 --  Fetch the pinned IANA tzdb release and produce the rearguard tzdb fixtures
 --  under cldr/upstream/tzdb/ -- tzdata.zi (built by running the tz project's own
@@ -33,7 +33,7 @@ procedure Download_TZDB is
    TZ_Version  : constant String := "2026a";
    URL         : constant String :=
      "https://data.iana.org/time-zones/releases/tzdata" & TZ_Version & ".tar.gz";
-   Work_Dir    : constant String := Hostkit.Fs.Temp_Directory & "/i18n_tzdb_download";
+   Work_Dir    : constant String := Cldr_Output.Temp_Path ("i18n_tzdb_download");
    Tgz_Path    : constant String := Work_Dir & "/tzdata.tar.gz";
    Out_Dir     : constant String := "upstream/tzdb";
 
@@ -287,6 +287,7 @@ begin
       --  3. Extract the tar in memory (regular files by base name).
       Extract_Tar (Tar);
    end;
+   Ada.Directories.Delete_Tree (Work_Dir);
 
    --  4. Run ziguard (rearguard) then zishrink through awklib.
    declare

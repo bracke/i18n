@@ -1,7 +1,6 @@
 with Ada.Exceptions;
 with Ada.Command_Line;
 with Ada.Containers.Indefinite_Hashed_Sets;
-with Ada.Directories;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
 with Ada.Strings.Hash;
@@ -9,7 +8,7 @@ with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
 with Project_Tools.Files;
-with Hostkit.Fs;
+with Cldr_Output;
 
 procedure Import_CLDR_Subset is
    package US renames Ada.Strings.Unbounded;
@@ -20,7 +19,7 @@ procedure Import_CLDR_Subset is
 
    Source_Path : constant String := "import/normalized_cldr.txt";
    Target_Path : constant String := "data/cldr_subset.txt";
-   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_cldr_subset.generated.txt";
+   Generated_Path : constant String := Cldr_Output.Temp_Path ("i18n_cldr_subset.generated.txt");
 
    Max_Keys : constant := 2_000_000;
 
@@ -1452,9 +1451,9 @@ begin
                "cldr/data/cldr_subset.txt is not current; run cldr/bin/import_cldr_subset");
             Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          end if;
+         Cldr_Output.Discard (Generated_Path);
       else
-         Ada.Directories.Create_Path (Ada.Directories.Containing_Directory (Target_Path));
-         Ada.Directories.Copy_File (Generated_Path, Target_Path);
+         Cldr_Output.Publish (Generated_Path, Target_Path);
          Ada.Text_IO.Put_Line ("imported cldr/data/cldr_subset.txt");
       end if;
    end;

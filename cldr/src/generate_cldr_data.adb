@@ -10,7 +10,7 @@ with Ada.Text_IO;
 with GNAT.OS_Lib;
 
 with Project_Tools.Files;
-with Hostkit.Fs;
+with Cldr_Output;
 with I18N.TZ_Rules;
 with Project_Tools.Processes;
 
@@ -20,7 +20,7 @@ procedure Generate_CLDR_Data is
    Source_Path : constant String := "data/cldr_subset.txt";
    TZDB_Path   : constant String := "upstream/tzdb/tzdata.zi";
    Target_Path : constant String := "../src/i18n-cldr_data.adb";
-   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_cldr_data.generated.adb";
+   Generated_Path : constant String := Cldr_Output.Temp_Path ("i18n_cldr_data.generated.adb");
 
    CLDR_Version : constant String := "48.2";
 
@@ -2129,7 +2129,7 @@ procedure Generate_CLDR_Data is
       --  because zdump reads a slash-led argument as an absolute tzfile but
       --  anything else as TZDIR-relative (a relative path sends it looking under
       --  /usr/share/zoneinfo, not here). See Tool_Path for the Windows twist.
-      Out_Dir : constant String := Hostkit.Fs.Temp_Directory & "/i18n_tzdb_generated";
+      Out_Dir : constant String := Cldr_Output.Temp_Path ("i18n_tzdb_generated");
 
       --  On Windows the zic/zdump that Locate_Command finds are the Unix tools
       --  from git-bash/MSYS2: they cannot resolve a native "C:\Users\...\Temp"
@@ -2384,6 +2384,7 @@ procedure Generate_CLDR_Data is
          end;
       end loop;
 
+      Ada.Directories.Delete_Tree (Out_Dir);
       if TZDB_Transition_Count < 20000 then
          Add_Error ("generated tzdb transition table is unexpectedly small");
       end if;
@@ -3621,8 +3622,9 @@ begin
                "src/i18n-cldr_data.adb is not current; run cldr/bin/generate_cldr_data");
             Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          end if;
+         Cldr_Output.Discard (Generated_Path);
       else
-         Ada.Directories.Copy_File (Generated_Path, Target_Path);
+         Cldr_Output.Publish (Generated_Path, Target_Path);
          Emit_Formats_File (Formats_Target);
          Emit_TZDB_File (TZDB_Target);
          Emit_Shards (Unit_Entries, Unit_Count, Units_Dir, "unit");

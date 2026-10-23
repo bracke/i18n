@@ -11,7 +11,7 @@ with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
 with Project_Tools.Files;
-with Hostkit.Fs;
+with Cldr_Output;
 with Project_Tools.JSON;
 
 procedure Generate_CLDR_Export is
@@ -23,7 +23,7 @@ procedure Generate_CLDR_Export is
 
    function S (Value : US.Unbounded_String) return String renames US.To_String;
 
-   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_cldr_export.generated.jsonl";
+   Generated_Path : constant String := Cldr_Output.Temp_Path ("i18n_cldr_export.generated.jsonl");
 
    procedure Add_Error (Message : String) is
    begin
@@ -3860,9 +3860,9 @@ begin
                "cldr/upstream/cldr_export.jsonl is not current; run cldr/bin/generate_cldr_export");
             Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          end if;
+         Cldr_Output.Discard (Generated_Path);
       else
-         Ada.Directories.Create_Path (Ada.Directories.Containing_Directory (Target_Path));
-         Ada.Directories.Copy_File (Generated_Path, Target_Path);
+         Cldr_Output.Publish (Generated_Path, Target_Path);
          Ada.Text_IO.Put_Line ("generated cldr/upstream/cldr_export.jsonl");
       end if;
    end;

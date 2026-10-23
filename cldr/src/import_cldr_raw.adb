@@ -1,7 +1,6 @@
 with Ada.Exceptions;
 with Ada.Command_Line;
 with Ada.Containers.Indefinite_Hashed_Sets;
-with Ada.Directories;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
 with Ada.Strings.Hash;
@@ -9,7 +8,7 @@ with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
 with Project_Tools.Files;
-with Hostkit.Fs;
+with Cldr_Output;
 with Project_Tools.JSON;
 
 procedure Import_CLDR_Raw is
@@ -22,7 +21,7 @@ procedure Import_CLDR_Raw is
    Manifest_Path : constant String := "upstream/source_manifest.txt";
    Source_Path   : constant String := "upstream/cldr_export.jsonl";
    Target_Path   : constant String := "raw/cldr_records.txt";
-   Generated_Path : constant String := Hostkit.Fs.Temp_Directory & "/i18n_cldr_records.generated.txt";
+   Generated_Path : constant String := Cldr_Output.Temp_Path ("i18n_cldr_records.generated.txt");
 
    Max_Keys : constant := 2_000_000;
 
@@ -1099,9 +1098,9 @@ begin
                "cldr/raw/cldr_records.txt is not current; run cldr/bin/import_cldr_raw");
             Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
          end if;
+         Cldr_Output.Discard (Generated_Path);
       else
-         Ada.Directories.Create_Path (Ada.Directories.Containing_Directory (Target_Path));
-         Ada.Directories.Copy_File (Generated_Path, Target_Path);
+         Cldr_Output.Publish (Generated_Path, Target_Path);
          Ada.Text_IO.Put_Line ("imported cldr/raw/cldr_records.txt");
       end if;
    end;

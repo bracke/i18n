@@ -319,3 +319,12 @@ commit is what a consumer's release records.
 ## Releasing
 
 No procedure yet.
+### Fixed
+
+- The CLDR generators each write to a temp file of their own and publish
+  their target with one atomic rename. They shared fixed temp paths and
+  overwrote targets in place, so a `--check` or second regen running
+  alongside could hand `import_cldr_raw` a half-written export -- the
+  likely cause of its one-off "invalid staged unit_name record" on a
+  valid line.
+
