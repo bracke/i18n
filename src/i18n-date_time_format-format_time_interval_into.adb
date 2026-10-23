@@ -66,8 +66,12 @@ begin
       declare
          Skel    : constant String := Skeleton;
          Twelve  : constant Boolean := (for some C of Skel => C in 'h' | 'K');
+         --  A flexible day period ("in the morning") may change with the hour;
+         --  its pattern writes it for both times.
+         Periods : constant Boolean := (for some C of Skel => C = 'B');
          Field   : constant Character :=
-           (if Twelve and then (From.Hour < 12) /= (To.Hour < 12) then 'a'
+           (if Periods and then From.Hour /= To.Hour then 'B'
+            elsif Twelve and then (From.Hour < 12) /= (To.Hour < 12) then 'a'
             elsif From.Hour /= To.Hour then (if Twelve then 'h' else 'H')
             else 'm');
          Found   : Boolean;
@@ -76,7 +80,8 @@ begin
          Split   : constant Natural := (if Found then Interval_Second_Half (Pattern) else 0);
       begin
          if Split > Pattern'First
-           and then Interval_Writes_Field (Pattern (Pattern'First .. Split - 1), (if Field = 'a' then 'h' else Field))
+           and then Interval_Writes_Field
+             (Pattern (Pattern'First .. Split - 1), (if Field in 'a' | 'B' then 'h' else Field))
          then
             Write (Pattern (Pattern'First .. Split - 1), From, Done);
             if Done and then not Overflow then

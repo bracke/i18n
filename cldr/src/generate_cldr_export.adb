@@ -2615,9 +2615,12 @@ procedure Generate_CLDR_Export is
                then Intervals_Of (Parent) else "");
             type Name_List is array (Positive range <>) of US.Unbounded_String;
             function "+" (Item : String) return US.Unbounded_String renames US.To_Unbounded_String;
+            --  Every interval skeleton CLDR has, and every field it keys them by.
             Skeletons : constant Name_List :=
-              [+"yMMMd", +"yMMMEd", +"yMd", +"yMEd", +"yMMM", +"yM", +"MMMd", +"MMMEd", +"Md", +"d", +"Hm", +"hm"];
-            Fields    : constant Name_List := [+"y", +"M", +"d", +"a", +"h", +"H", +"m"];
+              [+"Bh", +"Bhm", +"Gy", +"GyM", +"GyMEd", +"GyMMM", +"GyMMMEd", +"GyMMMd", +"GyMd", +"H", +"Hm",
+               +"Hmv", +"Hv", +"M", +"MEd", +"MMM", +"MMMEd", +"MMMd", +"Md", +"d", +"h", +"hm", +"hmv", +"hv",
+               +"y", +"yM", +"yMEd", +"yMMM", +"yMMMEd", +"yMMMM", +"yMMMd", +"yMd"];
+            Fields    : constant Name_List := [+"G", +"y", +"M", +"d", +"B", +"a", +"h", +"H", +"m"];
 
             procedure Emit (Key : String; Value : String) is
             begin

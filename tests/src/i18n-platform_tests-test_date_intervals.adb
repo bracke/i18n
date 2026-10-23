@@ -70,6 +70,18 @@ begin
            = "11:00" & Narrow_No_Break & "AM" & Range_Dash & "1:00" & Narrow_No_Break & "PM",
            "English times across noon write both");
    Assert (Clock ("14:00:00/15:30:00", "de", "::jm") = "14:00" & En_Dash & "15:30 Uhr", "German times");
+   --  Every interval skeleton CLDR has.
+   Assert (Interval ("2026-10-09/2026-11-15", "en", "::yMMMM") = "October" & Range_Dash & "November 2026",
+           "English months of one year");
+   Assert (Interval ("2026-10-09/2026-11-15", "de", "::yMMMM") = "Oktober" & En_Dash & "November 2026",
+           "German months of one year");
+   Assert (Interval ("2026-10-09/2026-10-15", "en", "::MEd") = "Fri, 10/9" & Range_Dash & "Thu, 10/15",
+           "English weekdays and numeric days");
+   Assert (Interval ("2026-10-09/2026-10-15", "de", "::GyMMMd") = "9." & En_Dash & "15. Okt. 2026 n. Chr.",
+           "German days with the era");
+   Assert (Clock ("10:00:00/15:00:00", "en", "::Bhm")
+           = "10:00 in the morning" & Range_Dash & "3:00 in the afternoon",
+           "English flexible day periods on both times");
    --  A date and a time joined as the locale joins them, and one day's times.
    Assert (Moment ("2026-10-09T14:00:00Z", "de", "::yMMMdjm") = "9. Okt. 2026, 14:00",
            "a written-out date and a time joined by CLDR's glue");

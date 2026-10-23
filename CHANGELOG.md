@@ -10,6 +10,10 @@ commit is what a consumer's release records.
 
 ### Added
 
+- Every interval skeleton CLDR has (32, with its era, day-period and zone
+  forms: "October – November 2026", "Fri, 10/9 – Thu, 10/15", "10:00 in the
+  morning – 3:00 in the afternoon"), where only the common date and time
+  skeletons were imported.
 - `I18N.Plural_Ranges.Category`: a range's plural category by CLDR's
   pluralRanges for the language (Arabic one to two is other, French one to
   one stays one), else the end's.
