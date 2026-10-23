@@ -1500,6 +1500,15 @@ procedure Generate_CLDR_Export is
                                   Project_Tools.JSON.Object_Field_Value
                                     (Object_Field_Object (Text, "currencyFormats-numberSystem-" & System),
                                      "standard"));
+                        --  How the locale writes a range of numbers ("{0}–{1}")
+                        --  and an approximate one ("≈{0}", "~{0}").
+                        declare
+                           Misc : constant String :=
+                             Object_Field_Object (Text, "miscPatterns-numberSystem-" & System);
+                        begin
+                           Put_Text ("range", Project_Tools.JSON.Object_Field_Value (Misc, "range"));
+                           Put_Text ("approximately", Project_Tools.JSON.Object_Field_Value (Misc, "approximately"));
+                        end;
                         --  Each numbering system's own symbols, the default's too,
                         --  for a tag that names one (ar-u-nu-latn "1,234.5" and
                         --  "25‎%‎"; ar-MA-u-nu-arab, whose default is Latin).

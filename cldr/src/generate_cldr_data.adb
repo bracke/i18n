@@ -1757,6 +1757,8 @@ procedure Generate_CLDR_Data is
                   elsif Name = "currency_group" then "number_currency_group"
                   elsif Name = "currency_decimal" then "number_currency_decimal"
                   elsif Name = "currency_pattern" then "currency_pattern"
+                  elsif Name = "range" then "number_range_pattern"
+                  elsif Name = "approximately" then "number_approximately_pattern"
                   else "");
                --  A currency symbol the locale writes otherwise than it
                --  inherits, keyed by the code beside the und rows.

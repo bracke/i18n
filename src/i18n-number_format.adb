@@ -11459,6 +11459,19 @@ package body I18N.Number_Format is
          Overflow := False;
    end Format_Plain_Into;
 
+   --  Pattern ("{0}–{1}", "≈{0}") with {0} and {1} as First and Second
+   --  formatted in Style; a missing pattern reads as CLDR root's.
+   procedure Format_Pattern_Into
+     (Pattern    : String;
+      First      : String;
+      Second     : String;
+      Locale     : String;
+      Style      : String;
+      Target     : in out String;
+      Last       : out Natural;
+      Ok         : out Boolean;
+      Overflow   : out Boolean) is separate;
+
    procedure Format_Into
      (Value_Text : String;
       Locale     : String;
@@ -11475,6 +11488,24 @@ package body I18N.Number_Format is
       Frac_Len     : Natural;
       Abs_Value    : Long_Long_Float;
    begin
+      --  A range "low/high" and an approximate "~value", in the locale's
+      --  patterns for them (CLDR's miscPatterns: "{0}–{1}", "≈{0}").
+      for Slash in Value_Text'First + 1 .. Value_Text'Last - 1 loop
+         if Value_Text (Slash) = '/' then
+            Format_Pattern_Into
+              (I18N.Locale_Data.Field ("number_range_pattern", Locale),
+               Value_Text (Value_Text'First .. Slash - 1), Value_Text (Slash + 1 .. Value_Text'Last),
+               Locale, Style, Target, Last, Ok, Overflow);
+            return;
+         end if;
+      end loop;
+      if Value_Text'Length > 1 and then Value_Text (Value_Text'First) = '~' then
+         Format_Pattern_Into
+           (I18N.Locale_Data.Field ("number_approximately_pattern", Locale),
+            Value_Text (Value_Text'First + 1 .. Value_Text'Last), "", Locale, Style, Target, Last, Ok, Overflow);
+         return;
+      end if;
+
       if Style = "" then
          Format_Plain_Into
            (Value_Text => Value_Text,

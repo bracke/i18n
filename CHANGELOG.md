@@ -10,6 +10,10 @@ commit is what a consumer's release records.
 
 ### Added
 
+- Number ranges and approximate numbers: a number value "low/high" formats
+  as the locale's range ("1.200–5.000", Japanese "1,200～5,000") and "~value"
+  as its approximate form ("≈12,5", "~12", "約 12"), each number in the style
+  given; the generator imports CLDR's number `miscPatterns`.
 - Date intervals: a date value written as an ISO 8601 interval
   ("2026-10-09/2026-10-15") formats by CLDR's interval formats for the
   skeleton ("9.–15. Okt. 2026", "Oct 9 – 15, 2026", "2026年10月9日 – 15日"):

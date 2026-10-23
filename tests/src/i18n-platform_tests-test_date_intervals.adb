@@ -1,4 +1,5 @@
 with I18N.Date_Time_Format;
+with I18N.Number_Format;
 
 --  An ISO 8601 interval value as CLDR 48's interval formats write it: the
 --  pattern for the greatest field that differs, else the fallback joining
@@ -22,7 +23,24 @@ is
       I18N.Date_Time_Format.Format_Date_Into (Value, Locale, Style, Buffer, Last, Ok, Full);
       return (if Ok and then not Full then Buffer (1 .. Last) else "<failed>");
    end Interval;
+
+   function Number (Value, Locale : String; Style : String := "") return String is
+      Buffer : String (1 .. 160);
+      Last   : Natural;
+      Ok     : Boolean;
+      Full   : Boolean;
+   begin
+      I18N.Number_Format.Format_Into (Value, Locale, Style, Buffer, Last, Ok, Full);
+      return (if Ok and then not Full then Buffer (1 .. Last) else "<failed>");
+   end Number;
 begin
+   --  Number ranges and approximate numbers by CLDR's miscPatterns.
+   Assert (Number ("1200/5000", "de") = "1.200" & En_Dash & "5.000", "a German number range");
+   Assert (Number ("1200/5000", "ja") = "1,200" & [Character'Val (16#EF#), Character'Val (16#BD#),
+           Character'Val (16#9E#)] & "5,000", "a Japanese number range");
+   Assert (Number ("~12.5", "de") = [Character'Val (16#E2#), Character'Val (16#89#), Character'Val (16#88#)]
+           & "12,5", "a German approximate number");
+   Assert (Number ("~12", "en") = "~12", "an English approximate number");
    Assert (Interval ("2026-10-09/2026-10-15", "en", "::yMMMd") = "Oct 9" & Range_Dash & "15, 2026",
            "English days of one month share the month and year");
    Assert (Interval ("2026-10-09/2026-11-15", "en", "::yMMMd") = "Oct 9" & Range_Dash & "Nov 15, 2026",
