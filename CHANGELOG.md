@@ -30,6 +30,14 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- A decimal spelled out follows CLDR's fraction rule (`I18N.Spellout.Decimal_Words`):
+  German "eins Komma fünf", Spanish "doce coma cinco" (the rule whose
+  separator is the locale's decimal mark), Japanese digits without spaces.
+  Rules that read the fraction as tenths or hundredths (Russian "пять
+  десятых", Polish, Kazakh, Kyrgyz, Lithuanian) are not interpreted yet
+  and keep the earlier digit-by-digit composition. 245 of 261 cases match
+  ICU; the rest are those rules and CLDR 48 data (Indonesian).
+
 - **Currencies are formatted by CLDR's own patterns and symbols.** The
   formatter composed a symbol, a symbol-first flag and a separator. It now
   reads each locale's currency pattern (symbol side, no-break spaces,

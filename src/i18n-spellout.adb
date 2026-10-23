@@ -597,6 +597,139 @@ package body I18N.Spellout is
       return "";
    end Negative_Words;
 
+   function Decimal_Words
+     (Locale          : String;
+      Integer_Part    : Long_Long_Integer;
+      Fraction_Digits : String;
+      Ruleset         : String := "")
+      return String
+   is
+      Chosen : constant String :=
+        (if Ruleset /= "" then Ruleset
+         elsif Load (Locale, "%spellout-cardinal") /= "" then "%spellout-cardinal"
+         else "%spellout-numbering");
+      Serialized : constant String := Load (Locale, Chosen);
+      Whole_Rule : Unbounded_String;
+      Zero_Rule  : Unbounded_String;
+      --  ICU takes the rule whose separator is the locale's decimal mark:
+      --  Spanish has "x.x ... punto" and "x,x ... coma", and writes ",".
+      Comma : constant Boolean := I18N.Number_Format.Decimal_Separator (Locale) = ",";
+      Whole_Comma : Unbounded_String;
+      Zero_Comma  : Unbounded_String;
+      procedure Find (Base, Text : String) is
+      begin
+         if Base = "x.x" then
+            Whole_Rule := To_Unbounded_String (Without_Semi (Text));
+         elsif Base = "0.x" then
+            Zero_Rule := To_Unbounded_String (Without_Semi (Text));
+         elsif Base = "x,x" then
+            Whole_Comma := To_Unbounded_String (Without_Semi (Text));
+         elsif Base = "0,x" then
+            Zero_Comma := To_Unbounded_String (Without_Semi (Text));
+         end if;
+      end Find;
+      procedure It is new Iterate_Rules (Find);
+   begin
+      if Serialized = "" then
+         return "";
+      end if;
+      It (Serialized);
+      if Comma and then Length (Whole_Comma) > 0 then
+         Whole_Rule := Whole_Comma;
+      end if;
+      if Comma and then Length (Zero_Comma) > 0 then
+         Zero_Rule := Zero_Comma;
+      end if;
+      declare
+         Rule : constant String :=
+           (if Integer_Part = 0 and then Length (Zero_Rule) > 0 then To_String (Zero_Rule)
+            else To_String (Whole_Rule));
+         Result : Unbounded_String;
+         I      : Natural := Rule'First;
+
+         --  The fraction digit by digit in Digit_Set, Separator between.
+         function Fraction (Digit_Set : String; Separator : String) return String is
+            Words : Unbounded_String;
+         begin
+            for Index in Fraction_Digits'Range loop
+               declare
+                  Word : constant String :=
+                    Format (Locale,
+                            Long_Long_Integer (Character'Pos (Fraction_Digits (Index)) - Character'Pos ('0')),
+                            Digit_Set, 1);
+               begin
+                  if Word = "" then
+                     return "";
+                  end if;
+                  if Index > Fraction_Digits'First then
+                     Append (Words, Separator);
+                  end if;
+                  Append (Words, Word);
+               end;
+            end loop;
+            return To_String (Words);
+         end Fraction;
+
+         --  The ruleset a substitution names ("<%rs<"), or the chosen one.
+         function Named (From, To : Natural) return String is
+           (if To > From then Rule (From .. To) else Chosen);
+      begin
+         if Rule = "" then
+            --  A ruleset that hands numbers on whole names the rule in the
+            --  one it hands them to (French, Russian numbering).
+            if Delegate_For (Serialized, 1) /= "" and then Delegate_For (Serialized, 1) /= Chosen then
+               return Decimal_Words (Locale, Integer_Part, Fraction_Digits, Delegate_For (Serialized, 1));
+            end if;
+            return "";
+         end if;
+         while I <= Rule'Last loop
+            if Is_L (Rule, I) then
+               declare
+                  J : Natural := I + 3;
+               begin
+                  while J <= Rule'Last and then not Is_L (Rule, J) loop
+                     J := J + 1;
+                  end loop;
+                  if J > Rule'Last then
+                     return "";
+                  end if;
+                  Append (Result, Format (Locale, Integer_Part, Named (I + 3, J - 1), 1));
+                  I := J + 3;
+               end;
+            elsif Is_R (Rule, I) then
+               if Is_R (Rule, I + 3) and then Is_R (Rule, I + 6) then
+                  --  ">>>": the digits with nothing between (Japanese).
+                  Append (Result, Fraction (Chosen, ""));
+                  I := I + 9;
+               else
+                  declare
+                     J : Natural := I + 3;
+                  begin
+                     while J <= Rule'Last and then not Is_R (Rule, J) loop
+                        J := J + 1;
+                     end loop;
+                     --  A named fraction ruleset reads the fraction as a
+                     --  number over a denominator (Russian "пять десятых"),
+                     --  which this does not do: leave it to the caller.
+                     if J > Rule'Last or else J > I + 3 then
+                        return "";
+                     end if;
+                     Append (Result, Fraction (Named (I + 3, J - 1), " "));
+                     I := J + 3;
+                  end;
+               end if;
+            elsif Rule (I) in '=' | '$' | '[' | ']' then
+               --  A decimal-pattern or plural substitution: not a spelled form.
+               return "";
+            else
+               Append (Result, Rule (I));
+               I := I + 1;
+            end if;
+         end loop;
+         return To_String (Result);
+      end;
+   end Decimal_Words;
+
    function Ordinal_Ruleset (Locale : String) return String is
      (if Load (Locale, "%spellout-ordinal") /= "" then "%spellout-ordinal"
       elsif Load (Locale, "%spellout-ordinal-masculine") /= "" then "%spellout-ordinal-masculine"

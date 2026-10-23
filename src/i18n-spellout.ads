@@ -29,6 +29,17 @@ package I18N.Spellout is
 
    --  Ordinal words, e.g. Ordinal ("en", 21) = "twenty-first"; Ruleset ""
    --  is the locale's Ordinal_Ruleset.
+   --  A decimal in words by the ruleset's fraction rule ("x.x", or "0.x"
+   --  for a zero integer part): Decimal_Words ("de", 12, "5") = "zwölf Komma
+   --  fünf", the fraction digit by digit as ICU spells it. "" where the
+   --  locale has no such rule.
+   function Decimal_Words
+     (Locale          : String;
+      Integer_Part    : Long_Long_Integer;
+      Fraction_Digits : String;
+      Ruleset         : String := "")
+      return String;
+
    --  The ordinal ruleset a locale spells with: %spellout-ordinal, or for a
    --  language that only has gendered ones (French, Russian) the masculine.
    function Ordinal_Ruleset (Locale : String) return String;

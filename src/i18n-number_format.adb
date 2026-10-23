@@ -11129,6 +11129,18 @@ package body I18N.Number_Format is
          return Decimal_Rule;
       end if;
 
+      --  CLDR's fraction rule ("zwölf Komma fünf"), as ICU spells a decimal.
+      if not Integer_Found then
+         declare
+            CLDR_Text : constant String :=
+              I18N.Spellout.Decimal_Words (Locale, Long_Long_Integer (Integer_Part), Fraction_Text);
+         begin
+            if CLDR_Text /= "" then
+               return CLDR_Text;
+            end if;
+         end;
+      end if;
+
       for Index in Fraction_Text'Range loop
          declare
             Digit_Value : constant Natural :=
