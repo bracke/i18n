@@ -4226,6 +4226,146 @@ package body I18N.Date_Time_Format is
       end case;
    end To_Display_Calendar;
 
+   --  Where an interval pattern's second moment starts: its first field
+   --  letter of a kind already seen ("d'.–'" | "d'. 'MMM' 'y"); 0 when none
+   --  repeats.
+   function Interval_Second_Half (Pattern : String) return Natural is
+      function Kind (C : Character) return Character is
+        (case C is
+            when 'L' => 'M',
+            when 'c' | 'e' => 'E',
+            when 'k' | 'K' => 'h',
+            when others => C);
+      Seen     : String (1 .. 32) := [others => ' '];
+      Count    : Natural := 0;
+      Quoted   : Boolean := False;
+      Previous : Character := ' ';
+   begin
+      for I in Pattern'Range loop
+         if Pattern (I) = ''' then
+            Quoted := not Quoted;
+            Previous := ' ';
+         elsif not Quoted and then Pattern (I) in 'A' .. 'Z' | 'a' .. 'z' then
+            if Pattern (I) /= Previous then
+               if (for some J in 1 .. Count => Seen (J) = Kind (Pattern (I))) then
+                  return I;
+               end if;
+               if Count < Seen'Last then
+                  Count := Count + 1;
+                  Seen (Count) := Kind (Pattern (I));
+               end if;
+            end if;
+            Previous := Pattern (I);
+         else
+            Previous := ' ';
+         end if;
+      end loop;
+      return 0;
+   end Interval_Second_Half;
+
+   --  Whether Half (the first moment's part of an interval pattern) writes
+   --  Field, the greatest one that differs: a pattern that does not ("d – d
+   --  MMM y" for months apart, CLDR 48's Swahili) cannot tell the moments
+   --  apart.
+   function Interval_Writes_Field (Half : String; Field : Character) return Boolean is
+      Quoted : Boolean := False;
+   begin
+      for C of Half loop
+         if C = ''' then
+            Quoted := not Quoted;
+         elsif not Quoted
+           and then (C = Field or else (Field = 'M' and then C = 'L')
+                     or else (Field = 'h' and then C in 'K' | 'k' | 'H'))
+         then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Interval_Writes_Field;
+
+   --  Whether a runtime override (an LDML appendItem for Time) says how the
+   --  locale joins a date and a time; it then wins over CLDR's glue.
+   function Runtime_Date_Time_Join (Locale : String) return Boolean is
+      Found   : Boolean;
+      Ignored : constant String := I18N.Runtime_Data.Locale_Text (Locale, "date_time_field_separator", Found);
+      pragma Unreferenced (Ignored);
+   begin
+      return Found;
+   end Runtime_Date_Time_Join;
+
+   --  The locale's pattern joining two whole moments ("{0} – {1}"); "" when
+   --  no data says.
+   function Interval_Fallback (Locale : String) return String is
+      Found : Boolean;
+      Text  : constant String := I18N.Locale_Data.Lookup ("date_interval", Locale, "fallback", Found);
+   begin
+      return (if Found then Text else "");
+   end Interval_Fallback;
+
+   --  Pattern ("{0} – {1}") with {0} and {1} as First and Second; a missing
+   --  pattern reads as CLDR root's.
+   procedure Join_Interval
+     (Pattern  : String;
+      First    : String;
+      Second   : String;
+      Target   : in out String;
+      Last     : in out Natural;
+      Overflow : in out Boolean)
+   is
+      En_Dash : constant String := [Character'Val (16#E2#), Character'Val (16#80#), Character'Val (16#93#)];
+      Joining : constant String := (if Pattern /= "" then Pattern else "{0} " & En_Dash & " {1}");
+      I       : Positive := Joining'First;
+
+      procedure Put_Text (Text : String) is
+      begin
+         if Last + Text'Length > Target'Last then
+            Overflow := True;
+         else
+            Target (Last + 1 .. Last + Text'Length) := Text;
+            Last := Last + Text'Length;
+         end if;
+      end Put_Text;
+   begin
+      while I <= Joining'Last and then not Overflow loop
+         if I + 2 <= Joining'Last and then Joining (I) = '{' and then Joining (I + 2) = '}'
+           and then Joining (I + 1) in '0' | '1'
+         then
+            Put_Text ((if Joining (I + 1) = '0' then First else Second));
+            I := I + 3;
+         else
+            Put_Text ([1 => Joining (I)]);
+            I := I + 1;
+         end if;
+      end loop;
+   end Join_Interval;
+
+   --  A time interval ("14:00:00/15:30:00") in Locale and Style: CLDR's
+   --  interval pattern for the style's skeleton ("j" as the locale's hour
+   --  cycle) and the greatest field that differs ("14:00–15:30", "2:00 –
+   --  3:30 PM"), else the locale's fallback joining the two times whole.
+   procedure Format_Time_Interval_Into
+     (From_Text : String;
+      To_Text   : String;
+      Locale    : String;
+      Style     : String;
+      Target    : in out String;
+      Last      : out Natural;
+      Ok        : out Boolean;
+      Overflow  : out Boolean) is separate;
+
+   --  A date-time interval: on one day, the day as the style writes it and
+   --  the time interval in place of its time ("9. Okt. 2026, 14:00–15:30");
+   --  on two days, the fallback joining both whole.
+   procedure Format_Date_Time_Interval_Into
+     (From_Text : String;
+      To_Text   : String;
+      Locale    : String;
+      Style     : String;
+      Target    : in out String;
+      Last      : out Natural;
+      Ok        : out Boolean;
+      Overflow  : out Boolean) is separate;
+
    --  A date interval ("2026-10-09/2026-10-15") in Locale and Style: CLDR's
    --  interval pattern for the style's skeleton and the greatest field that
    --  differs ("9.–15. Okt. 2026"), else the locale's fallback joining the
@@ -4414,6 +4554,16 @@ package body I18N.Date_Time_Format is
       Ok := False;
       Overflow := False;
 
+      --  An ISO 8601 interval: two moments joined by "/".
+      for Slash in Value_Text'First + 1 .. Value_Text'Last - 1 loop
+         if Value_Text (Slash) = '/' then
+            Format_Time_Interval_Into
+              (Value_Text (Value_Text'First .. Slash - 1), Value_Text (Slash + 1 .. Value_Text'Last),
+               Locale, Style, Target, Last, Ok, Overflow);
+            return;
+         end if;
+      end loop;
+
       Parse_Date_Time_Value
         (Value_Text => Value_Text,
          Option     => Effective_Style,
@@ -4557,6 +4707,16 @@ package body I18N.Date_Time_Format is
       Ok := False;
       Overflow := False;
 
+      --  An ISO 8601 interval: two moments joined by "/".
+      for Slash in Value_Text'First + 1 .. Value_Text'Last - 1 loop
+         if Value_Text (Slash) = '/' then
+            Format_Date_Time_Interval_Into
+              (Value_Text (Value_Text'First .. Slash - 1), Value_Text (Slash + 1 .. Value_Text'Last),
+               Locale, Style, Target, Last, Ok, Overflow);
+            return;
+         end if;
+      end loop;
+
       Parse_Date_Time_Value
         (Value_Text => Value_Text,
          Option     => Effective_Style,
@@ -4612,6 +4772,71 @@ package body I18N.Date_Time_Format is
          Style_Only : constant String := Style_Name (Effective_Style);
       begin
          if Is_Skeleton (Style_Only) then
+            --  A skeleton with a date and a time ("yMMMdjm"): each resolved on
+            --  its own and joined as the locale joins them for the date's
+            --  width ("{1}, {0}"), as ICU does -- the field-by-field resolution
+            --  below has no separator between them.
+            declare
+               Requested  : constant String := Skeleton_Text (Style_Only);
+               Date_Part  : String (1 .. Requested'Length);
+               Time_Part  : String (1 .. Requested'Length);
+               Date_Count : Natural := 0;
+               Time_Count : Natural := 0;
+               Has_Day    : Boolean := False;
+               Months     : Natural := 0;
+            begin
+               for C of Requested loop
+                  if C in 'h' | 'H' | 'k' | 'K' | 'j' | 'J' | 'C' | 'm' | 's' | 'S' | 'a' | 'b' | 'B' | 'A'
+                    | 'z' | 'Z' | 'O' | 'v' | 'V' | 'X' | 'x'
+                  then
+                     Time_Count := Time_Count + 1;
+                     Time_Part (Time_Count) := C;
+                  else
+                     Date_Count := Date_Count + 1;
+                     Date_Part (Date_Count) := C;
+                     Has_Day := Has_Day or else C in 'y' | 'M' | 'L' | 'd' | 'D' | 'Q' | 'q' | 'u' | 'U' | 'G' | 'w';
+                     Months := Months + (if C in 'M' | 'L' then 1 else 0);
+                  end if;
+               end loop;
+               --  Only for a written-out date (a month name): a numeric
+               --  skeleton ("yyyyMMddHHmm") keeps its field-by-field form.
+               if Has_Day and then Time_Count > 0 and then Months >= 3
+                 and then not Runtime_Date_Time_Join (Locale)
+               then
+                  declare
+                     Width : constant String :=
+                       (if Months >= 4 and then (for some C of Requested => C in 'E' | 'c' | 'e') then "full"
+                        elsif Months >= 4 then "long"
+                        elsif Months = 3 then "medium" else "short");
+                     Found : Boolean;
+                     Glue  : constant String := I18N.Locale_Data.Lookup ("date_time_glue", Locale, Width, Found);
+                     Day_Text, Clock_Text : String (1 .. Max_Formatted_Length);
+                     Day_Last, Clock_Last : Natural := 0;
+                     Day_Ok, Clock_Ok     : Boolean;
+                     Full                 : Boolean := False;
+                  begin
+                     Format_Skeleton_Into
+                       (Skeleton => Resolve_Skeleton_Pattern (Locale, Date_Part (1 .. Date_Count)),
+                        Style => Effective_Style, Locale => Locale, Year => Display_Year, Related_Year => Year,
+                        Month => Display_Month, Day => Display_Day, Hour => Hour, Minute => Minute,
+                        Second => Second, Nanosecond => Nanosecond, Target => Day_Text, Last => Day_Last,
+                        Overflow => Full, Ok => Day_Ok);
+                     Format_Skeleton_Into
+                       (Skeleton => Resolve_Skeleton_Pattern (Locale, Time_Part (1 .. Time_Count)),
+                        Style => Effective_Style, Locale => Locale, Year => Display_Year, Related_Year => Year,
+                        Month => Display_Month, Day => Display_Day, Hour => Hour, Minute => Minute,
+                        Second => Second, Nanosecond => Nanosecond, Target => Clock_Text, Last => Clock_Last,
+                        Overflow => Full, Ok => Clock_Ok);
+                     if Day_Ok and then Clock_Ok and then not Full then
+                        Join_Interval
+                          ((if Found and then Glue /= "" then Glue else "{1}, {0}"), Clock_Text (1 .. Clock_Last),
+                           Day_Text (1 .. Day_Last), Target, Last, Overflow);
+                        Ok := not Overflow;
+                     end if;
+                     return;
+                  end;
+               end if;
+            end;
             declare
                Skeleton : constant String :=
                  Resolve_Skeleton_Pattern

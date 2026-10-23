@@ -37,41 +37,6 @@ is
       return Supported;
    end Read;
 
-   --  Where Pattern's second date starts: its first field letter of a kind
-   --  already seen ("d'.–'" | "d'. 'MMM' 'y"); 0 when none repeats.
-   function Second_Half (Pattern : String) return Natural is
-      function Kind (C : Character) return Character is
-        (case C is
-            when 'L' => 'M',
-            when 'c' | 'e' => 'E',
-            when others => C);
-      Seen     : String (1 .. 32) := [others => ' '];
-      Count    : Natural := 0;
-      Quoted   : Boolean := False;
-      Previous : Character := ' ';
-   begin
-      for I in Pattern'Range loop
-         if Pattern (I) = ''' then
-            Quoted := not Quoted;
-            Previous := ' ';
-         elsif not Quoted and then Pattern (I) in 'A' .. 'Z' | 'a' .. 'z' then
-            if Pattern (I) /= Previous then
-               if (for some J in 1 .. Count => Seen (J) = Kind (Pattern (I))) then
-                  return I;
-               end if;
-               if Count < Seen'Last then
-                  Count := Count + 1;
-                  Seen (Count) := Kind (Pattern (I));
-               end if;
-            end if;
-            Previous := Pattern (I);
-         else
-            Previous := ' ';
-         end if;
-      end loop;
-      return 0;
-   end Second_Half;
-
    procedure Write (Pattern : String; Item : Date_Fields; Done : out Boolean) is
    begin
       Format_Skeleton_Into
@@ -133,27 +98,12 @@ begin
          Found   : Boolean;
          Pattern : constant String :=
            I18N.Locale_Data.Lookup ("date_interval", Locale, Skeleton_Text (Style_Only) & ":" & Field, Found);
-         Split   : constant Natural := (if Found then Second_Half (Pattern) else 0);
+         Split   : constant Natural := (if Found then Interval_Second_Half (Pattern) else 0);
 
-         --  Whether the first date's half writes the field that differs: a
-         --  pattern that does not ("d – d MMM y" for months apart, CLDR 48's
-         --  Swahili) cannot tell the dates apart, and the fallback can.
-         function Writes_Field (Half : String) return Boolean is
-            Quoted : Boolean := False;
-         begin
-            for C of Half loop
-               if C = ''' then
-                  Quoted := not Quoted;
-               elsif not Quoted
-                 and then (C = Field (Field'First) or else (Field = "M" and then C = 'L'))
-               then
-                  return True;
-               end if;
-            end loop;
-            return False;
-         end Writes_Field;
       begin
-         if Split > Pattern'First and then Writes_Field (Pattern (Pattern'First .. Split - 1)) then
+         if Split > Pattern'First
+           and then Interval_Writes_Field (Pattern (Pattern'First .. Split - 1), Field (Field'First))
+         then
             Write (Pattern (Pattern'First .. Split - 1), From, Done);
             if Done and then not Overflow then
                Write (Pattern (Split .. Pattern'Last), To, Done);

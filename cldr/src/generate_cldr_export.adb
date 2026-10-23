@@ -2557,8 +2557,8 @@ procedure Generate_CLDR_Export is
             return S (Output);
          end Internal_Pattern;
 
-         --  CLDR's interval formats for the date skeletons ranges are written
-         --  in: per skeleton, the pattern for each greatest differing field
+         --  CLDR's interval formats for the date and time skeletons ranges are
+         --  written in: per skeleton, the pattern for each greatest differing field
          --  ("yMMMd:d" "d.–d. MMM y"), and the fallback joining two whole
          --  dates ("{0} – {1}"). Only what differs from the parent locale.
          procedure Emit_Interval_Format_Rows (Locale : String) is
@@ -2573,8 +2573,8 @@ procedure Generate_CLDR_Export is
             type Name_List is array (Positive range <>) of US.Unbounded_String;
             function "+" (Item : String) return US.Unbounded_String renames US.To_Unbounded_String;
             Skeletons : constant Name_List :=
-              [+"yMMMd", +"yMMMEd", +"yMd", +"yMEd", +"yMMM", +"yM", +"MMMd", +"MMMEd", +"Md", +"d"];
-            Fields    : constant Name_List := [+"y", +"M", +"d"];
+              [+"yMMMd", +"yMMMEd", +"yMd", +"yMEd", +"yMMM", +"yM", +"MMMd", +"MMMEd", +"Md", +"d", +"Hm", +"hm"];
+            Fields    : constant Name_List := [+"y", +"M", +"d", +"a", +"h", +"H", +"m"];
 
             procedure Emit (Key : String; Value : String) is
             begin
@@ -2584,7 +2584,31 @@ procedure Generate_CLDR_Export is
             end Emit;
 
             Fallback : constant String := Project_Tools.JSON.Object_Field_Value (Own, "intervalFormatFallback");
+
+            --  How the locale joins a date and a time, by the date's width
+            --  ("{1}, {0}", Japanese "{1} {0}"), where it differs from the parent.
+            procedure Emit_Glue is
+               function Formats_Of (Name : String) return String is
+                 (Object_Field_Object (Gregorian_Object (Name), "dateTimeFormats"));
+               Mine   : constant String := Formats_Of (Locale);
+               Theirs : constant String :=
+                 (if Parent /= "" and then Project_Tools.Files.File_Exists ("upstream/" & Date_Source_Path (Parent))
+                  then Formats_Of (Parent) else "");
+            begin
+               for Width of Name_List'[+"full", +"long", +"medium", +"short"] loop
+                  declare
+                     Glue : constant String := Project_Tools.JSON.Object_Field_Value (Mine, S (Width));
+                  begin
+                     if Glue /= "" and then Glue /= Project_Tools.JSON.Object_Field_Value (Theirs, S (Width)) then
+                        Emit_JSON
+                          ("{""type"":""glue_text"",""locale"":""" & Locale & """,""key"":""" & S (Width)
+                           & """,""value"":""" & JSON_Escape (Glue) & """}");
+                     end if;
+                  end;
+               end loop;
+            end Emit_Glue;
          begin
+            Emit_Glue;
             if Own = "" then
                return;
             end if;

@@ -1701,6 +1701,17 @@ procedure Generate_CLDR_Data is
             Add_Format ("date_interval", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                         Sub => Field (Line, 3));
          end if;
+      elsif Kind = "glue_text" then
+         --  How a locale joins a date and a time ("{1}, {0}"), keyed by the
+         --  date's width (full, long, medium, short).
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
+           or else Field (Line, 4) = ""
+         then
+            Add_Line_Error (Line_Number, "invalid glue_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            Add_Format ("date_time_glue", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
+                        Sub => Field (Line, 3));
+         end if;
       elsif Kind = "likely_text" then
          --  A language's likely region (CLDR's likelySubtags), under und keyed
          --  by the language or language-script tag ("dv" "MV", "zh-Hant" "TW").
