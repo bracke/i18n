@@ -2694,6 +2694,20 @@ procedure Generate_CLDR_Export is
                         & """,""value"":""" & JSON_Escape (Display) & """}");
                   end if;
 
+                  --  The unit as a rate's denominator where CLDR names it so:
+                  --  "{0}/s" rather than "{0}/sec", German "{0} pro Stunde".
+                  declare
+                     Per : constant String :=
+                       Project_Tools.JSON.Object_Field_Value (Value, "perUnitPattern");
+                  begin
+                     if Per /= "" then
+                        Emit_JSON
+                          ("{""type"":""unit_text"",""locale"":""" & Locale
+                           & """,""key"":""" & Base & ":" & Width & ":per"
+                           & """,""value"":""" & JSON_Escape (Per) & """}");
+                     end if;
+                  end;
+
                   Emit_Category ("zero");
                   Emit_Category ("one");
                   Emit_Category ("two");

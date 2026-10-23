@@ -50,6 +50,15 @@ package body I18N.Unit_Format is
       return Try ("other", Found);
    end Pattern;
 
+   function Per_Pattern
+     (Locale : String;
+      Base   : String;
+      Width  : String;
+      Found  : out Boolean)
+      return String
+   is (I18N.Locale_Data.Resolved_Shard_Lookup
+         ("units", "unit", Locale, "p:" & Base & ":" & Canonical_Width (Width) & ":per", Found));
+
    function Display_Name
      (Locale   : String;
       Base     : String;

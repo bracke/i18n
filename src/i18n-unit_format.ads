@@ -35,6 +35,17 @@ package I18N.Unit_Format is
       Found    : out Boolean)
       return String;
 
+   --  CLDR's pattern for Base as a rate's denominator in Width -- "{0}/s",
+   --  German "{0} pro Stunde" -- into which the numerator's whole text goes.
+   --  Found is False where the locale has none, and the rate is composed
+   --  with Per_Unit_Separator / Short_Per_Separator.
+   function Per_Pattern
+     (Locale : String;
+      Base   : String;
+      Width  : String;
+      Found  : out Boolean)
+      return String;
+
    --  Canonicalize an ICU unit id -- with or without its CLDR category prefix
    --  (length-, volume-, ...) and in British or American spelling -- to the
    --  bare base name Display_Name and English_Name key on. Returns "" for an

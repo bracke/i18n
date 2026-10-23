@@ -10,6 +10,10 @@ commit is what a consumer's release records.
 
 ### Added
 
+- CLDR's `perUnitPattern` -- a unit as a rate's denominator, "{0}/s",
+  German "{0} pro Stunde" -- as `p:<unit>:<width>:per` rows of the unit
+  shards (64,344 rows), read by `I18N.Unit_Format.Per_Pattern`.
+
 - CLDR's named relative offsets -- "yesterday", "the day before yesterday",
   "last week", and per weekday "last Monday" / "this Monday" / "next
   Monday" -- in a `relative_exact` section of `formats.i18ndata` (91,404 rows
