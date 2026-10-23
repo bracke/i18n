@@ -1701,6 +1701,14 @@ procedure Generate_CLDR_Data is
             Add_Format ("date_interval", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                         Sub => Field (Line, 3));
          end if;
+      elsif Kind = "range_text" then
+         --  A language's plural category for a range (CLDR's pluralRanges),
+         --  under und keyed "<language>:<start>:<end>".
+         if Field_Count (Line) /= 4 or else Field (Line, 3) = "" or else Field (Line, 4) = "" then
+            Add_Line_Error (Line_Number, "invalid range_text row shape");
+         else
+            Add_Format ("plural_range", "und", Ada_Expression_UTF8_Bytes (Field (Line, 4)), Sub => Field (Line, 3));
+         end if;
       elsif Kind = "glue_text" then
          --  How a locale joins a date and a time ("{1}, {0}"), keyed by the
          --  date's width (full, long, medium, short).

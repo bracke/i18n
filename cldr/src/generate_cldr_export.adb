@@ -893,6 +893,49 @@ procedure Generate_CLDR_Export is
          For_Each_Member (Data, Tag'Access);
       end Emit_Likely_Region_Rows;
 
+      --  Each language's plural category for a range of numbers (CLDR's
+      --  pluralRanges): "pluralRange-start-one-end-two" in Arabic is "other".
+      procedure Emit_Plural_Range_Rows is
+         Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/pluralRanges.json");
+         Data   : constant String :=
+           Object_Field_Object (Object_Field_Object (Source, "supplemental"), "plurals");
+         Language : US.Unbounded_String;
+
+         procedure Pair (Key : String; Value : String) is
+            Prefix : constant String := "pluralRange-start-";
+            Middle : constant String := "-end-";
+            Text   : constant String :=
+              (if Value'Length >= 2 and then Value (Value'First) = '"' and then Value (Value'Last) = '"'
+               then Value (Value'First + 1 .. Value'Last - 1) else "");
+            Split  : Natural := 0;
+         begin
+            if Key'Length > Prefix'Length and then Key (Key'First .. Key'First + Prefix'Length - 1) = Prefix then
+               for I in Key'First + Prefix'Length .. Key'Last - Middle'Length loop
+                  if Key (I .. I + Middle'Length - 1) = Middle then
+                     Split := I;
+                     exit;
+                  end if;
+               end loop;
+            end if;
+            if Split > 0 and then Text /= "" then
+               Emit_JSON
+                 ("{""type"":""range_text"",""locale"":""und"",""key"":""" & US.To_String (Language) & ":"
+                  & Key (Key'First + Prefix'Length .. Split - 1) & ":" & Key (Split + Middle'Length .. Key'Last)
+                  & """,""value"":""" & JSON_Escape (Text) & """}");
+            end if;
+         end Pair;
+
+         procedure Of_Language (Key : String; Value : String) is
+         begin
+            Language := US.To_Unbounded_String (Key);
+            For_Each_Member (Value, Pair'Access);
+         end Of_Language;
+      begin
+         For_Each_Member (Data, Of_Language'Access);
+      end Emit_Plural_Range_Rows;
+
       procedure Emit_Zone_Metazone_Rows is
          Source : constant String :=
            Project_Tools.Files.Read_Raw_File
@@ -4019,6 +4062,7 @@ procedure Generate_CLDR_Export is
          Emit_Hour_Cycle_Rows;
          Emit_Week_Rows;
          Emit_Likely_Region_Rows;
+         Emit_Plural_Range_Rows;
       end Emit_Migrated_Date_Name_Rows;
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);

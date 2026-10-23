@@ -10,6 +10,9 @@ commit is what a consumer's release records.
 
 ### Added
 
+- `I18N.Plural_Ranges.Category`: a range's plural category by CLDR's
+  pluralRanges for the language (Arabic one to two is other, French one to
+  one stays one), else the end's.
 - Time and date-time intervals: a time value "14:00:00/15:30:00" formats by
   CLDR's interval formats for the skeleton, "j" as the locale's hour cycle
   ("2:00 – 3:30 PM", "14:00–15:30 Uhr"); a date-time interval on one day writes

@@ -1,3 +1,5 @@
+with I18N.Plural_Ranges;
+with I18N.Plurals;
 with I18N.Week_Data;  use I18N.Week_Data;
 
 --  CLDR's weekData through the locale's region, as ICU answers (CLDR 48:
@@ -23,4 +25,17 @@ begin
    Assert (Minimal_Days ("en-GB") = 4, "a British first week has four days of the year");
    Assert (Minimal_Days ("en") = 1, "a United States first week has one day of the year");
    Assert (Minimal_Days ("ja") = 1, "a Japanese first week has one day of the year");
+   --  CLDR's plural ranges (supplemental data beside the week's).
+   Assert (I18N.Plurals."=" (I18N.Plural_Ranges.Category ("ar", I18N.Plurals.One, I18N.Plurals.Two),
+                             I18N.Plurals.Other),
+           "an Arabic range from one to two is other");
+   Assert (I18N.Plurals."=" (I18N.Plural_Ranges.Category ("fr-CA", I18N.Plurals.One, I18N.Plurals.One),
+                             I18N.Plurals.One),
+           "a French range within one stays one");
+   Assert (I18N.Plurals."=" (I18N.Plural_Ranges.Category ("de", I18N.Plurals.Other, I18N.Plurals.One),
+                             I18N.Plurals.One),
+           "a German range ending in one is one");
+   Assert (I18N.Plurals."=" (I18N.Plural_Ranges.Category ("ru", I18N.Plurals.Few, I18N.Plurals.Many),
+                             I18N.Plurals.Many),
+           "a Russian range takes its end's category");
 end Test_Week_Data;
