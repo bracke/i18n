@@ -2,6 +2,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 with I18N.CLDR_Data;
 with I18N.Locale_Data;
+with I18N.Spellout;
 with I18N.Plurals;
 with I18N.Runtime_Data;
 
@@ -10875,6 +10876,15 @@ package body I18N.Number_Format is
       begin
          if Rule_Text /= "" then
             return Rule_Text;
+         end if;
+      end;
+
+      --  CLDR's own rule-based spell-out for the locale.
+      declare
+         CLDR_Text : constant String := I18N.Spellout.Spell (Locale, Long_Long_Integer (Value));
+      begin
+         if CLDR_Text /= "" then
+            return CLDR_Text;
          end if;
       end;
 

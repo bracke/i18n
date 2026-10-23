@@ -162,9 +162,13 @@ package body I18N.Spellout is
            Comma > Content'First
            and then Content (Content'First .. Comma - 1) = "ordinal";
          declare
+            --  A rule's plural agrees with the count of its divisor, as ICU's
+            --  does: 1234 is one thousand ("одна тысяча"), not a few.
+            Counted : constant Long_Long_Integer :=
+              (if Divisor > 1 then Quotient else Value);
             Cat : constant I18N.Plurals.Plural_Category :=
-              (if Ordinal_Kind then I18N.Plurals.Ordinal (Locale, Value)
-               else I18N.Plurals.Cardinal (Locale, Value));
+              (if Ordinal_Kind then I18N.Plurals.Ordinal (Locale, Counted)
+               else I18N.Plurals.Cardinal (Locale, Counted));
             Want : constant String := Category_Id (Cat);
             J    : Natural := Comma + 1;
             Other_Text : Unbounded_String;
@@ -375,6 +379,10 @@ package body I18N.Spellout is
          Best_Div  : Long_Long_Integer := 1;
          Best_Text : Unbounded_String;
          Found     : Boolean := False;
+         --  The rule before the best, for ICU's roll-back.
+         Prev_Base : Long_Long_Integer := -1;
+         Prev_Div  : Long_Long_Integer := 1;
+         Prev_Text : Unbounded_String;
 
          procedure Consider (Base, Text : String) is
             Slash : Natural := 0;
@@ -396,12 +404,30 @@ package body I18N.Spellout is
                  (if Slash = 0 then Base else Base (Base'First .. Slash - 1));
                Base_Val : constant Long_Long_Integer := To_Int (Base_Str);
             begin
+               --  "0.x" and "x.x" are fraction rules, never an integer's.
+               if (for some C of Base_Str => C not in '0' .. '9') then
+                  return;
+               end if;
                if Base_Val <= Value and then Base_Val > Best_Base then
+                  Prev_Base := Best_Base;
+                  Prev_Div  := Best_Div;
+                  Prev_Text := Best_Text;
                   Best_Base := Base_Val;
                   Best_Text := To_Unbounded_String (Text);
                   Found     := True;
                   if Slash /= 0 then
-                     Best_Div := To_Int (Base (Slash + 1 .. Base'Last));
+                     --  The largest power of the radix not above the base.
+                     declare
+                        Radix : constant Long_Long_Integer :=
+                          To_Int (Base (Slash + 1 .. Base'Last));
+                     begin
+                        Best_Div := 1;
+                        if Radix > 1 then
+                           while Best_Div <= Base_Val / Radix loop
+                              Best_Div := Best_Div * Radix;
+                           end loop;
+                        end if;
+                     end;
                   elsif Base_Val >= 1 then
                      Best_Div := 10 ** (Digits_Of (Base_Val) - 1);
                   else
@@ -416,6 +442,19 @@ package body I18N.Spellout is
          It (Serialized);
          if not Found then
             return "";
+         end if;
+         --  A rule with a remainder substitution whose base is not a
+         --  multiple of its divisor (1001) yields an exact multiple (2000)
+         --  to the rule before it, as ICU does.
+         if Prev_Base >= 0
+           and then Best_Div > 1
+           and then Value mod Best_Div = 0
+           and then Best_Base mod Best_Div /= 0
+           and then (for some K in 1 .. Length (Best_Text) =>
+                       Is_R (To_String (Best_Text), K))
+         then
+            Best_Text := Prev_Text;
+            Best_Div  := Prev_Div;
          end if;
          declare
             T : constant String := To_String (Best_Text);

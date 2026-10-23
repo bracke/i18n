@@ -21,6 +21,12 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- `I18N.Number_Format` spells numbers out (`::spellout`) with CLDR's RBNF
+  rules through `I18N.Spellout` wherever the locale has them, so the words
+  match ICU: soft hyphens in German and Italian compounds, Danish "og",
+  Vietnamese "lẻ", Finnish "yksi miljoona", ... The hand-written tables
+  remain only for locales CLDR has no rules for.
+
 - **Time styles are CLDR's.** `{t, time}` / `short` / `medium` / `long` /
   `full` used a hand-written pattern ("HH:mm", 12-hour only for Korean).
   Each locale's Gregorian `timeFormats` now come from the data files (a
@@ -95,6 +101,12 @@ commit is what a consumer's release records.
   file installed, every zone but UTC is unknown.
 
 ### Fixed
+
+- `I18N.Spellout` read a fraction rule ("0.x") as the rule for zero, which
+  looped (Ewe, Korean); counted a plural from the whole number instead of
+  the divisor's quotient (Russian "одна тысячи" for 1234); used a `/radix`
+  base's radix as its divisor; and lacked ICU's roll-back, so an exact
+  multiple took the rule meant for one more (Burmese 2000).
 
 - **A skeleton's `j` and the default hour cycle follow CLDR's timeData.** The
   hour cycle came from a hand-kept rule (12-hour for English, Arabic and
