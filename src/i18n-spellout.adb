@@ -1,5 +1,6 @@
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with I18N.Data_Store;
+with I18N.Number_Format;
 with I18N.Plurals;
 
 package body I18N.Spellout is
@@ -273,13 +274,25 @@ package body I18N.Spellout is
                      Append (Result,
                              Format (Locale, Value, Content, Depth + 1));
                   else
-                     --  Decimal-pattern substitution: v1 emits the integer.
+                     --  Decimal-pattern substitution ("=#,##0="): the number
+                     --  in the locale's own format, grouping included, as ICU
+                     --  writes Tamil "1,000ாவது".
                      declare
                         Img : constant String := Long_Long_Integer'Image (Value);
+                        Digits_Text : constant String :=
+                          (if Img (Img'First) = ' '
+                           then Img (Img'First + 1 .. Img'Last) else Img);
+                        Formatted : String (1 .. I18N.Number_Format.Max_Formatted_Length);
+                        Last      : Natural;
+                        Ok        : Boolean;
+                        Overflow  : Boolean;
                      begin
+                        I18N.Number_Format.Format_Into
+                          (Value_Text => Digits_Text, Locale => Locale, Style => "",
+                           Target => Formatted, Last => Last, Ok => Ok, Overflow => Overflow);
                         Append (Result,
-                                (if Img (Img'First) = ' '
-                                 then Img (Img'First + 1 .. Img'Last) else Img));
+                                (if Ok and then not Overflow and then Last > 0
+                                 then Formatted (1 .. Last) else Digits_Text));
                      end;
                   end if;
                   I := J + 1;
@@ -296,21 +309,38 @@ package body I18N.Spellout is
                   Content : constant String := Text (I + 1 .. J - 1);
                   Has_R   : Boolean := False;
                   Has_L   : Boolean := False;
+                  Bar     : Natural := 0;
                begin
                   for K in Content'Range loop
-                     if Is_R (Content, K) then
-                        Has_R := True;
-                     elsif Is_L (Content, K) then
-                        Has_L := True;
+                     if Content (K) = '|' then
+                        Bar := K;
+                        exit;
                      end if;
                   end loop;
-                  if (Has_R and then Remainder /= 0)
-                    or else (Has_L and then not Has_R and then Quotient /= 0)
-                    or else (not Has_R and then not Has_L)
-                  then
+                  --  "[A|B]": A where the number is not an exact multiple of
+                  --  the rule's divisor, B where it is (Polish "[sto ->->|
+                  --  setny]"), as ICU reads it.
+                  if Bar /= 0 then
                      Append (Result,
-                             Apply (Content, Value, Divisor, Locale, Ruleset,
-                                    Depth));
+                             Apply ((if Remainder /= 0 then Content (Content'First .. Bar - 1)
+                                     else Content (Bar + 1 .. Content'Last)),
+                                    Value, Divisor, Locale, Ruleset, Depth));
+                  else
+                     for K in Content'Range loop
+                        if Is_R (Content, K) then
+                           Has_R := True;
+                        elsif Is_L (Content, K) then
+                           Has_L := True;
+                        end if;
+                     end loop;
+                     if (Has_R and then Remainder /= 0)
+                       or else (Has_L and then not Has_R and then Quotient /= 0)
+                       or else (not Has_R and then not Has_L)
+                     then
+                        Append (Result,
+                                Apply (Content, Value, Divisor, Locale, Ruleset,
+                                       Depth));
+                     end if;
                   end if;
                   I := J + 1;
                end;
@@ -567,12 +597,21 @@ package body I18N.Spellout is
       return "";
    end Negative_Words;
 
+   function Ordinal_Ruleset (Locale : String) return String is
+     (if Load (Locale, "%spellout-ordinal") /= "" then "%spellout-ordinal"
+      elsif Load (Locale, "%spellout-ordinal-masculine") /= "" then "%spellout-ordinal-masculine"
+      else "");
+
    function Ordinal
      (Locale  : String;
       Value   : Long_Long_Integer;
-      Ruleset : String := "%spellout-ordinal")
+      Ruleset : String := "")
       return String
-   is (Format (Locale, Value, Ruleset, 0));
+   is
+      Chosen : constant String := (if Ruleset = "" then Ordinal_Ruleset (Locale) else Ruleset);
+   begin
+      return (if Chosen = "" then "" else Format (Locale, Value, Chosen, 0));
+   end Ordinal;
 
    function Available (Locale : String) return Boolean is
       Cand : constant String := Norm (Locale);

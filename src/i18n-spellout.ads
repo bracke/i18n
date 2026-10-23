@@ -27,11 +27,16 @@ package I18N.Spellout is
       Ruleset : String := "%spellout-cardinal")
       return String;
 
-   --  Ordinal words, e.g. Ordinal ("en", 21) = "twenty-first".
+   --  Ordinal words, e.g. Ordinal ("en", 21) = "twenty-first"; Ruleset ""
+   --  is the locale's Ordinal_Ruleset.
+   --  The ordinal ruleset a locale spells with: %spellout-ordinal, or for a
+   --  language that only has gendered ones (French, Russian) the masculine.
+   function Ordinal_Ruleset (Locale : String) return String;
+
    function Ordinal
      (Locale  : String;
       Value   : Long_Long_Integer;
-      Ruleset : String := "%spellout-ordinal")
+      Ruleset : String := "")
       return String;
 
    --  True when an RBNF shard is installed for the locale (or a parent).

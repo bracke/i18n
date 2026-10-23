@@ -30,6 +30,16 @@ commit is what a consumer's release records.
 
 ### Changed
 
+- Ordinals spelled out (`ordinal_words`) use CLDR's RBNF rules too, through
+  `I18N.Spellout.Ordinal` and the new `Ordinal_Ruleset` (`%spellout-ordinal`,
+  or the masculine set where a language has only gendered ones). The
+  interpreter learned CLDR 48's `[A|B]` (Polish "trzechsetny") and writes a
+  `=#,##0=` substitution in the locale's number format (Tamil "1,000ாவது").
+  Checked against ICU in every RBNF locale. Where CLDR 48 and ICU 74's
+  CLDR 44 disagree, CLDR 48 is right by design: Bulgarian "тристо",
+  Catalan "dos-cents", Indonesian "nol", Romanian "ș", German narrow
+  hour "1h" rather than "1 Std.".
+
 - `I18N.Number_Format` spells numbers out (`::spellout`) with CLDR's RBNF
   rules through `I18N.Spellout` wherever the locale has them, so the words
   match ICU: soft hyphens in German and Italian compounds, Danish "og",

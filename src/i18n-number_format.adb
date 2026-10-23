@@ -11152,6 +11152,15 @@ package body I18N.Number_Format is
          end if;
       end;
 
+      --  CLDR's ordinal rules wherever the locale has them, as ICU spells.
+      declare
+         CLDR_Text : constant String := I18N.Spellout.Ordinal (Locale, Long_Long_Integer (Value));
+      begin
+         if CLDR_Text /= "" then
+            return CLDR_Text;
+         end if;
+      end;
+
       if Language (Locale) = "de" then
          return German_Ordinal (Value);
       elsif Language (Locale) = "fr" then
@@ -11429,6 +11438,18 @@ package body I18N.Number_Format is
                end if;
 
                if Spellout_Negative and then not Found_Exact then
+                  declare
+                     Ruleset : constant String := I18N.Spellout.Ordinal_Ruleset (Locale);
+                     Signed  : constant String :=
+                       (if Ruleset = "" then ""
+                        else I18N.Spellout.Negative_Words (Locale, Text, Ruleset));
+                  begin
+                     if Signed /= "" then
+                        Put (Target, Last, Overflow, Signed);
+                        Ok := not Overflow;
+                        return;
+                     end if;
+                  end;
                   Put (Target, Last, Overflow, Number_Minus_Sign (Locale));
                   Put (Target, Last, Overflow, " ");
                end if;
