@@ -11471,7 +11471,19 @@ package body I18N.Number_Format is
                      return;
                   end if;
 
+                  --  CLDR's negative rule where the locale has one: "minus
+                  --  forty-two", as ICU spells it.
                   if Spellout_Negative and then not Found_Exact then
+                     declare
+                        Signed : constant String :=
+                          I18N.Spellout.Negative_Words (Locale, Text);
+                     begin
+                        if Signed /= "" then
+                           Put (Target, Last, Overflow, Signed);
+                           Ok := not Overflow;
+                           return;
+                        end if;
+                     end;
                      Put (Target, Last, Overflow, Number_Minus_Sign (Locale));
                      Put (Target, Last, Overflow, " ");
                   end if;
@@ -11507,6 +11519,16 @@ package body I18N.Number_Format is
                      end if;
 
                      if Spellout_Negative and then not Found_Exact then
+                        declare
+                           Signed : constant String :=
+                             I18N.Spellout.Negative_Words (Locale, Text);
+                        begin
+                           if Signed /= "" then
+                              Put (Target, Last, Overflow, Signed);
+                              Ok := not Overflow;
+                              return;
+                           end if;
+                        end;
                         Put
                           (Target, Last, Overflow, Number_Minus_Sign (Locale));
                         Put (Target, Last, Overflow, " ");

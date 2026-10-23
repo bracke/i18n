@@ -339,6 +339,38 @@ package body I18N.Spellout is
       return To_String (Result);
    end Apply;
 
+   --  The ruleset the rule for Magnitude hands the number to whole --
+   --  "1=%spellout-cardinal-sinokorean=" -- or "". Without a negative rule
+   --  ICU applies that rule to the signed number, so the delegate's own
+   --  negative rule spells the sign.
+   function Delegate_For (Serialized : String; Magnitude : Long_Long_Integer) return String is
+      Best   : Long_Long_Integer := -1;
+      Target : Unbounded_String;
+      procedure Find (Base, Text : String) is
+         T : constant String := Without_Semi (Text);
+      begin
+         if Base'Length = 0 or else (for some C of Base => C not in '0' .. '9') then
+            return;
+         end if;
+         declare
+            Value : constant Long_Long_Integer := To_Int (Base);
+         begin
+            if Value <= Magnitude and then Value > Best then
+               Best := Value;
+               Target :=
+                 (if T'Length > 3 and then T (T'First) = '=' and then T (T'First + 1) = '%'
+                    and then T (T'Last) = '='
+                  then To_Unbounded_String (T (T'First + 1 .. T'Last - 1))
+                  else Null_Unbounded_String);
+            end if;
+         end;
+      end Find;
+      procedure It is new Iterate_Rules (Find);
+   begin
+      It (Serialized);
+      return To_String (Target);
+   end Delegate_For;
+
    function Format
      (Locale : String; Value : Long_Long_Integer;
       Ruleset : String; Depth : Natural) return String
@@ -367,6 +399,8 @@ package body I18N.Spellout is
             elsif Length (Neg) > 0 then
                return Apply (Without_Semi (To_String (Neg)), -Value,
                              Long_Long_Integer'Last, Locale, Ruleset, Depth);
+            elsif Delegate_For (Serialized, -Value) /= "" then
+               return Format (Locale, Value, Delegate_For (Serialized, -Value), Depth + 1);
             else
                return "-" & Format (Locale, -Value, Ruleset, Depth + 1);
             end if;
@@ -488,6 +522,50 @@ package body I18N.Spellout is
       end if;
       return Direct;
    end Spell;
+
+   function Negative_Words
+     (Locale  : String;
+      Words   : String;
+      Ruleset : String := "%spellout-cardinal")
+      return String
+   is
+      Direct     : constant String := Load (Locale, Ruleset);
+      Serialized : constant String :=
+        (if Direct = "" and then Ruleset = "%spellout-cardinal"
+         then Load (Locale, "%spellout-numbering") else Direct);
+      Neg : Unbounded_String;
+      procedure Find (Base, Text : String) is
+      begin
+         if Base = "-x" then
+            Neg := To_Unbounded_String (Without_Semi (Text));
+         end if;
+      end Find;
+      procedure It is new Iterate_Rules (Find);
+   begin
+      if Serialized = "" then
+         return "";
+      end if;
+      It (Serialized);
+      --  A magnitude in words has no number left to choose a rule by: the
+      --  rule for one stands in, as it hands every count to the same ruleset.
+      if Length (Neg) = 0 and then Delegate_For (Serialized, 1) /= ""
+        and then Delegate_For (Serialized, 1) /= Ruleset
+      then
+         return Negative_Words (Locale, Words, Delegate_For (Serialized, 1));
+      end if;
+      declare
+         Rule : constant String := To_String (Neg);
+      begin
+         --  The magnitude goes where the rule's "->->" stands; a rule that
+         --  names another ruleset there is left to Spell.
+         for I in Rule'First .. Rule'Last - 5 loop
+            if Is_R (Rule, I) and then Is_R (Rule, I + 3) then
+               return Rule (Rule'First .. I - 1) & Words & Rule (I + 6 .. Rule'Last);
+            end if;
+         end loop;
+      end;
+      return "";
+   end Negative_Words;
 
    function Ordinal
      (Locale  : String;

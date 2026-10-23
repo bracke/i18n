@@ -111,6 +111,12 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- A negative number spelled out follows CLDR's negative rule, as ICU does:
+  "minus forty-two", German "minus zweiundvierzig", Russian "минус сорок
+  два" (through the ruleset its numbering rules hand the number to),
+  instead of the minus sign and a space. `I18N.Spellout.Negative_Words`
+  applies it to a decimal's words too.
+
 - `I18N.Spellout` read a fraction rule ("0.x") as the rule for zero, which
   looped (Ewe, Korean); counted a plural from the whole number instead of
   the divisor's quotient (Russian "одна тысячи" for 1234); used a `/radix`

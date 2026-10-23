@@ -17,6 +17,16 @@ package I18N.Spellout is
       Ruleset : String := "%spellout-cardinal")
       return String;
 
+   --  Words, the spelled-out magnitude of a negative number, under the
+   --  ruleset's negative rule: Negative_Words ("en", "zero point five") =
+   --  "minus zero point five", German "minus ...", Ewe's suffix. "" where the
+   --  locale has no such rule.
+   function Negative_Words
+     (Locale  : String;
+      Words   : String;
+      Ruleset : String := "%spellout-cardinal")
+      return String;
+
    --  Ordinal words, e.g. Ordinal ("en", 21) = "twenty-first".
    function Ordinal
      (Locale  : String;
