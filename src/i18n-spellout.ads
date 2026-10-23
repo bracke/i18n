@@ -41,7 +41,8 @@ package I18N.Spellout is
       return String;
 
    --  The ordinal ruleset a locale spells with: %spellout-ordinal, or for a
-   --  language that only has gendered ones (French, Russian) the masculine.
+   --  language that only has gendered ones the masculine (French, Russian),
+   --  the common gender (Danish) or the native series (Korean).
    function Ordinal_Ruleset (Locale : String) return String;
 
    function Ordinal
@@ -49,6 +50,17 @@ package I18N.Spellout is
       Value   : Long_Long_Integer;
       Ruleset : String := "")
       return String;
+
+   --  Read Text back as a number by the ruleset's rules (the locale's
+   --  cardinal one by default), as ICU's RBNF parse does: Parse ("de",
+   --  "zweiundvierzig") gives 42. Consumed is how many of Text's bytes the
+   --  longest reading took, 0 when none; soft hyphens are skipped.
+   procedure Parse
+     (Locale   : String;
+      Text     : String;
+      Value    : out Long_Long_Integer;
+      Consumed : out Natural;
+      Ruleset  : String := "");
 
    --  True when an RBNF shard is installed for the locale (or a parent).
    function Available (Locale : String) return Boolean;

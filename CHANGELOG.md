@@ -10,6 +10,16 @@ commit is what a consumer's release records.
 
 ### Added
 
+- `I18N.Spellout.Parse` reads a spelled-out number back by the CLDR rules,
+  as ICU's RBNF parse does. Substitutions are parsed under ICU's divisor
+  bound, every reading is tried, and soft hyphens are skipped. Spell then
+  Parse round-trips 0..3000 and larger values in 99.6% of 264,792 cases
+  over all RBNF locales; Irish, Cantonese and Ewe forms remain. Every case
+  in the shipped locales round-trips, ordinals included.
+- Spell-out rules load along CLDR's parent chain (Norwegian Bokmål reads
+  `no`'s), and ordinals fall back to the common gender (Danish) or the
+  native series (Korean) where no plain or masculine set exists.
+
 - CLDR's narrow unit lists (`unit-narrow`, "1 h, 30 min und 5 s") beside
   the standard, or and unit families. A separator CLDR leaves empty --
   Japanese and Chinese "{0}{1}" -- is kept as the "no value" marker and
