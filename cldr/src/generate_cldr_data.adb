@@ -1719,6 +1719,7 @@ procedure Generate_CLDR_Data is
                  (if Name = "plus" then "number_plus_sign"
                   elsif Name = "minus" then "number_minus_sign"
                   elsif Name = "percent" then "number_percent_suffix"
+                  elsif Name = "percent_prefix" then "number_percent_prefix"
                   elsif Name = "permille" then "number_permille_suffix"
                   elsif Name = "exponent" then "number_exponent_separator"
                   elsif Name = "min_grouping" then "number_min_grouping"

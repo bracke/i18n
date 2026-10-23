@@ -190,6 +190,10 @@ package body I18N.Number_Format is
    function Number_Percent_Suffix (Locale : String) return String is
      (System_Field ("number_percent_suffix", "number_percent_suffix", Locale));
 
+   --  What precedes a percentage's digits (Turkish "%12"); "" for most.
+   function Number_Percent_Prefix (Locale : String) return String is
+     (System_Field ("number_percent_prefix", "number_percent_prefix", Locale));
+
    function Number_Permille_Suffix (Locale : String) return String is
      (I18N.Locale_Data.Field
         ("number_permille_suffix", Locale));
@@ -709,6 +713,20 @@ package body I18N.Number_Format is
             Style.Max_Frac := Natural'Last;
             Style.Min_Sig := 0;
             Style.Sig_Digits := 0;
+         elsif Token'Length >= 2 and then Token (Token'First) = '.'
+           and then (for all C of Token (Token'First + 1 .. Token'Last) => C in '0' | '#')
+         then
+            --  ICU's short fraction stem: ".00" exactly two, ".0#" one or two.
+            Style.Min_Frac := 0;
+            Style.Max_Frac := Token'Length - 1;
+            for C of Token (Token'First + 1 .. Token'Last) loop
+               if C = '0' then
+                  Style.Min_Frac := Style.Min_Frac + 1;
+               end if;
+            end loop;
+            Style.Min_Sig := 0;
+            Style.Sig_Digits := 0;
+            return True;
          elsif Starts_With (Token, "precision-fraction/")
            or else Starts_With (Token, "::precision-fraction/")
            or else Starts_With (Token, "precision/fraction/")
@@ -1558,7 +1576,8 @@ package body I18N.Number_Format is
       Suffix      : String;
       Target     : in out String;
       Last       : in out Natural;
-      Overflow   : in out Boolean)
+      Overflow   : in out Boolean;
+      Prefix     : String := "")
    is
       Width : Natural :=
         Fraction_Width (Style, Value, Had_Frac, Frac_Len);
@@ -1676,6 +1695,7 @@ package body I18N.Number_Format is
             Number_Plus_Sign (Locale));
       end if;
 
+      Put (Target, Last, Overflow, Prefix);
       Put_Grouped_Integer
         (Target, Last, Overflow, Locale, Integer_Image (Int_Part),
          Style.Padded, Style.Grouping);
@@ -11648,10 +11668,15 @@ package body I18N.Number_Format is
               (Abs_Value, Negative, Locale, Parsed_Style, Had_Frac, Frac_Len,
                "", Target, Last, Overflow);
          when Percent_Mode =>
-            Emit_Decimal
-              (Abs_Value * 100.0, Negative, Locale, Parsed_Style, False, 0,
-               Number_Percent_Suffix (Locale),
-               Target, Last, Overflow);
+            declare
+               --  A sign before the digits (Turkish "%12") has none after.
+               Prefix : constant String := Number_Percent_Prefix (Locale);
+            begin
+               Emit_Decimal
+                 (Abs_Value * 100.0, Negative, Locale, Parsed_Style, False, 0,
+                  (if Prefix = "" then Number_Percent_Suffix (Locale) else ""),
+                  Target, Last, Overflow, Prefix);
+            end;
          when Permille_Mode =>
             Emit_Decimal
               (Abs_Value * 1_000.0, Negative, Locale, Parsed_Style, False, 0,

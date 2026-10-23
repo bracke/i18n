@@ -1526,7 +1526,32 @@ procedure Generate_CLDR_Export is
                            Sign_At : constant Natural := Ada.Strings.Fixed.Index (Tail, "%");
                         begin
                            if Sign_At = 0 then
-                              Put_Text ("percent", Percent_Sign);
+                              --  The sign stands before the digits: that head
+                              --  is the prefix, and no suffix follows.
+                              declare
+                                 First_Digit : Natural := 0;
+                              begin
+                                 for Index in Percent_Pattern'Range loop
+                                    if Percent_Pattern (Index) in '0' | '#' then
+                                       First_Digit := Index;
+                                       exit;
+                                    end if;
+                                 end loop;
+                                 declare
+                                    Head : constant String :=
+                                      (if First_Digit = 0 then ""
+                                       else Percent_Pattern (Percent_Pattern'First .. First_Digit - 1));
+                                    Head_Sign : constant Natural := Ada.Strings.Fixed.Index (Head, "%");
+                                 begin
+                                    if Head_Sign > 0 then
+                                       Put_Text ("percent_prefix",
+                                                 Head (Head'First .. Head_Sign - 1) & Percent_Sign
+                                                 & Head (Head_Sign + 1 .. Head'Last));
+                                    else
+                                       Put_Text ("percent", Percent_Sign);
+                                    end if;
+                                 end;
+                              end;
                            else
                               Put_Text ("percent",
                                     Tail (Tail'First .. Sign_At - 1) & Percent_Sign & Tail (Sign_At + 1 .. Tail'Last));

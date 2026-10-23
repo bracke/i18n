@@ -321,6 +321,9 @@ commit is what a consumer's release records.
 No procedure yet.
 ### Fixed
 
+- Percentages follow CLDR's pattern where the sign comes first (Turkish,
+  Basque, Kurdish, ...: "%12"), from a new `number_percent_prefix` field, and
+  number skeletons accept ICU's short fraction stems (`.00`, `.0#`).
 - The CLDR export carries the year-month and year-quarter skeletons (y, yM,
   yMMM, yMMMM, yQQQ, yQQQQ): a date in those shapes formatted as the
   locale writes it ("Okt. 2026", "2026年10月") instead of a field-by-field
