@@ -1388,150 +1388,193 @@ procedure Generate_CLDR_Export is
       begin
          Load_Locales;
 
-         for Index in 1 .. Locale_Count loop
-            declare
-               Locale      : constant String := S (Locales (Index));
-               Path        : constant String :=
-                 "cldr-json/cldr-numbers-full/main/" & Locale & "/numbers.json";
-               Text        : constant String := Project_Tools.Files.Read_Raw_File ("upstream/" & Path);
-               Raw_System  : constant String :=
-                 Project_Tools.JSON.Field_Value (Text, "defaultNumberingSystem");
-               System      : constant String :=
-                 (if Locale = "ar" then "arab" else Raw_System);
-               Symbols     : constant String :=
-                 Object_Field_Object (Text, "symbols-numberSystem-" & System);
-               Decimal     : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Symbols, "decimal");
-               Group       : constant String :=
-                 Project_Tools.JSON.Object_Field_Value (Symbols, "group");
-               Digit_Codes : constant String :=
-                 (if System = "latn" then "" else Numbering_Digits (System));
-            begin
-               if System = "" or else Symbols = "" or else Decimal = "" or else Group = "" then
-                  Add_Error ("missing CLDR number symbols for locale " & Locale);
-               else
-                  Emit_JSON
-                    ("{""type"":""symbol"",""kind"":""decimal"",""locales"":"""
-                     & Locale & """,""value"":""" & Decimal & """}");
-                  Emit_JSON
-                    ("{""type"":""symbol"",""kind"":""group"",""locales"":"""
-                     & Locale & """,""value"":""" & Group & """}");
+         declare
+            type Name_Access is access constant String;
+            Numbering_System_Names : constant array (Positive range <>) of Name_Access :=
+              [new String'("latn"), new String'("arab"), new String'("arabext"), new String'("deva"),
+               new String'("beng"), new String'("mymr"), new String'("thai"), new String'("tamldec"),
+               new String'("telu"), new String'("knda"), new String'("mlym"), new String'("gujr"),
+               new String'("guru"), new String'("orya"), new String'("tibt"), new String'("khmr"),
+               new String'("laoo"), new String'("hanidec"), new String'("fullwide"), new String'("adlm"),
+               new String'("cakm"), new String'("mtei"), new String'("olck"), new String'("sora"),
+               new String'("java"), new String'("bali"), new String'("nkoo"), new String'("vaii")];
+         begin
+            for Index in 1 .. Locale_Count loop
+               declare
+                  Locale      : constant String := S (Locales (Index));
+                  Path        : constant String :=
+                    "cldr-json/cldr-numbers-full/main/" & Locale & "/numbers.json";
+                  Text        : constant String := Project_Tools.Files.Read_Raw_File ("upstream/" & Path);
+                  Raw_System  : constant String :=
+                    Project_Tools.JSON.Field_Value (Text, "defaultNumberingSystem");
+                  System      : constant String :=
+                    (if Locale = "ar" then "arab" else Raw_System);
+                  Symbols     : constant String :=
+                    Object_Field_Object (Text, "symbols-numberSystem-" & System);
+                  Decimal     : constant String :=
+                    Project_Tools.JSON.Object_Field_Value (Symbols, "decimal");
+                  Group       : constant String :=
+                    Project_Tools.JSON.Object_Field_Value (Symbols, "group");
+                  Digit_Codes : constant String :=
+                    (if System = "latn" then "" else Numbering_Digits (System));
+               begin
+                  if System = "" or else Symbols = "" or else Decimal = "" or else Group = "" then
+                     Add_Error ("missing CLDR number symbols for locale " & Locale);
+                  else
+                     Emit_JSON
+                       ("{""type"":""symbol"",""kind"":""decimal"",""locales"":"""
+                        & Locale & """,""value"":""" & Decimal & """}");
+                     Emit_JSON
+                       ("{""type"":""symbol"",""kind"":""group"",""locales"":"""
+                        & Locale & """,""value"":""" & Group & """}");
 
-                  --  The signs, the per-mille sign and the exponent, as the
-                  --  locale's numbering system writes them, and the percent
-                  --  sign with what the percent pattern puts before it after
-                  --  the digits (a no-break space in German).
-                  declare
-                     procedure Put_Text (Name : String; Value : String) is
-                     begin
-                        if Value /= "" then
-                           Emit_JSON
-                             ("{""type"":""number_text"",""locale"":""" & Locale
-                              & """,""key"":""" & Name & """,""value"":""" & JSON_Escape (Value) & """}");
-                        end if;
-                     end Put_Text;
-
-                     Percent_Sign : constant String :=
-                       Project_Tools.JSON.Object_Field_Value (Symbols, "percentSign");
-                     Percent_Pattern : constant String :=
-                       Project_Tools.JSON.Object_Field_Value
-                         (Object_Field_Object (Text, "percentFormats-numberSystem-" & System), "standard");
-                     Last_Digit : Natural := 0;
-                  begin
-                     for Index in Percent_Pattern'Range loop
-                        if Percent_Pattern (Index) in '0' | '#' then
-                           Last_Digit := Index;
-                        end if;
-                     end loop;
-                     --  Grouping waits for this many digits beyond the group
-                     --  (Spanish and Polish write "1234"), and the currency
-                     --  pattern places the symbol, its spacing and bidi marks.
+                     --  The signs, the per-mille sign and the exponent, as the
+                     --  locale's numbering system writes them, and the percent
+                     --  sign with what the percent pattern puts before it after
+                     --  the digits (a no-break space in German).
                      declare
-                        Min_Grouping : constant String :=
-                          Project_Tools.JSON.Field_Value (Text, "minimumGroupingDigits");
-                     begin
-                        if Min_Grouping /= "" then
-                           Put_Text ("min_grouping", Min_Grouping);
-                        end if;
-                     end;
-                     Put_Text ("currency_pattern",
-                               Project_Tools.JSON.Object_Field_Value
-                                 (Object_Field_Object (Text, "currencyFormats-numberSystem-" & System),
-                                  "standard"));
-                     --  The Latin system's separators beside a native default
-                     --  (Arabic "1,234.5" for ar-u-nu-latn, not "1٬234٫5").
-                     if System /= "latn" then
-                        declare
-                           Latin : constant String := Object_Field_Object (Text, "symbols-numberSystem-latn");
+                        procedure Put_Text (Name : String; Value : String) is
                         begin
-                           if Latin /= "" then
-                              Put_Text ("decimal_latn", Project_Tools.JSON.Object_Field_Value (Latin, "decimal"));
-                              Put_Text ("group_latn", Project_Tools.JSON.Object_Field_Value (Latin, "group"));
+                           if Value /= "" then
+                              Emit_JSON
+                                ("{""type"":""number_text"",""locale"":""" & Locale
+                                 & """,""key"":""" & Name & """,""value"":""" & JSON_Escape (Value) & """}");
+                           end if;
+                        end Put_Text;
+
+                        Percent_Sign : constant String :=
+                          Project_Tools.JSON.Object_Field_Value (Symbols, "percentSign");
+                        Percent_Pattern : constant String :=
+                          Project_Tools.JSON.Object_Field_Value
+                            (Object_Field_Object (Text, "percentFormats-numberSystem-" & System), "standard");
+                        Last_Digit : Natural := 0;
+                     begin
+                        for Index in Percent_Pattern'Range loop
+                           if Percent_Pattern (Index) in '0' | '#' then
+                              Last_Digit := Index;
+                           end if;
+                        end loop;
+                        --  Grouping waits for this many digits beyond the group
+                        --  (Spanish and Polish write "1234"), and the currency
+                        --  pattern places the symbol, its spacing and bidi marks.
+                        declare
+                           Min_Grouping : constant String :=
+                             Project_Tools.JSON.Field_Value (Text, "minimumGroupingDigits");
+                        begin
+                           if Min_Grouping /= "" then
+                              Put_Text ("min_grouping", Min_Grouping);
                            end if;
                         end;
-                     end if;
-                     Put_Text ("currency_group", Project_Tools.JSON.Object_Field_Value (Symbols, "currencyGroup"));
-                     Put_Text ("currency_decimal", Project_Tools.JSON.Object_Field_Value (Symbols, "currencyDecimal"));
-                     Put_Text ("plus", Project_Tools.JSON.Object_Field_Value (Symbols, "plusSign"));
-                     Put_Text ("minus", Project_Tools.JSON.Object_Field_Value (Symbols, "minusSign"));
-                     Put_Text ("permille", Project_Tools.JSON.Object_Field_Value (Symbols, "perMille"));
-                     Put_Text ("exponent", Project_Tools.JSON.Object_Field_Value (Symbols, "exponential"));
-                     --  A pattern with the sign before the number (Turkish
-                     --  "%#,##0") has no tail; the sign alone follows.
-                     declare
-                        Tail : constant String :=
-                          (if Last_Digit = 0 then "" else Percent_Pattern (Last_Digit + 1 .. Percent_Pattern'Last));
-                        Sign_At : constant Natural := Ada.Strings.Fixed.Index (Tail, "%");
-                     begin
-                        if Sign_At = 0 then
-                           Put_Text ("percent", Percent_Sign);
-                        else
-                           Put_Text ("percent",
-                                 Tail (Tail'First .. Sign_At - 1) & Percent_Sign & Tail (Sign_At + 1 .. Tail'Last));
-                        end if;
+                        Put_Text ("currency_pattern",
+                                  Project_Tools.JSON.Object_Field_Value
+                                    (Object_Field_Object (Text, "currencyFormats-numberSystem-" & System),
+                                     "standard"));
+                        --  Each numbering system's own symbols, the default's too,
+                        --  for a tag that names one (ar-u-nu-latn "1,234.5" and
+                        --  "25‎%‎"; ar-MA-u-nu-arab, whose default is Latin).
+                        for Sys of Numbering_System_Names loop
+                           declare
+                              Sys_Symbols : constant String :=
+                                Object_Field_Object (Text, "symbols-numberSystem-" & Sys.all);
+                              Sys_Percent : constant String :=
+                                Project_Tools.JSON.Object_Field_Value
+                                  (Object_Field_Object (Text, "percentFormats-numberSystem-" & Sys.all), "standard");
+                              Sign : constant String :=
+                                Project_Tools.JSON.Object_Field_Value (Sys_Symbols, "percentSign");
+                              Last : Natural := 0;
+                           begin
+                              if Sys_Symbols /= "" then
+                                 Put_Text ("decimal_" & Sys.all,
+                                           Project_Tools.JSON.Object_Field_Value (Sys_Symbols, "decimal"));
+                                 Put_Text ("group_" & Sys.all,
+                                           Project_Tools.JSON.Object_Field_Value (Sys_Symbols, "group"));
+                                 Put_Text ("plus_" & Sys.all,
+                                           Project_Tools.JSON.Object_Field_Value (Sys_Symbols, "plusSign"));
+                                 Put_Text ("minus_" & Sys.all,
+                                           Project_Tools.JSON.Object_Field_Value (Sys_Symbols, "minusSign"));
+                                 for Index in Sys_Percent'Range loop
+                                    if Sys_Percent (Index) in '0' | '#' then
+                                       Last := Index;
+                                    end if;
+                                 end loop;
+                                 if Sign /= "" and then Last > 0 then
+                                    declare
+                                       Tail : constant String := Sys_Percent (Last + 1 .. Sys_Percent'Last);
+                                       At_Sign : constant Natural := Ada.Strings.Fixed.Index (Tail, "%");
+                                    begin
+                                       Put_Text ("percent_" & Sys.all,
+                                                 (if At_Sign = 0 then Sign
+                                                  else Tail (Tail'First .. At_Sign - 1) & Sign
+                                                       & Tail (At_Sign + 1 .. Tail'Last)));
+                                    end;
+                                 end if;
+                              end if;
+                           end;
+                        end loop;
+                        Put_Text ("currency_group", Project_Tools.JSON.Object_Field_Value (Symbols, "currencyGroup"));
+                        Put_Text ("currency_decimal",
+                                  Project_Tools.JSON.Object_Field_Value (Symbols, "currencyDecimal"));
+                        Put_Text ("plus", Project_Tools.JSON.Object_Field_Value (Symbols, "plusSign"));
+                        Put_Text ("minus", Project_Tools.JSON.Object_Field_Value (Symbols, "minusSign"));
+                        Put_Text ("permille", Project_Tools.JSON.Object_Field_Value (Symbols, "perMille"));
+                        Put_Text ("exponent", Project_Tools.JSON.Object_Field_Value (Symbols, "exponential"));
+                        --  A pattern with the sign before the number (Turkish
+                        --  "%#,##0") has no tail; the sign alone follows.
+                        declare
+                           Tail : constant String :=
+                             (if Last_Digit = 0 then "" else Percent_Pattern (Last_Digit + 1 .. Percent_Pattern'Last));
+                           Sign_At : constant Natural := Ada.Strings.Fixed.Index (Tail, "%");
+                        begin
+                           if Sign_At = 0 then
+                              Put_Text ("percent", Percent_Sign);
+                           else
+                              Put_Text ("percent",
+                                    Tail (Tail'First .. Sign_At - 1) & Percent_Sign & Tail (Sign_At + 1 .. Tail'Last));
+                           end if;
+                        end;
                      end;
-                  end;
 
-                  --  A region writing Latin digits where its language writes
-                  --  others (ar-MA, ar-DZ) says so, or it would inherit them.
-                  if System = "latn" and then Ada.Strings.Fixed.Index (Locale, "-") > 0 then
-                     declare
-                        Language : constant String :=
-                          Locale (Locale'First .. Ada.Strings.Fixed.Index (Locale, "-") - 1);
-                        Language_Text : constant String :=
-                          Project_Tools.Files.Read_Raw_File
-                            ("upstream/cldr-json/cldr-numbers-full/main/" & Language & "/numbers.json");
-                        Language_System : constant String :=
-                          (if Language = "ar" then "arab"
-                           else Project_Tools.JSON.Field_Value (Language_Text, "defaultNumberingSystem"));
-                     begin
-                        if Language_System /= "" and then Language_System /= "latn" then
+                     --  A region writing Latin digits where its language writes
+                     --  others (ar-MA, ar-DZ) says so, or it would inherit them.
+                     if System = "latn" and then Ada.Strings.Fixed.Index (Locale, "-") > 0 then
+                        declare
+                           Language : constant String :=
+                             Locale (Locale'First .. Ada.Strings.Fixed.Index (Locale, "-") - 1);
+                           Language_Text : constant String :=
+                             Project_Tools.Files.Read_Raw_File
+                               ("upstream/cldr-json/cldr-numbers-full/main/" & Language & "/numbers.json");
+                           Language_System : constant String :=
+                             (if Language = "ar" then "arab"
+                              else Project_Tools.JSON.Field_Value (Language_Text, "defaultNumberingSystem"));
+                        begin
+                           if Language_System /= "" and then Language_System /= "latn" then
+                              Emit_JSON
+                                ("{""type"":""numbering_system"",""locale"":"""
+                                 & Locale & """,""digits"":""" & Numbering_Digits ("latn") & """}");
+                           end if;
+                        exception
+                           when others =>
+                              null;
+                        end;
+                     end if;
+                     if System /= "latn" then
+                        if Digit_Codes = "" then
+                           Add_Error
+                             ("missing numeric digit data for numbering system "
+                              & System & " in locale " & Locale);
+                        else
                            Emit_JSON
                              ("{""type"":""numbering_system"",""locale"":"""
-                              & Locale & """,""digits"":""" & Numbering_Digits ("latn") & """}");
+                              & Locale & """,""digits"":""" & Digit_Codes & """}");
                         end if;
-                     exception
-                        when others =>
-                           null;
-                     end;
-                  end if;
-                  if System /= "latn" then
-                     if Digit_Codes = "" then
-                        Add_Error
-                          ("missing numeric digit data for numbering system "
-                           & System & " in locale " & Locale);
-                     else
-                        Emit_JSON
-                          ("{""type"":""numbering_system"",""locale"":"""
-                           & Locale & """,""digits"":""" & Digit_Codes & """}");
                      end if;
                   end if;
-               end if;
-            exception
-               when others =>
-                  Add_Error ("failed to import CLDR number source " & Locale);
-            end;
-         end loop;
+               exception
+                  when others =>
+                     Add_Error ("failed to import CLDR number source " & Locale);
+               end;
+            end loop;
+         end;
 
          Emit_Numeric_Numbering_System_Rows;
          Emit_Locale_Currency_Symbols;

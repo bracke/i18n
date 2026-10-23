@@ -13,7 +13,10 @@ package body I18N.Data_Store is
    type String_Access is access String;
    type Dir_List is array (Positive range <>) of Unbounded_String;
 
-   Max_Sections : constant := 64;
+   --  Sections in one data file. formats holds ~180 (one per field and per
+   --  numbering system); a file with more raises rather than losing the rest
+   --  silently, as 64 once did.
+   Max_Sections : constant := 512;
    type Section_Record is record
       Name : Unbounded_String;
       Lo   : Natural := 1;   --  first byte of the first record
@@ -215,7 +218,9 @@ package body I18N.Data_Store is
             if Count > 0 then
                Sections (Count).Hi := I - 2;   --  drop the preceding LF too
             end if;
-            if Count < Max_Sections then
+            if Count = Max_Sections then
+               raise Program_Error with "data file has more than" & Max_Sections'Image & " sections";
+            else
                Count := Count + 1;
                declare
                   Bar : Natural := I + 1;

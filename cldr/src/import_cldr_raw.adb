@@ -857,7 +857,19 @@ procedure Import_CLDR_Raw is
                  or else not Is_Plural_Category (Category)
                  or else not Valid_Value (Value)
                then
-                  Add_Line_Error (Line_Number, "invalid staged unit_name record");
+                  --  Name the failing check and the fields: this once
+                  --  rejected a valid line and passed on rerun.
+                  Add_Line_Error
+                    (Line_Number,
+                     "invalid staged unit_name record ("
+                     & (if not Valid_Value (Locale) then "locale"
+                        elsif not Is_Unit_Base (Base) then "base"
+                        elsif not Is_Relative_Width (Width) then "width"
+                        elsif not Is_Plural_Category (Category) then "category"
+                        else "value")
+                     & ": locale=[" & Locale & "] base=[" & Base & "] width=[" & Width
+                     & "] category=[" & Category & "] value=[" & Value & "] line length"
+                     & Natural'Image (Line'Length) & ")");
                   return;
                end if;
                Add_Key

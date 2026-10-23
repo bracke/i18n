@@ -168,6 +168,15 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- A numbering system named in the tag (`-u-nu-latn`, `-u-nu-arab`) writes its
+  own separators and plus, minus and percent signs, as ICU: ar-u-nu-latn
+  "‎-1,234,567.5" and "25‎%‎", en-u-nu-arab Arabic's ٬ and ٫ (from a locale
+  where that system is the default when the locale has none of its own).
+- The data store held at most 64 sections per file and silently dropped the
+  rest; it holds 512 and raises beyond that.
+- The importer names the failing check and fields for a rejected unit row (it
+  once rejected a valid row and passed on rerun).
+
 - `Spellout.Parse` reads Irish thousands ("dhá mhíle", "dhá mhíle dhéag"),
   where a rule writes one number in two parts, and Cantonese numbers the
   numbering rules spell ("十"); of readings as long, it keeps one that spells

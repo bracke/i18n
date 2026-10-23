@@ -1722,8 +1722,17 @@ procedure Generate_CLDR_Data is
                   elsif Name = "permille" then "number_permille_suffix"
                   elsif Name = "exponent" then "number_exponent_separator"
                   elsif Name = "min_grouping" then "number_min_grouping"
-                  elsif Name = "decimal_latn" then "number_decimal_latn"
-                  elsif Name = "group_latn" then "number_group_latn"
+                  --  A numbering system's own symbols: "<field>_<system>".
+                  elsif Name'Length > 8 and then Name (Name'First .. Name'First + 7) = "decimal_"
+                  then "number_" & Name
+                  elsif Name'Length > 6 and then Name (Name'First .. Name'First + 5) = "group_"
+                  then "number_" & Name
+                  elsif Name'Length > 5 and then Name (Name'First .. Name'First + 4) = "plus_"
+                  then "number_plus_sign_" & Name (Name'First + 5 .. Name'Last)
+                  elsif Name'Length > 6 and then Name (Name'First .. Name'First + 5) = "minus_"
+                  then "number_minus_sign_" & Name (Name'First + 6 .. Name'Last)
+                  elsif Name'Length > 8 and then Name (Name'First .. Name'First + 7) = "percent_"
+                  then "number_percent_suffix_" & Name (Name'First + 8 .. Name'Last)
                   elsif Name = "currency_group" then "number_currency_group"
                   elsif Name = "currency_decimal" then "number_currency_decimal"
                   elsif Name = "currency_pattern" then "currency_pattern"

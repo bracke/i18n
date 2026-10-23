@@ -104,29 +104,59 @@ package body I18N.Number_Format is
    --  The numbering system a locale names ("-u-nu-latn"), or "".
    function Named_System (Locale : String) return String is
       At_Key : constant Natural := Ada.Strings.Fixed.Index (Locale, "-u-nu-");
+      Last   : Natural;
    begin
-      if At_Key = 0 or else At_Key + 9 > Locale'Last then
+      if At_Key = 0 or else At_Key + 6 > Locale'Last then
          return "";
       end if;
-      return Locale (At_Key + 6 .. At_Key + 9);
+      Last := At_Key + 6;
+      while Last < Locale'Last and then Locale (Last + 1) /= '-' loop
+         Last := Last + 1;
+      end loop;
+      return Locale (At_Key + 6 .. Last);
    end Named_System;
 
-   --  A separator: the named Latin system's where the locale has one of its
-   --  own beside a native default, else the locale's.
-   function Separator (Field_Name, Latin_Section, Locale : String) return String is
-      Found : Boolean := False;
-      Latin : constant String :=
-        (if Named_System (Locale) = "latn"
-         then I18N.Locale_Data.Lookup (Latin_Section, Locale, "", Found) else "");
+   --  A number field as the numbering system the locale names writes it
+   --  (ar-u-nu-latn "1,234.5", ar-MA-u-nu-arab "١٬٢٣٤٫٥"), else the
+   --  locale's own.
+   function System_Field (Field_Name, Section, Locale : String) return String is
+      System : constant String := Named_System (Locale);
+
+      --  A locale whose default is System, for a locale with none of its own
+      --  for it (en-u-nu-arab writes Arabic's symbols, as ICU's root does).
+      function Native_Locale return String is
+        (if System = "arab" then "ar" elsif System = "arabext" then "fa"
+         elsif System = "beng" then "bn" elsif System = "deva" then "mr"
+         elsif System = "mymr" then "my" elsif System = "tibt" then "dz"
+         elsif System = "olck" then "sat" elsif System = "mtei" then "mni"
+         elsif System = "cakm" then "ccp" elsif System = "nkoo" then "nqo"
+         elsif System = "vaii" then "vai" elsif System = "adlm" then "ff-Adlm"
+         else "");
+
+      Found  : Boolean := False;
+      Value  : constant String :=
+        (if System /= "" then I18N.Locale_Data.Lookup (Section & "_" & System, Locale, "", Found) else "");
    begin
-      return (if Found and then Latin /= "" then Latin else I18N.Locale_Data.Field (Field_Name, Locale));
-   end Separator;
+      if Found and then Value /= "" then
+         return Value;
+      elsif System /= "" and then Native_Locale /= "" then
+         declare
+            Native : constant String :=
+              I18N.Locale_Data.Lookup (Section & "_" & System, Native_Locale, "", Found);
+         begin
+            if Found and then Native /= "" then
+               return Native;
+            end if;
+         end;
+      end if;
+      return I18N.Locale_Data.Field (Field_Name, Locale);
+   end System_Field;
 
    function Decimal_Separator (Locale : String) return String is
-     (Separator ("decimal_separator", "number_decimal_latn", Locale));
+     (System_Field ("decimal_separator", "number_decimal", Locale));
 
    function Group_Separator (Locale : String) return String is
-     (Separator ("group_separator", "number_group_latn", Locale));
+     (System_Field ("group_separator", "number_group", Locale));
 
    function Uses_Indian_Grouping (Locale : String) return Boolean is
       Found : Boolean;
@@ -158,20 +188,17 @@ package body I18N.Number_Format is
    end Uses_Indian_Grouping;
 
    function Number_Percent_Suffix (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("number_percent_suffix", Locale));
+     (System_Field ("number_percent_suffix", "number_percent_suffix", Locale));
 
    function Number_Permille_Suffix (Locale : String) return String is
      (I18N.Locale_Data.Field
         ("number_permille_suffix", Locale));
 
    function Number_Plus_Sign (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("number_plus_sign", Locale));
+     (System_Field ("number_plus_sign", "number_plus_sign", Locale));
 
    function Number_Minus_Sign (Locale : String) return String is
-     (I18N.Locale_Data.Field
-        ("number_minus_sign", Locale));
+     (System_Field ("number_minus_sign", "number_minus_sign", Locale));
 
    function Number_Accounting_Prefix (Locale : String) return String is
      (I18N.Locale_Data.Field
