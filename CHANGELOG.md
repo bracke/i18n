@@ -168,6 +168,11 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- `Spellout.Parse` reads Irish thousands ("dhá mhíle", "dhá mhíle dhéag"),
+  where a rule writes one number in two parts, and Cantonese numbers the
+  numbering rules spell ("十"); of readings as long, it keeps one that spells
+  back to the text.
+
 - Arabic and Persian with Latin digits (ar-u-nu-latn) take the Latin
   system's separators ("1,234,567.5", as ICU), not the Arabic ones; regions
   whose default is Latin where their language's is not (ar-MA, ar-DZ, ...)

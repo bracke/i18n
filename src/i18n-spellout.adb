@@ -921,10 +921,12 @@ package body I18N.Spellout is
       Memo : Memos.Map;
       Plain : Unbounded_String;
 
+      --  Readings that end alike but read different values are both kept:
+      --  Irish "dhá" is 2 or, before "mhíle dhéag", 12.
       procedure Add (List : in out Readings.Vector; Item : Match) is
       begin
          for Existing of List loop
-            if Existing.Next = Item.Next then
+            if Existing.Next = Item.Next and then Existing.Value = Item.Value then
                return;
             end if;
          end loop;
@@ -1115,7 +1117,13 @@ package body I18N.Spellout is
                      end if;
                      for Sub of Subs loop
                         if Equal then
-                           Add_All (Result, Walk (R, After, Sub.Next, Q, Remain, Sub.Value, Has_Q, True));
+                           --  A second "=" writes the same number in another
+                           --  part (Irish "=%%prefixpart= =%%thousandp=":
+                           --  "dhá" 2, "mhíle dhéag" the teen): each reads a
+                           --  bound of it, the larger the number.
+                           Add_All (Result, Walk (R, After, Sub.Next, Q, Remain,
+                                                  (if Has_Eq then Long_Long_Integer'Max (Eq, Sub.Value)
+                                                   else Sub.Value), Has_Q, True));
                         elsif Left then
                            Add_All (Result, Walk (R, After, Sub.Next, Sub.Value, Remain, Eq, True, Has_Eq));
                         else
@@ -1181,17 +1189,54 @@ package body I18N.Spellout is
            (if Ruleset /= "" then Ruleset
             elsif Load (Locale, "%spellout-cardinal") /= "" then "%spellout-cardinal"
             else "%spellout-numbering");
+         --  Unnamed, a number may be written by the cardinal or the numbering
+         --  rules (Cantonese spells 10 "十" by the latter): either reading.
+         function Both return Readings.Vector is
+            Result : Readings.Vector := Parse_Ruleset (Chosen, Source, 1, Long_Long_Integer'Last, 0);
+         begin
+            if Ruleset = "" and then Chosen /= "%spellout-numbering"
+              and then Load (Locale, "%spellout-numbering") /= ""
+            then
+               Add_All (Result, Parse_Ruleset ("%spellout-numbering", Source, 1, Long_Long_Integer'Last, 0));
+            end if;
+            return Result;
+         end Both;
          All_Readings : constant Readings.Vector :=
-           (if Source = "" then Readings.Empty_Vector
-            else Parse_Ruleset (Chosen, Source, 1, Long_Long_Integer'Last, 0));
+           (if Source = "" then Readings.Empty_Vector else Both);
          M : Match;
+
+         function Unhyphenated (Text : String) return String is
+            Result : Unbounded_String;
+            K      : Natural := Text'First;
+         begin
+            while K <= Text'Last loop
+               if K < Text'Last and then Text (K .. K + 1) = Soft_Hyphen then
+                  K := K + 2;
+               else
+                  Append (Result, Text (K));
+                  K := K + 1;
+               end if;
+            end loop;
+            return To_String (Result);
+         end Unhyphenated;
       begin
-         --  The longest reading.
+         --  The longest reading; of readings as long, one that spells back to
+         --  the text itself.
          for Item of All_Readings loop
             if not M.Ok or else Item.Next > M.Next then
                M := Item;
             end if;
          end loop;
+         if M.Ok then
+            for Item of All_Readings loop
+               if Item.Next = M.Next and then Item.Value /= M.Value
+                 and then Unhyphenated (Spell (Locale, M.Value)) /= Source (Source'First .. M.Next - 1)
+                 and then Unhyphenated (Spell (Locale, Item.Value)) = Source (Source'First .. Item.Next - 1)
+               then
+                  M := Item;
+               end if;
+            end loop;
+         end if;
          Value := (if M.Ok then M.Value else 0);
          Consumed := 0;
          if M.Ok then
