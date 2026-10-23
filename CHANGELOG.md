@@ -111,6 +111,11 @@ commit is what a consumer's release records.
 
 ### Fixed
 
+- A fresh clone generates the rbnf, calendars, person-names and annotations
+  shards. Each directory is tracked with a `.keep` placeholder, which the
+  regenerate tool took for generated data, so CI ran with no spell-out rules
+  and fell back to the hand-written words.
+
 - A negative number spelled out follows CLDR's negative rule, as ICU does:
   "minus forty-two", German "minus zweiundvierzig", Russian "минус сорок
   два" (through the ruleset its numbering rules hand the number to),

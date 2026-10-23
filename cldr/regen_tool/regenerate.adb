@@ -77,6 +77,27 @@ procedure Regenerate is
    function Data_Here (Path : String) return Boolean is
      (File_Here (Path) and then Size (Path) > 0);
 
+   --  A generated shard directory that holds data: the repository tracks each
+   --  one with only a .keep placeholder, so a bare directory is not data --
+   --  a clone had the rbnf, calendars and other directories, and none of
+   --  them was ever generated.
+   function Shards_Here (Path : String) return Boolean is
+      Search : Search_Type;
+      Item   : Directory_Entry_Type;
+      Found  : Boolean := False;
+   begin
+      if not Dir_Here (Path) then
+         return False;
+      end if;
+      Start_Search (Search, Path, "*.i18ndata", [Ordinary_File => True, others => False]);
+      while not Found and then More_Entries (Search) loop
+         Get_Next_Entry (Search, Item);
+         Found := Size (Item) > 0;
+      end loop;
+      End_Search (Search);
+      return Found;
+   end Shards_Here;
+
    --  A built generator, tolerating a .exe suffix on Windows.
    function Binary_Here (Path : String) return Boolean is
      (File_Here (Path) or else File_Here (Path & ".exe"));
@@ -241,7 +262,7 @@ procedure Regenerate is
          Generate_With ("generate_cldr_display_data");
       end if;
 
-      if not Dir_Here (Share & "/annotations")
+      if not Shards_Here (Share & "/annotations")
         and then Dir_Here (Upstream & "/cldr-annotations-full")
       then
          Build_Tools;
@@ -249,7 +270,7 @@ procedure Regenerate is
          Generate_With ("generate_cldr_annotation_data");
       end if;
 
-      if not Dir_Here (Share & "/calendars")
+      if not Shards_Here (Share & "/calendars")
         and then Dir_Here (Upstream & "/cldr-cal-islamic-full")
       then
          Build_Tools;
@@ -257,7 +278,7 @@ procedure Regenerate is
          Generate_With ("generate_cldr_calendar_data");
       end if;
 
-      if not Dir_Here (Share & "/person-names")
+      if not Shards_Here (Share & "/person-names")
         and then Dir_Here (Upstream & "/cldr-person-names-full")
       then
          Build_Tools;
@@ -265,7 +286,7 @@ procedure Regenerate is
          Generate_With ("generate_cldr_personname_data");
       end if;
 
-      if not Dir_Here (Share & "/rbnf")
+      if not Shards_Here (Share & "/rbnf")
         and then Dir_Here (Upstream & "/cldr-rbnf")
       then
          Build_Tools;
