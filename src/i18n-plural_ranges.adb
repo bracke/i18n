@@ -4,8 +4,6 @@ with I18N.Locale_Data;
 
 package body I18N.Plural_Ranges is
 
-   use type I18N.Plurals.Plural_Category;
-
    function Name (Category : I18N.Plurals.Plural_Category) return String is
      (Ada.Characters.Handling.To_Lower (I18N.Plurals.Plural_Category'Image (Category)));
 
