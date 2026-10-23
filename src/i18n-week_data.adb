@@ -1,37 +1,12 @@
-with Ada.Characters.Handling;
-
 with I18N.Locale_Data;
-with I18N.Locales;
+with I18N.Regions;
 
 package body I18N.Week_Data is
-
-   --  Locale's region subtag, after likely subtags; "" when it has none.
-   function Region (Locale : String) return String is
-      Full  : constant String := I18N.Locales.Maximize (Locale);
-      Start : Positive := Full'First;
-   begin
-      for Index in Full'Range loop
-         if Index = Full'Last or else Full (Index + 1) in '-' | '_' then
-            declare
-               Subtag : constant String := Full (Start .. Index);
-            begin
-               if Start > Full'First
-                 and then ((Subtag'Length = 2 and then Subtag (Subtag'First) in 'A' .. 'Z' | 'a' .. 'z')
-                           or else (Subtag'Length = 3 and then Subtag (Subtag'First) in '0' .. '9'))
-               then
-                  return Ada.Characters.Handling.To_Upper (Subtag);
-               end if;
-            end;
-            Start := Index + 2;
-         end if;
-      end loop;
-      return "";
-   end Region;
 
    --  Field ("first" or "min") for Locale's region, else the world's.
    function Lookup (Field : String; Locale : String) return String is
       Found     : Boolean;
-      Own       : constant String := Region (Locale);
+      Own       : constant String := I18N.Regions.Region (Locale);
       Of_Region : constant String :=
         (if Own = "" then "" else I18N.Locale_Data.Lookup ("week_data", "und", Field & ":" & Own, Found));
    begin

@@ -14,7 +14,8 @@ begin
    Assert (First_Day ("ar-EG") = "sat", "Egyptian weeks start on Saturday");
    Assert (First_Day ("ar-AE") = "mon", "Emirati weeks start on Monday");
    Assert (First_Day ("fa") = "sat", "Persian (Iran) weeks start on Saturday");
-   Assert (First_Day ("dv-MV") = "fri", "Maldivian weeks start on Friday");
+   Assert (First_Day ("dv") = "fri", "Maldivian weeks start on Friday (a likely region)");
+   Assert (First_Day ("zh-Hant") = "sun", "Traditional Chinese (Taiwan) weeks start on Sunday");
    Assert (First_Day ("pt") = "sun", "Brazilian weeks start on Sunday");
    Assert (First_Day ("zh") = "mon", "Chinese weeks start on Monday");
    Assert (First_Day ("sw") = "mon", "Swahili (Tanzania) weeks start on Monday");

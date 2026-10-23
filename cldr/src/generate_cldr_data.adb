@@ -1701,6 +1701,14 @@ procedure Generate_CLDR_Data is
             Add_Format ("date_interval", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
                         Sub => Field (Line, 3));
          end if;
+      elsif Kind = "likely_text" then
+         --  A language's likely region (CLDR's likelySubtags), under und keyed
+         --  by the language or language-script tag ("dv" "MV", "zh-Hant" "TW").
+         if Field_Count (Line) /= 4 or else Field (Line, 3) = "" or else Field (Line, 4) = "" then
+            Add_Line_Error (Line_Number, "invalid likely_text row shape");
+         else
+            Add_Format ("likely_region", "und", Ada_Expression_UTF8_Bytes (Field (Line, 4)), Sub => Field (Line, 3));
+         end if;
       elsif Kind = "week_text" then
          --  A region's week data, under und keyed "first:<region>" (the day a
          --  week starts on) and "min:<region>" (the days of a year's first week).

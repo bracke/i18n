@@ -10,6 +10,11 @@ commit is what a consumer's release records.
 
 ### Added
 
+- `I18N.Regions.Region`: a locale's region, from its own subtag or CLDR's
+  likelySubtags for its language and script ("dv" the Maldives, "zh-Hant"
+  Taiwan); week data and the hour cycle go by it. Before, a language outside
+  the compiled likely-subtag families had no region and took the world's
+  data (Dhivehi weeks started on Monday instead of Friday).
 - Number ranges and approximate numbers: a number value "low/high" formats
   as the locale's range ("1.200–5.000", Japanese "1,200～5,000") and "~value"
   as its approximate form ("≈12,5", "~12", "約 12"), each number in the style

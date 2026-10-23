@@ -6,6 +6,7 @@ with I18N.Locales;
 with I18N.TZ_Rules;
 with I18N.Locale_Data;
 with I18N.Time_Zone_Data;
+with I18N.Regions;
 with I18N.Runtime_Data;
 with I18N.Week_Data;
 
@@ -1588,27 +1589,9 @@ package body I18N.Date_Time_Format is
    --  preferred one from CLDR's timeData ("h" in the United States, "H" in
    --  Germany), else the world's.
    function Preferred_Hour (Locale : String) return Character is
-      Full   : constant String := I18N.Locales.Maximize (Locale);
-      Region : Ada.Strings.Unbounded.Unbounded_String;
-      Start  : Positive := Full'First;
+      Region : constant Ada.Strings.Unbounded.Unbounded_String :=
+        Ada.Strings.Unbounded.To_Unbounded_String (I18N.Regions.Region (Locale));
    begin
-      for Index in Full'Range loop
-         if Index = Full'Last or else Full (Index + 1) in '-' | '_' then
-            declare
-               Subtag : constant String := Full (Start .. Index);
-            begin
-               if Start > Full'First
-                 and then ((Subtag'Length = 2 and then Subtag (Subtag'First) in 'A' .. 'Z' | 'a' .. 'z')
-                           or else (Subtag'Length = 3 and then Subtag (Subtag'First) in '0' .. '9'))
-               then
-                  Region := Ada.Strings.Unbounded.To_Unbounded_String
-                    (Ada.Characters.Handling.To_Upper (Subtag));
-                  exit;
-               end if;
-            end;
-            Start := Index + 2;
-         end if;
-      end loop;
       declare
          Found : Boolean;
          Of_Region : constant String :=

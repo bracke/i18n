@@ -843,6 +843,56 @@ procedure Generate_CLDR_Export is
          For_Each_Member (Object_Field_Object (Data, "minDays"), Region'Access);
       end Emit_Week_Rows;
 
+      --  Each language's likely region (CLDR's likelySubtags), for a locale
+      --  that names none: "dv" is the Maldives, "zh-Hant" Taiwan. Keys that
+      --  already name a region, and the und ones, are left out.
+      procedure Emit_Likely_Region_Rows is
+         Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/likelySubtags.json");
+         Data   : constant String :=
+           Object_Field_Object (Object_Field_Object (Source, "supplemental"), "likelySubtags");
+
+         procedure Tag (Key : String; Value : String) is
+            Text : constant String :=
+              (if Value'Length >= 2 and then Value (Value'First) = '"' and then Value (Value'Last) = '"'
+               then Value (Value'First + 1 .. Value'Last - 1) else "");
+            Last_Dash : Natural := 0;
+            Key_Has_Region : Boolean := False;
+            Start : Positive := Key'First;
+         begin
+            for I in Key'Range loop
+               if I = Key'Last or else Key (I + 1) = '-' then
+                  declare
+                     Subtag : constant String := Key (Start .. I);
+                  begin
+                     if Start > Key'First
+                       and then (Subtag'Length = 2
+                                 or else (Subtag'Length = 3 and then Subtag (Subtag'First) in '0' .. '9'))
+                     then
+                        Key_Has_Region := True;
+                     end if;
+                  end;
+                  Start := I + 2;
+               end if;
+            end loop;
+            for I in Text'Range loop
+               if Text (I) = '-' then
+                  Last_Dash := I;
+               end if;
+            end loop;
+            if Text /= "" and then Last_Dash > 0 and then not Key_Has_Region
+              and then (Key'Length < 3 or else Key (Key'First .. Key'First + 2) /= "und")
+            then
+               Emit_JSON
+                 ("{""type"":""likely_text"",""locale"":""und"",""key"":""" & Key
+                  & """,""value"":""" & JSON_Escape (Text (Last_Dash + 1 .. Text'Last)) & """}");
+            end if;
+         end Tag;
+      begin
+         For_Each_Member (Data, Tag'Access);
+      end Emit_Likely_Region_Rows;
+
       procedure Emit_Zone_Metazone_Rows is
          Source : constant String :=
            Project_Tools.Files.Read_Raw_File
@@ -3944,6 +3994,7 @@ procedure Generate_CLDR_Export is
          Emit_Zone_Metazone_Rows;
          Emit_Hour_Cycle_Rows;
          Emit_Week_Rows;
+         Emit_Likely_Region_Rows;
       end Emit_Migrated_Date_Name_Rows;
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);

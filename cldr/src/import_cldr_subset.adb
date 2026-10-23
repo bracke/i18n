@@ -702,6 +702,8 @@ procedure Import_CLDR_Subset is
          return "week_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "interval_text" or else Kind = "interval_text_text" then
          return "interval_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
+      elsif Kind = "likely_text" or else Kind = "likely_text_text" then
+         return "likely_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "time_text" or else Kind = "time_text_text" then
          return "time_text|" & Field (Payload, 2) & "|" & Field (Payload, 3);
       elsif Kind = "zone_specific_name"
@@ -1240,6 +1242,7 @@ procedure Import_CLDR_Subset is
            or else Kind = "relative_text_text" or else Kind = "unit_text_text"
            or else Kind = "hour_text_text" or else Kind = "time_text_text"
            or else Kind = "week_text_text" or else Kind = "interval_text_text"
+           or else Kind = "likely_text_text"
          then
             declare
                Base : constant String := Kind (Kind'First .. Kind'Last - 5);
