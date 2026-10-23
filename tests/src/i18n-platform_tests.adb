@@ -23,6 +23,8 @@ package body I18N.Platform_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
    procedure Test_Calendar_Names
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
+   procedure Test_Week_Data
+     (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
    procedure Test_Display_Names
      (T : in out AUnit.Test_Cases.Test_Case'Class) is separate;
    procedure Test_Emoji_Annotations
@@ -61,6 +63,8 @@ package body I18N.Platform_Tests is
                         & "sentence/line boundaries");
       Register_Routine (T, Test_Calendar_Math'Access,
                         "Calendar arithmetic: date conversion across calendars");
+      Register_Routine (T, Test_Week_Data'Access,
+                        "CLDR week data: first day and minimal days by region");
       Register_Routine (T, Test_Calendar_Names'Access,
                         "CLDR non-Gregorian calendar names from per-locale "
                         & "runtime shards");

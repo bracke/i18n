@@ -7,6 +7,7 @@ with I18N.TZ_Rules;
 with I18N.Locale_Data;
 with I18N.Time_Zone_Data;
 with I18N.Runtime_Data;
+with I18N.Week_Data;
 
 package body I18N.Date_Time_Format is
 
@@ -306,36 +307,17 @@ package body I18N.Date_Time_Format is
       elsif Found then
          return Weekday_From_Name (Name);
       else
-         return Weekday_From_Name
-           (I18N.CLDR_Data.First_Day_Of_Week (Locale));
+         return Weekday_From_Name (I18N.Week_Data.First_Day (Locale));
       end if;
    end First_Day_Of_Week;
 
+   --  Whether week fields ("w", "e") have week data to go by: always, since
+   --  CLDR's weekData answers for every locale (the world's where its region
+   --  has none); the parameter stays for the callers' shape.
    function Week_Data_Overridden (Locale : String) return Boolean is
-      Found : Boolean;
-      Value : constant String :=
-        I18N.Runtime_Data.Locale_Text (Locale, "first_day_of_week", Found);
-      pragma Unreferenced (Value);
+      pragma Unreferenced (Locale);
    begin
-      if Calendar_For (Locale) = ISO8601 then
-         return True;
-      end if;
-
-      if Found then
-         return True;
-      end if;
-
-      declare
-         Min_Found : Boolean;
-         Min_Value : constant String :=
-           I18N.Runtime_Data.Locale_Text
-             (Locale, "first_week_min_days", Min_Found);
-         pragma Unreferenced (Min_Value);
-      begin
-         return Min_Found
-           or else I18N.CLDR_Data.First_Day_Of_Week (Locale) /= ""
-           or else I18N.CLDR_Data.First_Week_Min_Days (Locale) > 0;
-      end;
+      return True;
    end Week_Data_Overridden;
 
    function First_Week_Min_Days (Locale : String) return Natural is
@@ -352,7 +334,7 @@ package body I18N.Date_Time_Format is
       then
          return Character'Pos (Value (Value'First)) - Character'Pos ('0');
       else
-         return I18N.CLDR_Data.First_Week_Min_Days (Locale);
+         return I18N.Week_Data.Minimal_Days (Locale);
       end if;
    end First_Week_Min_Days;
 

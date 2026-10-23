@@ -10,6 +10,12 @@ commit is what a consumer's release records.
 
 ### Added
 
+- `I18N.Week_Data`: the day a locale's weeks start on and the minimal days
+  of its first week, from CLDR's supplemental weekData by the locale's region
+  (its own, else its likely one). Week fields in date patterns ("w", "e") use
+  it. It replaces a hand-written list keyed by language: weeks for Portuguese
+  (Brazil), French in Canada and English in India now start on Sunday, Arabic
+  (Egypt) on Saturday, and the United Arab Emirates on Monday (CLDR 48).
 - Decimal words by fraction rulesets: a fraction read as a number over its
   denominator (Russian "одна целая пять десятых", Kazakh "бір бүтін оннан
   бес", Lithuanian "vienas ir penkios dešimtosios"), Polish's fraction read

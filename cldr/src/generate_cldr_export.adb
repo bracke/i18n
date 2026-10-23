@@ -812,6 +812,37 @@ procedure Generate_CLDR_Export is
          For_Each_Member (Data, Region'Access);
       end Emit_Hour_Cycle_Rows;
 
+      --  Each region's week (CLDR weekData): the day it starts on ("sun" in
+      --  the United States, "mon" for 001) and how many days of a year's
+      --  first week must fall in that year.
+      procedure Emit_Week_Rows is
+         Source : constant String :=
+           Project_Tools.Files.Read_Raw_File
+             ("upstream/cldr-json/cldr-core/supplemental/weekData.json");
+         Data   : constant String :=
+           Object_Field_Object (Object_Field_Object (Source, "supplemental"), "weekData");
+         Prefix : US.Unbounded_String;
+
+         procedure Region (Key : String; Value : String) is
+            --  A plain string: "mon", "4".
+            Text : constant String :=
+              (if Value'Length >= 2 and then Value (Value'First) = '"' and then Value (Value'Last) = '"'
+               then Value (Value'First + 1 .. Value'Last - 1) else "");
+         begin
+            --  Variant keys ("GB-alt-variant") are not regions.
+            if Text /= "" and then (for all C of Key => C /= '-') then
+               Emit_JSON
+                 ("{""type"":""week_text"",""locale"":""und"",""key"":""" & US.To_String (Prefix) & Key
+                  & """,""value"":""" & JSON_Escape (Text) & """}");
+            end if;
+         end Region;
+      begin
+         Prefix := US.To_Unbounded_String ("first:");
+         For_Each_Member (Object_Field_Object (Data, "firstDay"), Region'Access);
+         Prefix := US.To_Unbounded_String ("min:");
+         For_Each_Member (Object_Field_Object (Data, "minDays"), Region'Access);
+      end Emit_Week_Rows;
+
       procedure Emit_Zone_Metazone_Rows is
          Source : constant String :=
            Project_Tools.Files.Read_Raw_File
@@ -3842,6 +3873,7 @@ procedure Generate_CLDR_Export is
          Emit_List_Separator_Rows;
          Emit_Zone_Metazone_Rows;
          Emit_Hour_Cycle_Rows;
+         Emit_Week_Rows;
       end Emit_Migrated_Date_Name_Rows;
    begin
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);

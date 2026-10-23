@@ -10,16 +10,6 @@ package I18N.CLDR_Data is
    --  @return The first two locale characters, or an empty string.
    function Language (Locale : String) return String;
 
-   --  Return the generated first day of week for a locale.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return Weekday key: sun, mon, fri, or sat.
-   function First_Day_Of_Week (Locale : String) return String;
-
-   --  Return the generated minimum days required in the first week.
-   --  @param Locale Locale identifier or catalog locale key.
-   --  @return Minimum first-week day count, usually 1 or 4.
-   function First_Week_Min_Days (Locale : String) return Natural;
-
    --  Return the deterministic separator between adjacent date/time fields.
    --  @param Locale Locale identifier or catalog locale key.
    --  @param Last_Class Previous field class: D for date or T for time.

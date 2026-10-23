@@ -681,6 +681,7 @@ procedure Import_CLDR_Raw is
             end;
          elsif Kind = "zone_text" or else Kind = "number_text" or else Kind = "relative_text"
            or else Kind = "unit_text" or else Kind = "hour_text" or else Kind = "time_text"
+           or else Kind = "week_text"
          then
             declare
                Locale : constant String := JSON_Value (Line, "locale");

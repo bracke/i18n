@@ -1689,6 +1689,14 @@ procedure Generate_CLDR_Data is
          else
             Add_Format ("hour_cycle", "und", Ada_Expression_UTF8_Bytes (Field (Line, 4)), Sub => Field (Line, 3));
          end if;
+      elsif Kind = "week_text" then
+         --  A region's week data, under und keyed "first:<region>" (the day a
+         --  week starts on) and "min:<region>" (the days of a year's first week).
+         if Field_Count (Line) /= 4 or else Field (Line, 3) = "" or else Field (Line, 4) = "" then
+            Add_Line_Error (Line_Number, "invalid week_text row shape");
+         else
+            Add_Format ("week_data", "und", Ada_Expression_UTF8_Bytes (Field (Line, 4)), Sub => Field (Line, 3));
+         end if;
       elsif Kind = "unit_text" then
          --  A unit pattern that is not the value, a space and the name, into
          --  the locale's unit shard beside the name, keyed p:base:width:category.
@@ -2824,15 +2832,6 @@ procedure Generate_CLDR_Data is
          L ("      end if;");
          L ("   end U;");
          L;
-         L ("   function Lower (C : Character) return Character is");
-         L ("   begin");
-         L ("      if C in 'A' .. 'Z' then");
-         L ("         return Character'Val (Character'Pos (C) + 32);");
-         L ("      end if;");
-         L;
-         L ("      return C;");
-         L ("   end Lower;");
-         L;
          L ("   function Language (Locale : String) return String is");
          L ("      First : constant Positive := Locale'First;");
          L ("   begin");
@@ -2842,158 +2841,7 @@ procedure Generate_CLDR_Data is
          L;
          L ("      return Locale (First .. First + 1);");
          L ("   end Language;");
-         L;
-         L ("   function Canonical_Locale (Locale : String) return String is");
-         L ("      Buffer : String (1 .. 64) := [others => Character'Val (0)];");
-         L ("      Last   : Natural := 0;");
-         L ("   begin");
-         L ("      for C of Locale loop");
-         L ("         exit when Last = Buffer'Last;");
-         L ("         if C = '_' then");
-         L ("            Last := Last + 1;");
-         L ("            Buffer (Last) := '-';");
-         L ("         else");
-         L ("            Last := Last + 1;");
-         L ("            Buffer (Last) := Lower (C);");
-         L ("         end if;");
-         L ("      end loop;");
-         L;
-         L ("      if Last = 0 then");
-         L ("         return """";");
-         L ("      else");
-         L ("         return Buffer (1 .. Last);");
-         L ("      end if;");
-         L ("   end Canonical_Locale;");
-         L;
-         L ("   function Locale_Equals (Locale : String; Candidate : String) return Boolean is");
-         L ("   begin");
-         L ("      return Canonical_Locale (Locale) = Canonical_Locale (Candidate);");
-         L ("   end Locale_Equals;");
-         L;
-         L ("   function Locale_Fallback_Matches");
-         L ("     (Locale    : String;");
-         L ("      Candidate : String)");
-         L ("      return Boolean");
-         L ("   is");
-         L ("      Current : String (1 .. 64) := [others => Character'Val (0)];");
-         L ("      Last    : Natural := 0;");
-         L ("      Target  : constant String := Canonical_Locale (Candidate);");
-         L ("   begin");
-         L ("      declare");
-         L ("         Canonical : constant String := Canonical_Locale (Locale);");
-         L ("      begin");
-         L ("         if Canonical'Length = 0 then");
-         L ("            return False;");
-         L ("         end if;");
-         L;
-         L ("         Last := Natural'Min (Canonical'Length, Current'Length);");
-         L ("         Current (1 .. Last) := Canonical (Canonical'First .. Canonical'First + Last - 1);");
-         L ("      end;");
-         L;
-         L ("      loop");
-         L ("         declare");
-         L ("            Dash : Natural := 0;");
-         L ("         begin");
-         L ("            for Index in reverse 1 .. Last loop");
-         L ("               if Current (Index) = '-' then");
-         L ("                  Dash := Index;");
-         L ("                  exit;");
-         L ("               end if;");
-         L ("            end loop;");
-         L;
-         L ("            exit when Dash = 0;");
-         L ("            Last := Dash - 1;");
-         L ("            if Current (1 .. Last) = Target then");
-         L ("               return True;");
-         L ("            end if;");
-         L ("         end;");
-         L ("      end loop;");
-         L;
-         L ("      return False;");
-         L ("   end Locale_Fallback_Matches;");
-         L;
-         L ("   function Locale_In_List");
-         L ("     (Locale           : String;");
-         L ("      List             : String;");
-         L ("      Include_Fallback : Boolean)");
-         L ("      return Boolean");
-         L ("   is");
-         L ("      Start : Positive := List'First;");
-         L;
-         L ("      function Matches (Candidate : String) return Boolean is");
-         L ("      begin");
-         L ("         if Locale_Equals (Locale, Candidate) then");
-         L ("            return True;");
-         L ("         elsif Include_Fallback then");
-         L ("            return Locale_Fallback_Matches (Locale, Candidate);");
-         L ("         else");
-         L ("            return False;");
-         L ("         end if;");
-         L ("      end Matches;");
-         L ("   begin");
-         L ("      for Index in List'Range loop");
-         L ("         if List (Index) = ',' then");
-         L ("            if Matches (List (Start .. Index - 1)) then");
-         L ("               return True;");
-         L ("            end if;");
-         L ("            Start := Index + 1;");
-         L ("         end if;");
-         L ("      end loop;");
-         L;
-         L ("      return Matches (List (Start .. List'Last));");
-         L ("   end Locale_In_List;");
       end Emit_Static_Prelude;
-
-      procedure Emit_Week_Data is
-      begin
-         L;
-         L ("   function First_Day_Of_Week (Locale : String) return String is");
-         L ("   begin");
-         L ("      if Locale_In_List");
-         L ("        (Locale => Locale,");
-         L ("         List =>");
-         L ("           ""en-001,en-AU,en-GB,en-IE,en-IN,en-NZ,de,fr,es,it,nl,""");
-         L ("           & ""pl,pt,ru,ro,lt,sl,cs,da,sv,nb,nn,fi,tr,vi,uk,bg,""");
-         L ("           & ""el,hu,sk,ca,eu,af,sw,eo"",");
-         L ("         Include_Fallback => True)");
-         L ("      then");
-         L ("         return ""mon"";");
-         L ("      elsif Locale_In_List");
-         L ("        (Locale => Locale,");
-         L ("         List =>");
-         L ("           ""ar-AE,ar-BH,ar-DJ,ar-DZ,ar-EG,ar-IQ,ar-JO,ar-KW,""");
-         L ("           & ""ar-LY,ar-OM,ar-QA,ar-SD,ar-SY,ar-YE,fa-AF,fa-IR,""");
-         L ("           & ""he-IL"",");
-         L ("         Include_Fallback => True)");
-         L ("      then");
-         L ("         return ""sat"";");
-         L ("      elsif Locale_In_List");
-         L ("        (Locale => Locale,");
-         L ("         List => ""ar-MV"",");
-         L ("         Include_Fallback => True)");
-         L ("      then");
-         L ("         return ""fri"";");
-         L ("      else");
-         L ("         return ""sun"";");
-         L ("      end if;");
-         L ("   end First_Day_Of_Week;");
-         L;
-         L ("   function First_Week_Min_Days (Locale : String) return Natural is");
-         L ("   begin");
-         L ("      if Locale_In_List");
-         L ("        (Locale => Locale,");
-         L ("         List =>");
-         L ("           ""en-001,en-AU,en-GB,en-IE,en-IN,en-NZ,de,fr,es,it,nl,""");
-         L ("           & ""pl,pt,ru,ro,lt,sl,cs,da,sv,nb,nn,fi,tr,vi,uk,bg,""");
-         L ("           & ""el,hu,sk,ca,eu,af,sw,eo"",");
-         L ("         Include_Fallback => True)");
-         L ("      then");
-         L ("         return 4;");
-         L ("      else");
-         L ("         return 1;");
-         L ("      end if;");
-         L ("   end First_Week_Min_Days;");
-      end Emit_Week_Data;
 
       --  Two levels: a couple of dozen skeletons select a segment of the
       --  locale index, and the locale is bisected inside that segment. The
@@ -3366,7 +3214,6 @@ procedure Generate_CLDR_Data is
       Ada.Text_IO.Create (Output, Ada.Text_IO.Out_File, Generated_Path);
       Current_File := Output'Unchecked_Access;
       Emit_Static_Prelude;
-      Emit_Week_Data;
       Emit_Date_Time_Field_Separator;
       Emit_Date_Time_Style_Separator;
       Emit_Number_Display_Affixes;
