@@ -321,6 +321,11 @@ commit is what a consumer's release records.
 No procedure yet.
 ### Fixed
 
+- The data store keeps each file's section table once, sized to the file,
+  and lookups share it instead of copying it. Raising the section cap to 512
+  had made every lookup copy three 512-entry tables of Unbounded_Strings --
+  slow everywhere, and enough stack to crash a consumer's tests on Windows.
+  There is no section cap any more.
 - The CLDR generators each write to a temp file of their own and publish
   their target with one atomic rename. They shared fixed temp paths and
   overwrote targets in place, so a `--check` or second regen running

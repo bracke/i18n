@@ -13,23 +13,23 @@ package body I18N.Data_Store is
    type String_Access is access String;
    type Dir_List is array (Positive range <>) of Unbounded_String;
 
-   --  Sections in one data file. formats holds ~180 (one per field and per
-   --  numbering system); a file with more raises rather than losing the rest
-   --  silently, as 64 once did.
-   Max_Sections : constant := 512;
    type Section_Record is record
       Name : Unbounded_String;
       Lo   : Natural := 1;   --  first byte of the first record
       Hi   : Natural := 0;   --  last byte of the last record (Hi < Lo => empty)
    end record;
-   type Section_Array is array (1 .. Max_Sections) of Section_Record;
+   --  A file's sections, sized to the file (formats holds ~180: one per field
+   --  and per numbering system). Built once and shared by access: lookups
+   --  never copy the table, which held Unbounded_Strings.
+   type Section_Array is array (Positive range <>) of Section_Record;
+   type Section_Access is access constant Section_Array;
+   No_Sections : constant Section_Access := new Section_Array'(1 .. 0 => <>);
 
    Max_Files : constant := 1024;   --  transforms chain through many shards
    type File_Record is record
       Name     : Unbounded_String;
       Content  : String_Access;      --  null when the file was not found
-      Sections : Section_Array;
-      Count    : Natural := 0;
+      Sections : Section_Access := No_Sections;
       Known    : Boolean := False;   --  load has been attempted
    end record;
 
@@ -183,67 +183,76 @@ package body I18N.Data_Store is
    end Read_File;
 
    --  Split the loaded content into sections at the '@' header lines.
-   procedure Index_Sections
-     (Content  : String;
-      Sections : out Section_Array;
-      Count    : out Natural)
-   is
-      I         : Natural := Content'First;
-      Line_Stop : Natural;
-      Is_Header : Boolean;
-   begin
-      Count := 0;
-      while I <= Content'Last loop
-         --  Line runs [I .. Line_Stop - 1], with Line_Stop at the LF or past end.
-         Line_Stop := I;
-         while Line_Stop <= Content'Last and then Content (Line_Stop) /= LF loop
-            Line_Stop := Line_Stop + 1;
-         end loop;
+   function Index_Sections (Content : String) return Section_Access is
 
-         --  A section header is "@name|count" -- it has no TAB. A record whose
-         --  key happens to start with '@' (the emoji "@") always has a TAB, so
-         --  the header sentinel does not collide with such keys.
-         Is_Header := Content (I) = '@';
-         if Is_Header then
-            for J in I .. Line_Stop - 1 loop
-               if Content (J) = HT then
-                  Is_Header := False;
-                  exit;
-               end if;
+      --  A section header is "@name|count" -- it has no TAB. A record whose
+      --  key happens to start with '@' (the emoji "@") always has a TAB, so
+      --  the header sentinel does not collide with such keys.
+      function Is_Header (First, Stop : Natural) return Boolean is
+        (Content (First) = '@' and then (for all J in First .. Stop - 1 => Content (J) /= HT));
+
+      --  Visit each header line: Line_Start .. Line_Stop - 1, Line_Stop at its LF.
+      generic
+         with procedure Visit (Line_Start, Line_Stop : Natural);
+      procedure For_Each_Header;
+
+      procedure For_Each_Header is
+         I         : Natural := Content'First;
+         Line_Stop : Natural;
+      begin
+         while I <= Content'Last loop
+            Line_Stop := I;
+            while Line_Stop <= Content'Last and then Content (Line_Stop) /= LF loop
+               Line_Stop := Line_Stop + 1;
             end loop;
-         end if;
+            if Is_Header (I, Line_Stop) then
+               Visit (I, Line_Stop);
+            end if;
+            exit when Line_Stop > Content'Last;
+            I := Line_Stop + 1;
+         end loop;
+      end For_Each_Header;
 
-         if Is_Header then
+      Total : Natural := 0;
+
+      procedure Count_One (Line_Start, Line_Stop : Natural) is
+         pragma Unreferenced (Line_Start, Line_Stop);
+      begin
+         Total := Total + 1;
+      end Count_One;
+
+      procedure Count_All is new For_Each_Header (Count_One);
+   begin
+      Count_All;
+      declare
+         Sections : Section_Array (1 .. Total);
+         Count    : Natural := 0;
+
+         procedure Add (Line_Start, Line_Stop : Natural) is
+            Bar : Natural := Line_Start + 1;
+         begin
             --  Close the previous section at the byte before this header line.
             if Count > 0 then
-               Sections (Count).Hi := I - 2;   --  drop the preceding LF too
+               Sections (Count).Hi := Line_Start - 2;   --  drop the preceding LF too
             end if;
-            if Count = Max_Sections then
-               raise Program_Error with "data file has more than" & Max_Sections'Image & " sections";
-            else
-               Count := Count + 1;
-               declare
-                  Bar : Natural := I + 1;
-               begin
-                  while Bar < Line_Stop and then Content (Bar) /= '|' loop
-                     Bar := Bar + 1;
-                  end loop;
-                  Sections (Count).Name :=
-                    To_Unbounded_String (Content (I + 1 .. Bar - 1));
-                  Sections (Count).Lo := Line_Stop + 1;
-                  Sections (Count).Hi := 0;   --  empty until closed
-               end;
-            end if;
+            Count := Count + 1;
+            while Bar < Line_Stop and then Content (Bar) /= '|' loop
+               Bar := Bar + 1;
+            end loop;
+            Sections (Count).Name := To_Unbounded_String (Content (Line_Start + 1 .. Bar - 1));
+            Sections (Count).Lo := Line_Stop + 1;
+            Sections (Count).Hi := 0;   --  empty until closed
+         end Add;
+
+         procedure Add_All is new For_Each_Header (Add);
+      begin
+         Add_All;
+         --  Close the final section at end of content.
+         if Count > 0 and then Sections (Count).Hi = 0 then
+            Sections (Count).Hi := Content'Last;
          end if;
-
-         exit when Line_Stop > Content'Last;
-         I := Line_Stop + 1;
-      end loop;
-
-      --  Close the final section at end of content.
-      if Count > 0 and then Sections (Count).Hi = 0 then
-         Sections (Count).Hi := Content'Last;
-      end if;
+         return new Section_Array'(Sections);
+      end;
    end Index_Sections;
 
    --  ------------------------------------------------------------------
@@ -313,14 +322,12 @@ package body I18N.Data_Store is
       procedure Peek
         (Name     : String;
          Content  : out String_Access;
-         Sections : out Section_Array;
-         Count    : out Natural;
+         Sections : out Section_Access;
          State    : out File_State);
       procedure Install
         (Name     : String;
          Content  : String_Access;
-         Sections : Section_Array;
-         Count    : Natural);
+         Sections : Section_Access);
    private
       Files : File_Array;
       Used  : Natural := 0;
@@ -330,19 +337,17 @@ package body I18N.Data_Store is
       procedure Peek
         (Name     : String;
          Content  : out String_Access;
-         Sections : out Section_Array;
-         Count    : out Natural;
+         Sections : out Section_Access;
          State    : out File_State)
       is
       begin
-         Content := null;
-         Count   := 0;
-         State   := Unknown;
+         Content  := null;
+         Sections := No_Sections;
+         State    := Unknown;
          for I in 1 .. Used loop
             if To_String (Files (I).Name) = Name then
                Content  := Files (I).Content;
                Sections := Files (I).Sections;
-               Count    := Files (I).Count;
                State    := (if Files (I).Content = null then Missing else Present);
                return;
             end if;
@@ -352,8 +357,7 @@ package body I18N.Data_Store is
       procedure Install
         (Name     : String;
          Content  : String_Access;
-         Sections : Section_Array;
-         Count    : Natural)
+         Sections : Section_Access)
       is
       begin
          for I in 1 .. Used loop
@@ -367,7 +371,6 @@ package body I18N.Data_Store is
               (Name     => To_Unbounded_String (Name),
                Content  => Content,
                Sections => Sections,
-               Count    => Count,
                Known    => True);
          end if;
       end Install;
@@ -377,12 +380,11 @@ package body I18N.Data_Store is
    procedure Obtain
      (File     : String;
       Content  : out String_Access;
-      Sections : out Section_Array;
-      Count    : out Natural)
+      Sections : out Section_Access)
    is
       State : File_State;
    begin
-      Registry.Peek (File, Content, Sections, Count, State);
+      Registry.Peek (File, Content, Sections, State);
       if State /= Unknown then
          return;
       end if;
@@ -391,20 +393,9 @@ package body I18N.Data_Store is
       declare
          Path : constant String := Resolve (File);
       begin
-         if Path = "" then
-            Content := null;
-            Count   := 0;
-            Registry.Install (File, null, Sections, 0);
-         else
-            Content := Read_File (Path);
-            if Content = null then
-               Count := 0;
-               Registry.Install (File, null, Sections, 0);
-            else
-               Index_Sections (Content.all, Sections, Count);
-               Registry.Install (File, Content, Sections, Count);
-            end if;
-         end if;
+         Content := (if Path = "" then null else Read_File (Path));
+         Sections := (if Content = null then No_Sections else Index_Sections (Content.all));
+         Registry.Install (File, Content, Sections);
       end;
 
       --  Re-read the winning entry (in case another task installed first). If
@@ -412,15 +403,13 @@ package body I18N.Data_Store is
       --  just loaded (read-through) rather than losing it.
       declare
          PC : String_Access;
-         PS : Section_Array;
-         PN : Natural;
+         PS : Section_Access;
          PState : File_State;
       begin
-         Registry.Peek (File, PC, PS, PN, PState);
+         Registry.Peek (File, PC, PS, PState);
          if PState /= Unknown then
             Content := PC;
             Sections := PS;
-            Count := PN;
          end if;
       end;
    end Obtain;
@@ -436,17 +425,15 @@ package body I18N.Data_Store is
       return String
    is
       Content  : String_Access;
-      Sections : Section_Array;
-      Count    : Natural;
+      Sections : Section_Access;
    begin
-      Obtain (File, Content, Sections, Count);
+      Obtain (File, Content, Sections);
       if Content = null then
          return "";
       end if;
-      for I in 1 .. Count loop
-         if To_String (Sections (I).Name) = Section then
-            return Find_In_Section
-              (Content.all, Sections (I).Lo, Sections (I).Hi, Key);
+      for S of Sections.all loop
+         if To_String (S.Name) = Section then
+            return Find_In_Section (Content.all, S.Lo, S.Hi, Key);
          end if;
       end loop;
       return "";
@@ -454,10 +441,9 @@ package body I18N.Data_Store is
 
    function Available (File : String) return Boolean is
       Content  : String_Access;
-      Sections : Section_Array;
-      Count    : Natural;
+      Sections : Section_Access;
    begin
-      Obtain (File, Content, Sections, Count);
+      Obtain (File, Content, Sections);
       return Content /= null;
    end Available;
 
