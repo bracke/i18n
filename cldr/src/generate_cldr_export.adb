@@ -2373,7 +2373,14 @@ procedure Generate_CLDR_Export is
               or else Skeleton = "Bhms"
               or else Skeleton = "EBhm"
               or else Skeleton = "EBhms"
-              or else Skeleton = "ms";
+              or else Skeleton = "ms"
+              --  Year-month and year-quarter, for month and quarter labels.
+              or else Skeleton = "y"
+              or else Skeleton = "yM"
+              or else Skeleton = "yMMM"
+              or else Skeleton = "yMMMM"
+              or else Skeleton = "yQQQ"
+              or else Skeleton = "yQQQQ";
          end Is_Exported_Available_Skeleton;
 
          function Internal_Pattern (Pattern : String) return String is

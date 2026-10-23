@@ -321,6 +321,10 @@ commit is what a consumer's release records.
 No procedure yet.
 ### Fixed
 
+- The CLDR export carries the year-month and year-quarter skeletons (y, yM,
+  yMMM, yMMMM, yQQQ, yQQQQ): a date in those shapes formatted as the
+  locale writes it ("Okt. 2026", "2026年10月") instead of a field-by-field
+  fallback ("2026 Okt.").
 - The data store keeps each file's section table once, sized to the file,
   and lookups share it instead of copying it. Raising the section cap to 512
   had made every lookup copy three 512-entry tables of Unbounded_Strings --

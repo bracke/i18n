@@ -2,7 +2,7 @@
 #
 # The extractor validates this file before accepting raw data as current.
 
-require_raw_count|available_format|10930
+require_raw_count|available_format|12823
 require_raw_count|currency|307
 require_raw_count|currency_name_payload|405
 require_raw_count|day_period|7530
