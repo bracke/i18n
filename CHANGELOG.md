@@ -10,6 +10,11 @@ commit is what a consumer's release records.
 
 ### Added
 
+- Units in grammatical cases: the CLDR export carries each unit's case
+  patterns (Russian accusative "{0} неделю", German dative "{0} Jahren",
+  Finnish genitive, Polish/Czech instrumental, ...) where they differ from
+  the nominative, and `I18N.Unit_Format.Case_Pattern` looks them up.
+
 - `I18N.Spellout.Parse` reads a spelled-out number back by the CLDR rules,
   as ICU's RBNF parse does. Substitutions are parsed under ICU's divisor
   bound, every reading is tried, and soft hyphens are skipped. Spell then

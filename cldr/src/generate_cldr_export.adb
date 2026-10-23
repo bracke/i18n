@@ -2770,6 +2770,29 @@ procedure Generate_CLDR_Export is
                Emit_List_Part (Locale, Family, "item", Middle);
             end Emit_List_Family;
 
+            type Text_Access is access constant String;
+            Accusative   : aliased constant String := "accusative";
+            Dative       : aliased constant String := "dative";
+            Genitive     : aliased constant String := "genitive";
+            Instrumental : aliased constant String := "instrumental";
+            Locative     : aliased constant String := "locative";
+            Prepositional : aliased constant String := "prepositional";
+            Elative      : aliased constant String := "elative";
+            Illative     : aliased constant String := "illative";
+            Partitive    : aliased constant String := "partitive";
+            Grammatical_Cases : constant array (Positive range <>) of Text_Access :=
+              [Accusative'Access, Dative'Access, Genitive'Access, Instrumental'Access, Locative'Access,
+               Prepositional'Access, Elative'Access, Illative'Access, Partitive'Access];
+            Zero_Category  : aliased constant String := "zero";
+            One_Category   : aliased constant String := "one";
+            Two_Category   : aliased constant String := "two";
+            Few_Category   : aliased constant String := "few";
+            Many_Category  : aliased constant String := "many";
+            Other_Category : aliased constant String := "other";
+            Plural_Categories : constant array (Positive range <>) of Text_Access :=
+              [Zero_Category'Access, One_Category'Access, Two_Category'Access, Few_Category'Access,
+               Many_Category'Access, Other_Category'Access];
+
             procedure Emit_Unit_Names
               (Locale : String;
                Width_Object : String;
@@ -2853,6 +2876,31 @@ procedure Generate_CLDR_Export is
                   Emit_Category ("few");
                   Emit_Category ("many");
                   Emit_Category ("other");
+
+                  --  The unit in a grammatical case -- Russian accusative
+                  --  "{0} неделю" after "через", German dative "{0} Jahren"
+                  --  after "in" -- keyed base:width:category:case, where it
+                  --  differs from the nominative pattern.
+                  for Grammatical_Case of Grammatical_Cases loop
+                     for Category of Plural_Categories loop
+                        declare
+                           Case_Pattern : constant String :=
+                             Project_Tools.JSON.Object_Field_Value
+                               (Value, Grammatical_Case.all & "-count-" & Category.all);
+                           Nominative : constant String :=
+                             Project_Tools.JSON.Object_Field_Value
+                               (Value, "unitPattern-count-" & Category.all);
+                        begin
+                           if Case_Pattern /= "" and then Case_Pattern /= Nominative then
+                              Emit_JSON
+                                ("{""type"":""unit_text"",""locale"":""" & Locale
+                                 & """,""key"":""" & Base & ":" & Width & ":" & Category.all
+                                 & ":" & Grammatical_Case.all
+                                 & """,""value"":""" & JSON_Escape (Case_Pattern) & """}");
+                           end if;
+                        end;
+                     end loop;
+                  end loop;
                end Emit_Unit;
             begin
                For_Each_Object_Field (Width_Object, Emit_Unit'Access);

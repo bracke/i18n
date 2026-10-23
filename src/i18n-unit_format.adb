@@ -11,6 +11,21 @@ package body I18N.Unit_Format is
       then "unit-width-narrow"
       else "unit-width-full-name");
 
+   function Case_Pattern
+     (Locale    : String;
+      Base      : String;
+      Width     : String;
+      Category  : String;
+      Case_Name : String;
+      Found     : out Boolean)
+      return String
+   is
+   begin
+      return I18N.Locale_Data.Resolved_Shard_Lookup
+        ("units", "unit", Locale,
+         "p:" & Base & ":" & Canonical_Width (Width) & ":" & Category & ":" & Case_Name, Found);
+   end Case_Pattern;
+
    function Pattern
      (Locale   : String;
       Base     : String;

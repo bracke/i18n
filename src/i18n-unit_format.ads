@@ -35,6 +35,18 @@ package I18N.Unit_Format is
       Found    : out Boolean)
       return String;
 
+   --  CLDR's pattern for a value of Base in Width, plural Category and the
+   --  grammatical case Case_Name ("accusative": Russian "{0} неделю"). Found
+   --  is False where CLDR has no such form, or it is the nominative pattern.
+   function Case_Pattern
+     (Locale    : String;
+      Base      : String;
+      Width     : String;
+      Category  : String;
+      Case_Name : String;
+      Found     : out Boolean)
+      return String;
+
    --  CLDR's pattern for Base as a rate's denominator in Width -- "{0}/s",
    --  German "{0} pro Stunde" -- into which the numerator's whole text goes.
    --  Found is False where the locale has none, and the rate is composed
