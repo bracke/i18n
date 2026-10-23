@@ -18,11 +18,12 @@ commit is what a consumer's release records.
   ("2:00 – 3:30 PM", "14:00–15:30 Uhr"); a date-time interval on one day writes
   the day once and the times as an interval ("Oct 9, 2026, 2:00 – 3:30 PM"),
   on two days both whole by the fallback.
-- A date-time skeleton with a month name and a time ("yMMMdjm") resolves its
-  date and time on their own and joins them by CLDR's dateTimeFormats glue
-  for the date's width ("9. Okt. 2026, 14:00", Japanese "{1} {0}"), as ICU
-  does; it was resolved field by field ("2026 Oct 9 2:0 PM"). Numeric
-  skeletons and a runtime appendItem for Time keep their behaviour.
+- A date-time skeleton ("yMMMdjm", "yMdHms") resolves its date and time on
+  their own and joins them by CLDR's dateTimeFormats glue for the date's
+  width ("9. Okt. 2026, 14:00", "2/29/2024, 21:30:07", Japanese "{1} {0}"), as
+  ICU does; it was resolved field by field ("2026 Oct 9 2:0 PM"). A skeleton
+  with quoted literals and a runtime appendItem for Time keep their own
+  layout.
 - `I18N.Regions.Region`: a locale's region, from its own subtag or CLDR's
   likelySubtags for its language and script ("dv" the Maldives, "zh-Hant"
   Taiwan); week data and the hour cycle go by it. Before, a language outside

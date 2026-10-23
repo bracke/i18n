@@ -4798,9 +4798,9 @@ package body I18N.Date_Time_Format is
                      Months := Months + (if C in 'M' | 'L' then 1 else 0);
                   end if;
                end loop;
-               --  Only for a written-out date (a month name): a numeric
-               --  skeleton ("yyyyMMddHHmm") keeps its field-by-field form.
-               if Has_Day and then Time_Count > 0 and then Months >= 3
+               --  Not for a skeleton with quoted literals: it spells its own
+               --  layout ("yyyy-MM-dd'T'HH:mm").
+               if Has_Day and then Time_Count > 0 and then (for all C of Requested => C /= ''')
                  and then not Runtime_Date_Time_Join (Locale)
                then
                   declare
