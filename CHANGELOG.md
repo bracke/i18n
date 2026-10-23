@@ -10,6 +10,12 @@ commit is what a consumer's release records.
 
 ### Added
 
+- Date intervals: a date value written as an ISO 8601 interval
+  ("2026-10-09/2026-10-15") formats by CLDR's interval formats for the
+  skeleton ("9.–15. Okt. 2026", "Oct 9 – 15, 2026", "2026年10月9日 – 15日"):
+  the pattern for the greatest field that differs, else the locale's fallback
+  joining both dates. The generator imports `intervalFormats` for the date
+  skeletons ranges use (yMMMd, yMMMEd, yMd, yMEd, yMMM, yM, MMMd, MMMEd, Md, d).
 - `I18N.Week_Data`: the day a locale's weeks start on and the minimal days
   of its first week, from CLDR's supplemental weekData by the locale's region
   (its own, else its likely one). Week fields in date patterns ("w", "e") use

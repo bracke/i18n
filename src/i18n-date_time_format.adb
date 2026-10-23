@@ -2684,7 +2684,10 @@ package body I18N.Date_Time_Format is
       Target     : in out String;
       Last       : in out Natural;
       Overflow   : in out Boolean;
-      Ok         : out Boolean)
+      Ok         : out Boolean;
+      --  A CLDR pattern as written, not a generated one: fields side by
+      --  side stay side by side ("MMMd" in "y年MMMd日").
+      Raw_Pattern : Boolean := False)
    is
       Index      : Positive := Skeleton'First;
       Need_Sep   : Boolean := False;
@@ -2734,7 +2737,7 @@ package body I18N.Date_Time_Format is
 
       procedure Put_Separator (Class : Character; Field : Character) is
       begin
-         if Need_Sep then
+         if Need_Sep and then not Raw_Pattern then
             declare
                Override_Found : Boolean;
                Override       : constant String :=
@@ -4200,6 +4203,60 @@ package body I18N.Date_Time_Format is
          Ok := False;
    end Parse_Date_Time_Value;
 
+   --  Year, Month and Day (Gregorian) in Locale's calendar; Supported is
+   --  False for a calendar this formatter cannot write.
+   procedure To_Display_Calendar
+     (Locale        : String;
+      Display_Year  : in out Natural;
+      Display_Month : in out Natural;
+      Display_Day   : in out Natural;
+      Supported     : out Boolean)
+   is
+   begin
+      Supported := True;
+      case Calendar_For (Locale) is
+         when Julian =>
+            Gregorian_To_Julian (Display_Year, Display_Month, Display_Day);
+         when Coptic =>
+            Gregorian_To_Coptic (Display_Year, Display_Month, Display_Day);
+         when Ethiopic =>
+            Gregorian_To_Ethiopic (Display_Year, Display_Month, Display_Day);
+         when Ethiopic_Amete_Alem =>
+            Gregorian_To_Ethiopic_Amete_Alem
+              (Display_Year, Display_Month, Display_Day);
+         when Islamic_Civil =>
+            Gregorian_To_Islamic_Civil
+              (Display_Year, Display_Month, Display_Day);
+         when Islamic_TBLA =>
+            Gregorian_To_Islamic_TBLA
+              (Display_Year, Display_Month, Display_Day);
+         when Indian =>
+            Gregorian_To_Indian (Display_Year, Display_Month, Display_Day);
+         when Persian =>
+            Gregorian_To_Persian (Display_Year, Display_Month, Display_Day);
+         when Hebrew =>
+            Gregorian_To_Hebrew (Display_Year, Display_Month, Display_Day);
+         when Unsupported_Calendar =>
+            Supported := False;
+         when others =>
+            null;
+      end case;
+   end To_Display_Calendar;
+
+   --  A date interval ("2026-10-09/2026-10-15") in Locale and Style: CLDR's
+   --  interval pattern for the style's skeleton and the greatest field that
+   --  differs ("9.–15. Okt. 2026"), else the locale's fallback joining the
+   --  two dates whole ("09.10.26 – 15.10.26").
+   procedure Format_Date_Interval_Into
+     (From_Text : String;
+      To_Text   : String;
+      Locale    : String;
+      Style     : String;
+      Target    : in out String;
+      Last      : out Natural;
+      Ok        : out Boolean;
+      Overflow  : out Boolean) is separate;
+
    procedure Format_Date_Into
      (Value_Text : String;
       Locale     : String;
@@ -4228,6 +4285,16 @@ package body I18N.Date_Time_Format is
       Ok := False;
       Overflow := False;
 
+      --  An ISO 8601 interval: two dates joined by "/".
+      for Slash in Value_Text'First + 1 .. Value_Text'Last - 1 loop
+         if Value_Text (Slash) = '/' then
+            Format_Date_Interval_Into
+              (Value_Text (Value_Text'First .. Slash - 1), Value_Text (Slash + 1 .. Value_Text'Last),
+               Locale, Style, Target, Last, Ok, Overflow);
+            return;
+         end if;
+      end loop;
+
       Parse_Date_Time_Value
         (Value_Text => Value_Text,
          Option     => Effective_Style,
@@ -4251,33 +4318,14 @@ package body I18N.Date_Time_Format is
       Display_Year := Year;
       Display_Month := Month;
       Display_Day := Day;
-      case Calendar_For (Locale) is
-         when Julian =>
-            Gregorian_To_Julian (Display_Year, Display_Month, Display_Day);
-         when Coptic =>
-            Gregorian_To_Coptic (Display_Year, Display_Month, Display_Day);
-         when Ethiopic =>
-            Gregorian_To_Ethiopic (Display_Year, Display_Month, Display_Day);
-         when Ethiopic_Amete_Alem =>
-            Gregorian_To_Ethiopic_Amete_Alem
-              (Display_Year, Display_Month, Display_Day);
-         when Islamic_Civil =>
-            Gregorian_To_Islamic_Civil
-              (Display_Year, Display_Month, Display_Day);
-         when Islamic_TBLA =>
-            Gregorian_To_Islamic_TBLA
-              (Display_Year, Display_Month, Display_Day);
-         when Indian =>
-            Gregorian_To_Indian (Display_Year, Display_Month, Display_Day);
-         when Persian =>
-            Gregorian_To_Persian (Display_Year, Display_Month, Display_Day);
-         when Hebrew =>
-            Gregorian_To_Hebrew (Display_Year, Display_Month, Display_Day);
-         when Unsupported_Calendar =>
+      declare
+         Supported : Boolean;
+      begin
+         To_Display_Calendar (Locale, Display_Year, Display_Month, Display_Day, Supported);
+         if not Supported then
             return;
-         when others =>
-            null;
-      end case;
+         end if;
+      end;
 
       if Is_Skeleton (Style_Only) then
          declare

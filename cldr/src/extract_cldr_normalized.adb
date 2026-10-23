@@ -1233,7 +1233,7 @@ procedure Extract_CLDR_Normalized is
             Seen_Output := True;
          elsif Kind = "zone_text" or else Kind = "number_text" or else Kind = "relative_text"
            or else Kind = "unit_text" or else Kind = "hour_text" or else Kind = "time_text"
-           or else Kind = "week_text"
+           or else Kind = "week_text" or else Kind = "interval_text"
          then
             if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
               or else Field (Line, 4) = ""

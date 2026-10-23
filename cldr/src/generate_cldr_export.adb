@@ -2498,6 +2498,66 @@ procedure Generate_CLDR_Export is
             return S (Output);
          end Internal_Pattern;
 
+         --  CLDR's interval formats for the date skeletons ranges are written
+         --  in: per skeleton, the pattern for each greatest differing field
+         --  ("yMMMd:d" "d.–d. MMM y"), and the fallback joining two whole
+         --  dates ("{0} – {1}"). Only what differs from the parent locale.
+         procedure Emit_Interval_Format_Rows (Locale : String) is
+            function Intervals_Of (Name : String) return String is
+              (Object_Field_Object
+                 (Object_Field_Object (Gregorian_Object (Name), "dateTimeFormats"), "intervalFormats"));
+            Own    : constant String := Intervals_Of (Locale);
+            Parent : constant String := Parent_Locale (Locale);
+            Parent_Own : constant String :=
+              (if Parent /= "" and then Project_Tools.Files.File_Exists ("upstream/" & Date_Source_Path (Parent))
+               then Intervals_Of (Parent) else "");
+            type Name_List is array (Positive range <>) of US.Unbounded_String;
+            function "+" (Item : String) return US.Unbounded_String renames US.To_Unbounded_String;
+            Skeletons : constant Name_List :=
+              [+"yMMMd", +"yMMMEd", +"yMd", +"yMEd", +"yMMM", +"yM", +"MMMd", +"MMMEd", +"Md", +"d"];
+            Fields    : constant Name_List := [+"y", +"M", +"d"];
+
+            procedure Emit (Key : String; Value : String) is
+            begin
+               Emit_JSON
+                 ("{""type"":""interval_text"",""locale"":""" & Locale & """,""key"":""" & Key
+                  & """,""value"":""" & JSON_Escape (Value) & """}");
+            end Emit;
+
+            Fallback : constant String := Project_Tools.JSON.Object_Field_Value (Own, "intervalFormatFallback");
+         begin
+            if Own = "" then
+               return;
+            end if;
+            if Fallback /= ""
+              and then Fallback /= Project_Tools.JSON.Object_Field_Value (Parent_Own, "intervalFormatFallback")
+            then
+               Emit ("fallback", Fallback);
+            end if;
+            for Skeleton of Skeletons loop
+               declare
+                  Formats        : constant String := Object_Field_Object (Own, S (Skeleton));
+                  Parent_Formats : constant String :=
+                    (if Parent_Own = "" then "" else Object_Field_Object (Parent_Own, S (Skeleton)));
+               begin
+                  for Field of Fields loop
+                     declare
+                        Pattern  : constant String :=
+                          (if Formats = "" then "" else Project_Tools.JSON.Object_Field_Value (Formats, S (Field)));
+                        Internal : constant String := (if Pattern = "" then "" else Internal_Pattern (Pattern));
+                        Parent_Pattern : constant String :=
+                          (if Parent_Formats = "" then ""
+                           else Project_Tools.JSON.Object_Field_Value (Parent_Formats, S (Field)));
+                     begin
+                        if Internal /= "" and then Pattern /= Parent_Pattern then
+                           Emit (S (Skeleton) & ":" & S (Field), Internal);
+                        end if;
+                     end;
+                  end loop;
+               end;
+            end loop;
+         end Emit_Interval_Format_Rows;
+
          procedure Emit_Available_Format_Rows (Locale : String) is
             Available : constant String := Available_Formats_Object (Locale);
             Parent    : constant String := Parent_Locale (Locale);
@@ -3864,6 +3924,7 @@ procedure Generate_CLDR_Export is
                Emit_Relative_Current_Rows (Locale);
                Emit_Relative_Time_Pattern_Rows (Locale);
                Emit_Available_Format_Rows (Locale);
+               Emit_Interval_Format_Rows (Locale);
                Emit_Date_Style_Pattern_Rows (Locale);
                Emit_Time_Zone_Format_Rows (Locale);
                Emit_Time_Zone_Exemplar_Rows (Locale);

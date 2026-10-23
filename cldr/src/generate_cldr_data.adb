@@ -1689,6 +1689,18 @@ procedure Generate_CLDR_Data is
          else
             Add_Format ("hour_cycle", "und", Ada_Expression_UTF8_Bytes (Field (Line, 4)), Sub => Field (Line, 3));
          end if;
+      elsif Kind = "interval_text" then
+         --  A locale's date interval pattern, keyed "<skeleton>:<field>" by the
+         --  greatest field that differs ("yMMMd:d" "d.–d. MMM y"), or
+         --  "fallback" for the pattern that joins two whole dates.
+         if Field_Count (Line) /= 4 or else Field (Line, 2) = "" or else Field (Line, 3) = ""
+           or else Field (Line, 4) = ""
+         then
+            Add_Line_Error (Line_Number, "invalid interval_text row shape");
+         elsif Capture_Locale (Field (Line, 2)) then
+            Add_Format ("date_interval", Field (Line, 2), Ada_Expression_UTF8_Bytes (Field (Line, 4)),
+                        Sub => Field (Line, 3));
+         end if;
       elsif Kind = "week_text" then
          --  A region's week data, under und keyed "first:<region>" (the day a
          --  week starts on) and "min:<region>" (the days of a year's first week).
