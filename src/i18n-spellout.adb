@@ -669,6 +669,42 @@ package body I18N.Spellout is
             return To_String (Words);
          end Fraction;
 
+         --  The fraction as a number over its denominator by Name's rule for
+         --  10 ** digits, as ICU reads a fraction ruleset; "" where Name has no
+         --  such rule (it reads digit by digit then).
+         function Over_Denominator (Name : String) return String is
+            Base_Text : constant String := "1" & [1 .. Fraction_Digits'Length => '0'];
+            Found     : Unbounded_String;
+            procedure Look (Base, Text : String) is
+            begin
+               if Base = Base_Text and then Length (Found) = 0 then
+                  Found := To_Unbounded_String (Without_Semi (Text));
+               end if;
+            end Look;
+            procedure Each is new Iterate_Rules (Look);
+            Serialized_Set : constant String := Load (Locale, Name);
+         begin
+            if Serialized_Set = "" or else Fraction_Digits'Length > 9 then
+               return "";
+            end if;
+            Each (Serialized_Set);
+            declare
+               Text : constant String := To_String (Found);
+               --  Polish writes "<%rs<<": the numerator, then nothing more.
+               Trimmed : constant String :=
+                 (if Text'Length >= 6 and then Is_L (Text, Text'Last - 2) and then Is_L (Text, Text'Last - 5)
+                    and then Text'Length >= 9 and then Is_L (Text, Text'Last - 8) = False
+                  then Text (Text'First .. Text'Last - 3) else Text);
+               Base : constant Long_Long_Integer := Long_Long_Integer'Value (Base_Text);
+               Numerator : constant Long_Long_Integer := Long_Long_Integer'Value (Fraction_Digits);
+            begin
+               if Text = "" or else (for some C of Text => C = '#' or else C = '0') then
+                  return "";
+               end if;
+               return Apply (Trimmed, Numerator * Base, Base, Locale, Name, 1);
+            end;
+         end Over_Denominator;
+
          --  The ruleset a substitution names ("<%rs<"), or the chosen one.
          function Named (From, To : Natural) return String is
            (if To > From then Rule (From .. To) else Chosen);
@@ -680,6 +716,14 @@ package body I18N.Spellout is
                return Decimal_Words (Locale, Integer_Part, Fraction_Digits, Delegate_For (Serialized, 1));
             end if;
             return "";
+         end if;
+         --  "=%rs=": the whole number by another ruleset (Russian masculine
+         --  hands decimals to the feminine).
+         if Rule'Length > 3 and then Rule (Rule'First) = '=' and then Rule (Rule'Last) = '='
+           and then Rule (Rule'First + 1) = '%'
+           and then Rule (Rule'First + 1 .. Rule'Last - 1) /= Chosen
+         then
+            return Decimal_Words (Locale, Integer_Part, Fraction_Digits, Rule (Rule'First + 1 .. Rule'Last - 1));
          end if;
          while I <= Rule'Last loop
             if Is_L (Rule, I) then
@@ -707,18 +751,47 @@ package body I18N.Spellout is
                      while J <= Rule'Last and then not Is_R (Rule, J) loop
                         J := J + 1;
                      end loop;
-                     --  A named fraction ruleset reads the fraction as a
-                     --  number over a denominator (Russian "пять десятых"),
-                     --  which this does not do: leave it to the caller.
-                     if J > Rule'Last or else J > I + 3 then
+                     if J > Rule'Last then
                         return "";
+                     elsif J > I + 3 and then Over_Denominator (Named (I + 3, J - 1)) /= "" then
+                        --  A fraction ruleset reads the fraction as a number
+                        --  over its denominator: Russian "пять десятых",
+                        --  Kazakh "оннан бес".
+                        Append (Result, Over_Denominator (Named (I + 3, J - 1)));
+                     elsif J > I + 3 then
+                        return "";
+                     else
+                        Append (Result, Fraction (Named (I + 3, J - 1), " "));
                      end if;
-                     Append (Result, Fraction (Named (I + 3, J - 1), " "));
                      I := J + 3;
                   end;
                end if;
-            elsif Rule (I) in '=' | '$' | '[' | ']' then
-               --  A decimal-pattern or plural substitution: not a spelled form.
+            elsif Rule (I) = '[' then
+               --  Text only a number with a whole part has ("одна целая ...").
+               if Integer_Part = 0 then
+                  while I <= Rule'Last and then Rule (I) /= ']' loop
+                     I := I + 1;
+                  end loop;
+               end if;
+               I := I + 1;
+            elsif Rule (I) = ']' then
+               I := I + 1;
+            elsif Rule (I) = '$' and then I < Rule'Last and then Rule (I + 1) = '(' then
+               --  A plural on the whole part: "$(cardinal,one{целая}other{целых})$".
+               declare
+                  Close : Natural := I + 2;
+               begin
+                  while Close < Rule'Last and then not (Rule (Close) = ')' and then Rule (Close + 1) = '$') loop
+                     Close := Close + 1;
+                  end loop;
+                  if Close >= Rule'Last then
+                     return "";
+                  end if;
+                  Append (Result, Apply (Rule (I .. Close + 1), Integer_Part, 1, Locale, Chosen, 1));
+                  I := Close + 2;
+               end;
+            elsif Rule (I) in '=' | '$' then
+               --  A decimal-pattern substitution: not a spelled form.
                return "";
             else
                Append (Result, Rule (I));

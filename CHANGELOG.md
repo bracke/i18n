@@ -10,6 +10,13 @@ commit is what a consumer's release records.
 
 ### Added
 
+- Decimal words by fraction rulesets: a fraction read as a number over its
+  denominator (Russian "одна целая пять десятых", Kazakh "бір бүтін оннан
+  бес", Lithuanian "vienas ir penkios dešimtosios"), Polish's fraction read
+  as a number ("przecinek dwadzieścia pięć"), optional `[...]` text and plural
+  substitutions in decimal rules, and a decimal rule that hands the number to
+  another ruleset whole. CLDR 48 corrects ICU 74's Russian "одна целый".
+
 - Units in grammatical cases: the CLDR export carries each unit's case
   patterns (Russian accusative "{0} неделю", German dative "{0} Jahren",
   Finnish genitive, Polish/Czech instrumental, ...) where they differ from
