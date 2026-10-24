@@ -10,6 +10,9 @@ commit is what a consumer's release records.
 
 ### Added
 
+- CLDR's coordinate units: `I18N.Unit_Format.Pattern` answers a hemisphere's
+  pattern for `coordinate-north`, `-east`, `-south` and `-west` at every
+  width ("{0} N", German "{0} O", Japanese "北緯{0}", Russian "{0} з. д.").
 - Every interval skeleton CLDR has (32, with its era, day-period and zone
   forms: "October – November 2026", "Fri, 10/9 – Thu, 10/15", "10:00 in the
   morning – 3:00 in the afternoon"), where only the common date and time

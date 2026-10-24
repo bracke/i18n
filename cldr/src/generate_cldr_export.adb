@@ -3124,6 +3124,12 @@ procedure Generate_CLDR_Export is
             Plural_Categories : constant array (Positive range <>) of Text_Access :=
               [Zero_Category'Access, One_Category'Access, Two_Category'Access, Few_Category'Access,
                Many_Category'Access, Other_Category'Access];
+            North_Direction : aliased constant String := "north";
+            East_Direction  : aliased constant String := "east";
+            South_Direction : aliased constant String := "south";
+            West_Direction  : aliased constant String := "west";
+            Coordinate_Directions : constant array (Positive range <>) of Text_Access :=
+              [North_Direction'Access, East_Direction'Access, South_Direction'Access, West_Direction'Access];
 
             procedure Emit_Unit_Names
               (Locale : String;
@@ -3174,6 +3180,25 @@ procedure Generate_CLDR_Export is
                      end if;
                   end Emit_Category;
                begin
+                  --  A coordinate's hemisphere: "{0} N", German "{0} O",
+                  --  Japanese "北緯{0}", keyed coordinate-<direction>.
+                  if Name = "coordinateUnit" then
+                     for Direction of Coordinate_Directions loop
+                        declare
+                           Pattern : constant String :=
+                             Project_Tools.JSON.Object_Field_Value (Value, Direction.all);
+                        begin
+                           if Pattern /= "" then
+                              Emit_JSON
+                                ("{""type"":""unit_text"",""locale"":""" & Locale
+                                 & """,""key"":""coordinate-" & Direction.all & ":" & Width & ":other"
+                                 & """,""value"":""" & JSON_Escape (Pattern) & """}");
+                           end if;
+                        end;
+                     end loop;
+                     return;
+                  end if;
+
                   if not Valid_Unit_Base (Base) then
                      return;
                   end if;

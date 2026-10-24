@@ -1,5 +1,6 @@
 with I18N.Plural_Ranges;
 with I18N.Plurals;
+with I18N.Unit_Format;
 with I18N.Week_Data;  use I18N.Week_Data;
 
 --  CLDR's weekData through the locale's region, as ICU answers (CLDR 48:
@@ -38,4 +39,28 @@ begin
    Assert (I18N.Plurals."=" (I18N.Plural_Ranges.Category ("ru", I18N.Plurals.Few, I18N.Plurals.Many),
                              I18N.Plurals.Many),
            "a Russian range takes its end's category");
+   --  CLDR's coordinate units: a hemisphere around the degrees.
+   declare
+      function Hemisphere (Locale, Direction : String) return String is
+         Found : Boolean;
+         Text  : constant String :=
+           I18N.Unit_Format.Pattern (Locale, "coordinate-" & Direction, "short", "other", Found);
+      begin
+         return (if Found then Text else "");
+      end Hemisphere;
+      --  U+5317 U+7DEF, "north latitude".
+      Kita_I         : constant String :=
+        [Character'Val (16#E5#), Character'Val (16#8C#), Character'Val (16#97#),
+         Character'Val (16#E7#), Character'Val (16#B7#), Character'Val (16#AF#)];
+      --  " з. д.", "west longitude".
+      West_Longitude : constant String :=
+        " " & [Character'Val (16#D0#), Character'Val (16#B7#)] & ". "
+        & [Character'Val (16#D0#), Character'Val (16#B4#)] & ".";
+   begin
+      Assert (Hemisphere ("en", "north") = "{0} N", "English writes north as {0} N");
+      Assert (Hemisphere ("de", "east") = "{0} O", "German writes east as {0} O");
+      Assert (Hemisphere ("de-CH", "east") = "{0} O", "Swiss German inherits German's east");
+      Assert (Hemisphere ("ja", "north") = Kita_I & "{0}", "Japanese writes north latitude before the degrees");
+      Assert (Hemisphere ("ru", "west") = "{0}" & West_Longitude, "Russian abbreviates west longitude");
+   end;
 end Test_Week_Data;
